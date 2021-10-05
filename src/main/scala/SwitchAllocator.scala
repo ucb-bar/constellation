@@ -14,5 +14,6 @@ class SwitchAllocReq(nOutputs: Int)(implicit val p: Parameters) extends Bundle w
 class SwitchAllocator(inParams: Seq[ChannelParams], outParams: Seq[ChannelParams])(implicit val p: Parameters) extends Module with HasAstroNoCParams {
   val io = IO(new Bundle {
     val req = MixedVec(inParams.map(u => Vec(u.virtualChannels, Flipped(Decoupled(new SwitchAllocReq(outParams.size))))))
+    val credit_alloc = Vec(outParams.size, Output(Bool()))
   })
 }

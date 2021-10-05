@@ -21,5 +21,6 @@ class VCAllocator(inParams: Seq[ChannelParams], outParams: Seq[ChannelParams])(i
   val io = IO(new Bundle {
     val req = Vec(inParams.size, Flipped(Decoupled(new VCAllocReq(outParams.size))))
     val resp = Vec(inParams.size, Valid(new VCAllocResp(outParams.size)))
+    val out_alloc = Vec(outParams.size, Valid(new OutputUnitAlloc(inParams.size)))
   })
 }

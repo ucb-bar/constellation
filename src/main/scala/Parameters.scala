@@ -9,7 +9,8 @@ case class AstroNoCConfig(
   flitPayloadWidth: Int = 64,
   idBits: Int = 3,
   virtChannelBits: Int = 2,
-  shareRouteComputer: Boolean = false
+  shareRouteComputer: Boolean = false,
+  maxFlits: Int = 8
 )
 
 case object AstroNoCKey extends Field[AstroNoCConfig](AstroNoCConfig())
@@ -22,6 +23,7 @@ trait HasAstroNoCParams {
   val idBits = params.idBits
   val virtChannelBits = params.virtChannelBits
   val shareRouteComputer = params.shareRouteComputer
+  val maxFlits = params.maxFlits
 }
 
 

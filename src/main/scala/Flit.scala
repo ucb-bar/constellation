@@ -10,6 +10,7 @@ class Flit(implicit val p: Parameters) extends Bundle with HasAstroNoCParams{
   val tail = Bool()
   val dest_id = UInt(idBits.W)
   val virt_channel_id = UInt(virtChannelBits.W)
+  val flits_in_packet = UInt((1+log2Ceil(maxFlits)).W)
 
   val payload = UInt(flitPayloadWidth.W)
 }

@@ -11,5 +11,8 @@ class InputBuffer(size: Int)(implicit val p: Parameters) extends Module with Has
     val in = Flipped(Valid(new Flit))
     val head = Output(UInt(log2Ceil(size).W))
     val full = Output(Bool())
+
+    val read_req = Input(Valid(UInt(log2Ceil(size).W)))
+    val read_resp = Output(new Flit)
   })
 }
