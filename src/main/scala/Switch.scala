@@ -6,7 +6,7 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
-class SwitchBundle(nOutputs: Int)(implicit val p: Parameters) extends Bundle {
+class SwitchBundle(val nOutputs: Int)(implicit val p: Parameters) extends Bundle {
   val flit = new Flit
   val out_channel = UInt(log2Ceil(nOutputs).W)
 }
@@ -17,4 +17,11 @@ class Switch(nInputs: Int, nOutputs: Int)(implicit val p: Parameters) extends Mo
     val in = Vec(nInputs, Input(Valid(new SwitchBundle(nOutputs))))
     val out = Vec(nOutputs, Output(Valid(new Flit)))
   })
+
+  io.out.zipWithIndex.map { case (o,x) =>
+    val oh = io.in.map(i => i.valid && i.bits.out_channel === x.U)
+    assert(PopCount(oh) <= 1.U)
+    o.valid := oh.reduce(_||_)
+    o.bits := Mux1H(oh, io.in.map(_.bits.flit))
+  }
 }
