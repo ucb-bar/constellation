@@ -13,11 +13,8 @@ class TestHarness(implicit val p: Parameters) extends Module {
   val io = IO(new Bundle {
     val success = Output(Bool())
   })
-  val cParams = Seq.fill(2) { ChannelParams(virtualChannelParams=Seq.fill(2) { VirtualChannelParams(bufferSize=3) })}
-  val rParams = RouterParams(0, cParams, cParams, (inChannel: Int, inVirtChannel: Int, outChannel: Int, outVirtChannel: Int) => (prio: UInt) => false.B)
-  val nocTest = Module(new Router(rParams))
 
-  nocTest.io := DontCare
+  val noc = Module(new NoC)
 
   io.success := true.B
 }
