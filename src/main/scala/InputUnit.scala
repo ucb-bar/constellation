@@ -23,7 +23,7 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams])
 
     val out_credit_available = Input(MixedVec(outParams.map { u => Vec(u.virtualChannelParams.size, Bool()) }))
 
-    val salloc_req = Vec(nVirtualChannels, Decoupled(new SwitchAllocReq(outParams.size)))
+    val salloc_req = Vec(nVirtualChannels, Decoupled(new SwitchAllocReq(outParams)))
     
     val out = Valid(new SwitchBundle(nOutputs))
     val credit_free = Output(Valid(UInt(log2Ceil(nVirtualChannels).W)))
@@ -109,6 +109,7 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams])
     val c = Mux1H(UIntToOH(s.o), Mux1H(s.r, io.out_credit_available))
     r.valid := s.g === g_a && c && s.flits_sent =/= s.flits_arrived
     r.bits.out_channel := OHToUInt(s.r)
+    r.bits.out_virt_channel := s.o
     when (r.fire()) {
       s.p := WrapInc(s.p + 1.U, u.bufferSize)
       s.flits_sent := s.flits_sent + 1.U
