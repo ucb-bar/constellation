@@ -23,17 +23,14 @@ class RouteComputer(val rParams: RouterParams)(implicit val p: Parameters) exten
     val req = MixedVec(inParams.map { u => Flipped(Decoupled(new RouteComputerReq(u))) })
     val resp = MixedVec(inParams.map { u => Valid(new RouteComputerResp(u, nOutputs)) })
   })
-  io := DontCare
+  val routingMatrix = outParams.map { u =>
+    VecInit((0 until nNodes).map { d => rParams.routingFunction(d, u.destId).B })
+  }
 
-  // if (params.shareRouteComputer) {
-  //   val route_arbiter = Module(new RRArbiter(new RouteComputerReq, nInputs))
-  //   (route_arbiter.io.in zip io.req).map { case (l,r) => l <> r }
-  //   route_arbiter.io.out
-  //   route_arbiter.io.chosen
-  // } else {
-  //   (io.req zip io.resp) map { case (req, resp) =>
-      
-  //   }
-  // }
-
+  (io.req zip io.resp) map { case (req, resp) =>
+    req.ready := true.B
+    resp.valid := req.valid
+    resp.bits.src_virt_id := req.bits.src_virt_id
+    resp.bits.out_channels := VecInit(routingMatrix.map(_(req.bits.dest_id))).asUInt
+  }
 }

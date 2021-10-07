@@ -12,8 +12,9 @@ case class AstroNoCConfig(
   prioBits: Int = 3,
 
   virtChannelBits: Int = 2,
-  topology: (Int, Int) => Option[ChannelParams] = (a: Int, b: Int) => None,
-  virtualLegalPaths: Int => (Int, Int, Int, Int) => UInt => Bool = (a: Int) => (b: Int, c: Int, d: Int, e: Int) => (f: UInt) => false.B
+  topology: (Int, Int) => Seq[VirtualChannelParams] = (a: Int, b: Int) => Nil,
+  virtualLegalPaths: Int => (Int, Int, Int, Int) => UInt => Bool = (a: Int) => (b: Int, c: Int, d: Int, e: Int) => (f: UInt) => false.B,
+  routingFunctions: Int => (Int, Int) => Boolean = (a: Int) => (b: Int, c: Int) => false
 )
 
 case object AstroNoCKey extends Field[AstroNoCConfig](AstroNoCConfig())
@@ -31,6 +32,7 @@ trait HasAstroNoCParams {
 
   val topologyFunction = params.topology
   val virtualLegalPathsFunction = params.virtualLegalPaths
+  val routingFunctions = params.routingFunctions
 }
 
 
@@ -39,6 +41,8 @@ case class VirtualChannelParams(
 )
 
 case class ChannelParams(
-  virtualChannelParams: Seq[VirtualChannelParams]
+  srcId: Int,
+  destId: Int,
+  virtualChannelParams: Seq[VirtualChannelParams],
 )
 
