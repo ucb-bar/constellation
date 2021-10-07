@@ -24,6 +24,7 @@ class OutputUnit(inParams: Seq[ChannelParams], outParam: ChannelParams)(implicit
     val vc_free = Input(Valid(UInt(log2Ceil(nVirtualChannels).W)))
 
     val credit_available = Output(Vec(nVirtualChannels, Bool()))
+    val channel_available = Output(Vec(nVirtualChannels, Bool()))
     val out = Valid(new Flit)
   })
 
@@ -39,7 +40,7 @@ class OutputUnit(inParams: Seq[ChannelParams], outParam: ChannelParams)(implicit
   }
 
   val states = Reg(MixedVec(outParam.virtualChannelParams.map { u => new OutputState(u.bufferSize) }))
-
+  (states zip io.channel_available).map { case (s,a) => a := s.g === g_i }
   io.out := io.in
 
   when (io.alloc.fire()) {

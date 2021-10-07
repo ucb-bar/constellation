@@ -18,13 +18,12 @@ class RouteComputerResp(val param: ChannelParams, val nOutputs: Int)(implicit va
 
 
 
-class RouteComputer(inParams: Seq[ChannelParams], outParams: Seq[ChannelParams], id: Int)(implicit val p: Parameters) extends Module with HasAstroNoCParams {
-  val nInputs = inParams.size
-  val nOutputs = outParams.size
+class RouteComputer(val rParams: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
   val io = IO(new Bundle {
     val req = MixedVec(inParams.map { u => Flipped(Decoupled(new RouteComputerReq(u))) })
     val resp = MixedVec(inParams.map { u => Valid(new RouteComputerResp(u, nOutputs)) })
   })
+  io := DontCare
 
   // if (params.shareRouteComputer) {
   //   val route_arbiter = Module(new RRArbiter(new RouteComputerReq, nInputs))

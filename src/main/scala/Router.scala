@@ -11,9 +11,23 @@ class Channel(val cParams: ChannelParams)(implicit val p: Parameters) extends Bu
   val vc_free = Input(Valid(UInt(log2Ceil(cParams.virtualChannelParams.size).W)))
 }
 
-class Router(id: Int, inParams: Seq[ChannelParams], outParams: Seq[ChannelParams])(implicit val p: Parameters) extends Module with HasAstroNoCParams {
+case class RouterParams(
+  id: Int,
+  inParams: Seq[ChannelParams],
+  outParams: Seq[ChannelParams],
+  vcAllocLegalPaths: (Int, Int, Int, Int) => UInt => Bool
+)
+
+trait HasRouterParams extends HasAstroNoCParams {
+  val rParams: RouterParams
+  val id = rParams.id
+  val inParams = rParams.inParams
+  val outParams = rParams.outParams
   val nInputs = inParams.size
   val nOutputs = outParams.size
+}
+
+class Router(val rParams: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
   val io = IO(new Bundle {
     val in = MixedVec(inParams.map { u => Flipped(new Channel(u)) })
     val out = MixedVec(outParams.map { u => new Channel(u) })
@@ -23,9 +37,9 @@ class Router(id: Int, inParams: Seq[ChannelParams], outParams: Seq[ChannelParams
   require(id < (1 << idBits))
   val input_units = inParams.map { u => Module(new InputUnit(u, outParams)) }
   val switch = Module(new Switch(nInputs, nOutputs))
-  val switch_allocator = Module(new SwitchAllocator(inParams, outParams))
-  val vc_allocator = Module(new VCAllocator(inParams, outParams))
-  val route_computer = Module(new RouteComputer(inParams, outParams, id))
+  val switch_allocator = Module(new SwitchAllocator(rParams))
+  val vc_allocator = Module(new VCAllocator(rParams))
+  val route_computer = Module(new RouteComputer(rParams))
   val output_units = outParams.map { u => Module(new OutputUnit(inParams, u)) }
 
   (io.in zip input_units).foreach { case (i,u) =>
@@ -45,6 +59,7 @@ class Router(id: Int, inParams: Seq[ChannelParams], outParams: Seq[ChannelParams
   (vc_allocator.io.req zip input_units).foreach { case (i,u) => i <> u.io.vcalloc_req }
   (input_units zip vc_allocator.io.resp).foreach { case (u,o) => u.io.vcalloc_resp <> o }
   (output_units zip vc_allocator.io.out_alloc).foreach { case (u,a) => u.io.alloc <> a }
+  (vc_allocator.io.channel_available zip output_units).foreach { case (a,u) => a := u.io.channel_available }
 
   input_units.foreach(u => (u.io.out_credit_available zip output_units).foreach { case (l,r) => l := r.io.credit_available })
   (input_units zip switch_allocator.io.req).foreach { case (u,r) => r <> u.io.salloc_req }

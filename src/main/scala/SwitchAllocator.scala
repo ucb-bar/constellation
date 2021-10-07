@@ -11,9 +11,10 @@ class SwitchAllocReq(val nOutputs: Int)(implicit val p: Parameters) extends Bund
   val out_channel = UInt(log2Ceil(nOutputs).W)
 }
 
-class SwitchAllocator(inParams: Seq[ChannelParams], outParams: Seq[ChannelParams])(implicit val p: Parameters) extends Module with HasAstroNoCParams {
+class SwitchAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
   val io = IO(new Bundle {
     val req = MixedVec(inParams.map(u => Vec(u.virtualChannelParams.size, Flipped(Decoupled(new SwitchAllocReq(outParams.size))))))
     val credit_alloc = MixedVec(outParams.map { u => Valid(UInt(log2Ceil(u.virtualChannelParams.size).W)) })
   })
+  io := DontCare
 }

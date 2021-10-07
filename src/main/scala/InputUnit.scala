@@ -37,6 +37,7 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams])
     val r = UInt(nOutputs.W)
     val o = UInt(log2Ceil(outParams.map(_.virtualChannelParams.size).max).W)
     val p = UInt(log2Ceil(inParam.virtualChannelParams.map(_.bufferSize).max).W)
+    val prio = UInt(prioBits.W)
     val flits_arrived = UInt((1+log2Ceil(maxFlits)).W)
     val flits_sent = UInt((1+log2Ceil(maxFlits)).W)
     val tail_seen = Bool()
@@ -57,6 +58,7 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams])
     states(id).flits_sent := 0.U
     states(id).flits_arrived := 1.U
     states(id).tail_seen := io.in.bits.tail
+    states(id).prio := io.in.bits.prio
 
   } .elsewhen (io.in.fire()) {
     val id = io.in.bits.virt_channel_id
@@ -87,6 +89,7 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams])
     i.valid := s.g === g_v
     i.bits.in_virt_channel := idx.U
     i.bits.out_channels := s.o
+    i.bits.in_prio := s.prio
     when (i.fire()) { s.g := g_v_stall }
   }
   io.vcalloc_req <> vcalloc_arbiter.io.out
