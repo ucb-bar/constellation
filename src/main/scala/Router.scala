@@ -15,7 +15,7 @@ case class RouterParams(
   id: Int,
   inParams: Seq[ChannelParams],
   outParams: Seq[ChannelParams],
-  vcAllocLegalPaths: (Int, Int, Int, Int) => UInt => Bool,
+  vcAllocLegalPaths: (Int, Int, Int, Int) => Int => Boolean,
   routingFunction: (Int, Int) => Boolean
 )
 

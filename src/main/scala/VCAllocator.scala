@@ -40,18 +40,18 @@ class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends
 
   var idx = 0
   for (j <- 0 until outParams.map(_.virtualChannelParams.size).max) {
-    for (i <- 0 until outParams.size) {
+    for (i <- 0 until outParams.size){
       if (j < outParams(i).virtualChannelParams.size) {
         for (k <- 0 until inParams.size) {
           val r = io.req(k)
-          val legalPaths = VecInit((0 until inParams(k).virtualChannelParams.size).map {
-            m => rParams.vcAllocLegalPaths(k, m, i, j)(r.bits.in_prio)
+          val legalPathsMatrix = VecInit((0 until inParams(k).virtualChannelParams.size).map { m =>
+            VecInit((0 until maxPrio).map { o => rParams.vcAllocLegalPaths(k, m, i, j)(o).B })
           })
 
           req_matrix(idx)(k).valid := (r.valid &&
             r.bits.out_channels(i) &&
             io.channel_available(i)(j) &&
-            legalPaths(r.bits.in_virt_channel)
+            legalPathsMatrix(r.bits.in_virt_channel)(r.bits.in_prio)
           )
           req_matrix(idx)(k).bits.in_channel := k.U
           req_matrix(idx)(k).bits.in_virt_channel := r.bits.in_virt_channel

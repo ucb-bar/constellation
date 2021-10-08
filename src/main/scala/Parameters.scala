@@ -13,7 +13,7 @@ case class AstroNoCConfig(
 
   virtChannelBits: Int = 2,
   topology: (Int, Int) => Seq[VirtualChannelParams] = (a: Int, b: Int) => Nil,
-  virtualLegalPaths: Int => (Int, Int, Int, Int) => UInt => Bool = (a: Int) => (b: Int, c: Int, d: Int, e: Int) => (f: UInt) => false.B,
+  virtualLegalPaths: Int => (Int, Int, Int, Int) => Int => Boolean = (a: Int) => (b: Int, c: Int, d: Int, e: Int) => (f: Int) => false,
   routingFunctions: Int => (Int, Int) => Boolean = (a: Int) => (b: Int, c: Int) => false
 )
 
@@ -29,6 +29,7 @@ trait HasAstroNoCParams {
   val maxFlits = params.maxFlits
   val prioBits = params.prioBits
   val virtChannelBits = params.virtChannelBits
+  val maxPrio = (1 << prioBits) - 1
 
   val topologyFunction = params.topology
   val virtualLegalPathsFunction = params.virtualLegalPaths
