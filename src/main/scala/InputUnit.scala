@@ -13,7 +13,7 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams])
   require(nVirtualChannels <= (1 << virtChannelBits))
 
   val io = IO(new Bundle {
-    val in = Flipped(Valid(new Flit))
+    val in = Flipped(new Channel(inParam))
 
     val router_req = Decoupled(new RouteComputerReq(inParam))
     val router_resp = Flipped(Valid(new RouteComputerResp(inParam, nOutputs)))
@@ -24,11 +24,8 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams])
     val out_credit_available = Input(MixedVec(outParams.map { u => Vec(u.virtualChannelParams.size, Bool()) }))
 
     val salloc_req = Vec(nVirtualChannels, Decoupled(new SwitchAllocReq(outParams)))
-    
-    val out = Valid(new SwitchBundle(nOutputs))
-    val credit_free = Output(Valid(UInt(log2Ceil(nVirtualChannels).W)))
 
-    val vc_free = Output(Valid(UInt(log2Ceil(nVirtualChannels).W)))
+    val out = Valid(new SwitchBundle(nOutputs))
   })
   val g_i :: g_r :: g_r_stall :: g_v :: g_v_stall :: g_a :: g_c :: Nil = Enum(7)
 
@@ -45,25 +42,25 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams])
   }
   val states = Reg(Vec(nVirtualChannels, new InputState))
   val buffer = Module(new InputBuffer(inParam))
-  buffer.io.in := io.in
+  buffer.io.in := io.in.flit
 
-  when (io.in.fire() && io.in.bits.head) {
-    val id = io.in.bits.virt_channel_id
+  when (io.in.flit.fire() && io.in.flit.bits.head) {
+    val id = io.in.flit.bits.virt_channel_id
     assert(id < nVirtualChannels.U)
     assert(states(id).g === g_i)
 
     states(id).g := g_r
-    states(id).dest_id := io.in.bits.dest_id
+    states(id).dest_id := io.in.flit.bits.dest_id
     states(id).p := buffer.io.head
     states(id).flits_sent := 0.U
     states(id).flits_arrived := 1.U
-    states(id).tail_seen := io.in.bits.tail
-    states(id).prio := io.in.bits.prio
+    states(id).tail_seen := io.in.flit.bits.tail
+    states(id).prio := io.in.flit.bits.prio
 
-  } .elsewhen (io.in.fire()) {
-    val id = io.in.bits.virt_channel_id
+  } .elsewhen (io.in.flit.fire()) {
+    val id = io.in.flit.bits.virt_channel_id
     states(id).flits_arrived := states(id).flits_arrived + 1.U
-    when (io.in.bits.tail) {
+    when (io.in.flit.bits.tail) {
       states(id).tail_seen := true.B
     }
   }
@@ -126,10 +123,10 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams])
   buffer.io.read_req.bits.addr := Mux1H(salloc_fires, states.map(_.p))
   buffer.io.read_req.bits.channel := OHToUInt(salloc_fires)
 
-  io.credit_free.valid := RegNext(salloc_fire)
-  io.credit_free.bits := RegNext(OHToUInt(salloc_fires))
-  io.vc_free.valid := RegNext(salloc_fire && tail_fired)
-  io.vc_free.bits := RegNext(OHToUInt(salloc_fires))
+  io.in.credit_return.valid := RegNext(salloc_fire)
+  io.in.credit_return.bits := RegNext(OHToUInt(salloc_fires))
+  io.in.vc_free.valid := RegNext(salloc_fire && tail_fired)
+  io.in.vc_free.bits := RegNext(OHToUInt(salloc_fires))
 
 
   io.out.valid := RegNext(buffer.io.read_req.valid)

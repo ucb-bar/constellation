@@ -43,16 +43,8 @@ class Router(val rParams: RouterParams)(implicit val p: Parameters) extends Modu
   val route_computer = Module(new RouteComputer(rParams))
   val output_units = outParams.map { u => Module(new OutputUnit(inParams, u)) }
 
-  (io.in zip input_units).foreach { case (i,u) =>
-    u.io.in := i.flit
-    i.credit_return := u.io.credit_free
-    i.vc_free := u.io.vc_free
-  }
-  (output_units zip io.out).foreach { case (u,i) =>
-    i.flit := u.io.out
-    u.io.credit_free := i.credit_return
-    u.io.vc_free := i.vc_free
-  }
+  (io.in zip input_units).foreach { case (i,u) => u.io.in <> i }
+  (output_units zip io.out).foreach { case (u,o) => o <> u.io.out }
 
   (route_computer.io.req zip input_units).foreach { case (i,u) => i <> u.io.router_req }
   (input_units zip route_computer.io.resp).foreach { case (u,o) => u.io.router_resp <> o }
@@ -69,5 +61,4 @@ class Router(val rParams: RouterParams)(implicit val p: Parameters) extends Modu
   (switch.io.in zip input_units).foreach { case (i,u) => i <> u.io.out }
   (output_units zip switch.io.out).foreach { case (u,o) => u.io.in <> o }
 
-  (io.out zip output_units).foreach { case (i,u) => i.flit <> u.io.out }
 }

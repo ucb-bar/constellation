@@ -20,12 +20,10 @@ class OutputUnit(inParams: Seq[ChannelParams], outParam: ChannelParams)(implicit
     val alloc = Flipped(Valid(new OutputUnitAlloc(inParams, outParam)))
 
     val credit_alloc = Input(Valid(UInt(log2Ceil(nVirtualChannels).W)))
-    val credit_free = Input(Valid(UInt(log2Ceil(nVirtualChannels).W)))
-    val vc_free = Input(Valid(UInt(log2Ceil(nVirtualChannels).W)))
 
     val credit_available = Output(Vec(nVirtualChannels, Bool()))
     val channel_available = Output(Vec(nVirtualChannels, Bool()))
-    val out = Valid(new Flit)
+    val out = new Channel(outParam)
   })
 
   val g_i :: g_a :: g_c :: Nil = Enum(3)
@@ -41,7 +39,7 @@ class OutputUnit(inParams: Seq[ChannelParams], outParam: ChannelParams)(implicit
 
   val states = Reg(MixedVec(outParam.virtualChannelParams.map { u => new OutputState(u.bufferSize) }))
   (states zip io.channel_available).map { case (s,a) => a := s.g === g_i }
-  io.out := io.in
+  io.out.flit := io.in
 
   when (io.alloc.fire()) {
     val id = io.alloc.bits.out_virt_channel
@@ -61,15 +59,15 @@ class OutputUnit(inParams: Seq[ChannelParams], outParam: ChannelParams)(implicit
   }
 
   states.zipWithIndex.map { case (s,i) =>
-    val free = (io.credit_free.valid && io.credit_free.bits === i.U)
+    val free = (io.out.credit_return.valid && io.out.credit_return.bits === i.U)
     val alloc = (io.credit_alloc.valid && io.credit_alloc.bits === i.U)
     s.c := s.c +& free - alloc
   }
 
 
-  when (io.vc_free.fire()) {
+  when (io.out.vc_free.fire()) {
     states.zipWithIndex.map { case (s,i) =>
-      when (io.vc_free.bits === i.U) {
+      when (io.out.vc_free.bits === i.U) {
         assert(s.g =/= g_i)
         s.g := g_i
       }
