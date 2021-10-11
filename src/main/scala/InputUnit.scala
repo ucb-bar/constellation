@@ -85,9 +85,12 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams])
   val vcalloc_arbiter = Module(new RRArbiter(new VCAllocReq(inParam, outParams.size), nVirtualChannels))
   (vcalloc_arbiter.io.in zip states).zipWithIndex.map { case ((i,s),idx) =>
     i.valid := s.g === g_v
-    i.bits.in_virt_channel := idx.U
-    i.bits.out_channels := s.o
-    i.bits.in_prio := s.prio
+    val bits = Wire(new VCAllocReq(inParam, outParams.size))
+    bits.in_virt_channel := idx.U
+    bits.out_channels := s.o
+    bits.in_prio := s.prio
+    bits.dummy := idx.U
+    i.bits <> bits
     when (i.fire()) { s.g := g_v_stall }
   }
   io.vcalloc_req <> vcalloc_arbiter.io.out

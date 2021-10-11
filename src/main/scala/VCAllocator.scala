@@ -10,6 +10,7 @@ class VCAllocReq(val inParam: ChannelParams, val nOutputs: Int)(implicit val p: 
   val in_virt_channel = UInt(log2Ceil(inParam.virtualChannelParams.size).W)
   val in_prio = UInt(prioBits.W)
   val out_channels = UInt(nOutputs.W)
+  val dummy = UInt(1.W) //avoids firrtl bug
 }
 
 class VCAllocResp(val inParam: ChannelParams, val outParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {

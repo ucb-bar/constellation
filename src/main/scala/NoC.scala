@@ -41,4 +41,6 @@ class NoC(implicit val p: Parameters) extends Module with HasAstroNoCParams{
       in <> router_nodes(in.cParams.srcId).io.out.filter(_.cParams.destId == dstId)(0)
     }
   }
+
+  router_nodes.foreach(i => dontTouch(i.io))
 }
