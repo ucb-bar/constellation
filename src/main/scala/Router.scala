@@ -16,7 +16,7 @@ case class RouterParams(
   inParams: Seq[ChannelParams],
   outParams: Seq[ChannelParams],
   vcAllocLegalPaths: (Int, Int, Int, Int) => Int => Boolean,
-  routingFunction: (Int, Int) => Boolean
+  routingFunction: (Int, Int) => Int => Boolean
 )
 
 trait HasRouterParams extends HasAstroNoCParams {

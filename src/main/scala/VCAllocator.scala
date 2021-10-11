@@ -28,7 +28,9 @@ class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends
     val out_alloc = MixedVec(outParams.map { u => Valid(new OutputUnitAlloc(inParams ,u)) })
   })
   val nOutChannels = outParams.map(_.virtualChannelParams.size).sum
+
   class InternalAlloc extends Bundle {
+    val dummy = Bool() // avoids firrtl bug
     val in_channel = UInt(log2Ceil(inParams.size).W)
     val in_virt_channel = UInt(log2Ceil(inParams.map(_.virtualChannelParams.size).max).W)
     val out_channel = UInt(log2Ceil(outParams.size).W)
@@ -46,7 +48,9 @@ class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends
         for (k <- 0 until inParams.size) {
           val r = io.req(k)
           val legalPathsMatrix = VecInit((0 until inParams(k).virtualChannelParams.size).map { m =>
-            VecInit((0 until maxPrio).map { o => rParams.vcAllocLegalPaths(k, m, i, j)(o).B })
+            VecInit((0 until nPrios).map { o =>
+              rParams.vcAllocLegalPaths(inParams(k).srcId, m, outParams(i).destId, j)(o).B
+            })
           })
 
           req_matrix(idx)(k).valid := (r.valid &&
@@ -58,6 +62,7 @@ class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends
           req_matrix(idx)(k).bits.in_virt_channel := r.bits.in_virt_channel
           req_matrix(idx)(k).bits.out_channel := i.U
           req_matrix(idx)(k).bits.out_virt_channel := j.U
+          req_matrix(idx)(k).bits.dummy := r.bits.in_virt_channel
           when (req_matrix(idx)(k).fire()) {
             io.resp(k).bits.out_channel := i.U
             io.resp(k).bits.out_virt_channel := j.U

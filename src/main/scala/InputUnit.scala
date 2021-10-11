@@ -70,7 +70,7 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams])
     i.valid := s.g === g_r
     i.bits.dest_id := s.dest_id
     i.bits.src_virt_id := idx.U
-    i.bits.prio := s.prio
+    i.bits.src_prio := s.prio
     when (i.fire()) { s.g := g_r_stall }
   }
   io.router_req <> route_arbiter.io.out
