@@ -8,7 +8,7 @@ import freechips.rocketchip.util._
 
 class SwitchBundle(val nOutputs: Int)(implicit val p: Parameters) extends Bundle {
   val flit = new Flit
-  val out_channel = UInt(log2Ceil(nOutputs).W)
+  val out_channel = UInt(log2Up(nOutputs).W)
 }
 
 class Switch(nInputs: Int, nOutputs: Int)(implicit val p: Parameters) extends Module with HasAstroNoCParams {

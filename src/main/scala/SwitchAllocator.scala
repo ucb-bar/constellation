@@ -8,24 +8,25 @@ import freechips.rocketchip.util._
 
 
 class SwitchAllocReq(val outParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
-  val out_channel = UInt(log2Ceil(outParams.size).W)
-  val out_virt_channel = UInt(log2Ceil(outParams.map(_.virtualChannelParams.size).max).W)
+  val out_channel = UInt(log2Up(outParams.size).W)
+  val out_virt_channel = UInt(log2Up(outParams.map(_.virtualChannelParams.size).max).W)
 }
 
 class SwitchAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
   val io = IO(new Bundle {
-    val req = MixedVec(inParams.map(u => Vec(u.virtualChannelParams.size, Flipped(Decoupled(new SwitchAllocReq(outParams))))))
-    val credit_alloc = MixedVec(outParams.map { u => Valid(UInt(log2Ceil(u.virtualChannelParams.size).W)) })
+    val req = MixedVec((inParams ++ terminalInParams).map(u =>
+      Vec(u.virtualChannelParams.size, Flipped(Decoupled(new SwitchAllocReq(outParams))))))
+    val credit_alloc = MixedVec(outParams.map { u => Valid(UInt(log2Up(u.virtualChannelParams.size).W)) })
   })
-  val nInputChannels = inParams.map(_.virtualChannelParams.size).sum
+  val nInputChannels = allInParams.map(_.virtualChannelParams.size).sum
 
-  val arbs = outParams.map { u => Module(new RRArbiter(UInt(log2Ceil(u.virtualChannelParams.size).W), nInputChannels)) }
+  val arbs = outParams.map { u => Module(new RRArbiter(UInt(log2Up(u.virtualChannelParams.size).W), nInputChannels)) }
   arbs.foreach(_.io.out.ready := true.B)
 
   var idx = 0
-  for (j <- 0 until inParams.map(_.virtualChannelParams.size).max) {
-    for (i <- 0 until inParams.size) {
-      if (j < inParams(i).virtualChannelParams.size) {
+  for (j <- 0 until allInParams.map(_.virtualChannelParams.size).max) {
+    for (i <- 0 until allInParams.size) {
+      if (j < allInParams(i).virtualChannelParams.size) {
         arbs.zipWithIndex.map { case (a,k) =>
           a.io.in(idx).valid := io.req(i)(j).valid && io.req(i)(j).bits.out_channel === k.U
           a.io.in(idx).bits := io.req(i)(j).bits.out_virt_channel

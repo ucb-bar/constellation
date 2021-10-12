@@ -8,7 +8,7 @@ import freechips.rocketchip.config.{Field, Parameters}
 
 class NoC(implicit val p: Parameters) extends Module with HasAstroNoCParams{
   val io = IO(new Bundle {
-
+    val in = Vec(inputNodes.size, Vec(nPrios, Flipped(Decoupled(new Flit))))
   })
 
   val channelParams: Seq[ChannelParams] = Seq.tabulate(nNodes, nNodes) { case (i,j) =>
@@ -78,7 +78,13 @@ class NoC(implicit val p: Parameters) extends Module with HasAstroNoCParams{
 
 
   val router_nodes = Seq.tabulate(nNodes) { i => Module(new Router(RouterParams(
-    i, inParams(i), outParams(i), virtualLegalPathsFunction(i), routingFunctions(i)
+    i,
+    inParams(i),
+    outParams(i),
+    if (inputNodes.contains(i)) Seq(ChannelParams(-1, i, Seq.fill(nPrios) { VirtualChannelParams(-1) }, isInput=true)) else Nil,
+    virtualLegalPathsFunction(i),
+    virtualLegalInitsFunction(i),
+    routingFunctions(i)
   ))) }
 
   val in_idxs = Array.fill(nNodes) { 0 }
@@ -88,7 +94,12 @@ class NoC(implicit val p: Parameters) extends Module with HasAstroNoCParams{
     dst.io.in.map { in =>
       in <> router_nodes(in.cParams.srcId).io.out.filter(_.cParams.destId == dstId)(0)
     }
+    val inputs = (io.in zip inputNodes).filter { case (_,i) => i == dstId }.map(_._1)
+    (dst.io.terminal_in zip inputs).map { case (l,r) => l <> r }
   }
+
+
+
 
   router_nodes.foreach(i => dontTouch(i.io))
 }

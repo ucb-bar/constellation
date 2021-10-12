@@ -6,37 +6,43 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
+class AbstractInputUnitIO(val inParam: ChannelParams, val outParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle {
+  val router_req = Decoupled(new RouteComputerReq(inParam))
+  val router_resp = Flipped(Valid(new RouteComputerResp(inParam, outParams.size)))
+
+  val vcalloc_req = Decoupled(new VCAllocReq(inParam, outParams.size))
+  val vcalloc_resp = Flipped(Valid(new VCAllocResp(inParam, outParams)))
+
+  val out_credit_available = Input(MixedVec(outParams.map { u => Vec(u.virtualChannelParams.size, Bool()) }))
+
+  val salloc_req = Vec(inParam.nVirtualChannels, Decoupled(new SwitchAllocReq(outParams)))
+
+  val out = Valid(new SwitchBundle(outParams.size))
+}
+
+abstract class AbstractInputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams]) (implicit val p: Parameters) extends Module with HasAstroNoCParams {
+  def io: AbstractInputUnitIO
+}
+
 class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams])
-  (implicit val p: Parameters) extends Module with HasAstroNoCParams {
+  (implicit p: Parameters) extends AbstractInputUnit(inParam, outParams)(p) {
   val nOutputs = outParams.size
   val nVirtualChannels = inParam.virtualChannelParams.size
   require(nVirtualChannels <= (1 << virtChannelBits))
 
-  val io = IO(new Bundle {
+  val io = IO(new AbstractInputUnitIO(inParam, outParams) {
     val in = Flipped(new Channel(inParam))
-
-    val router_req = Decoupled(new RouteComputerReq(inParam))
-    val router_resp = Flipped(Valid(new RouteComputerResp(inParam, nOutputs)))
-
-    val vcalloc_req = Decoupled(new VCAllocReq(inParam, nOutputs))
-    val vcalloc_resp = Flipped(Valid(new VCAllocResp(inParam, outParams)))
-
-    val out_credit_available = Input(MixedVec(outParams.map { u => Vec(u.virtualChannelParams.size, Bool()) }))
-
-    val salloc_req = Vec(nVirtualChannels, Decoupled(new SwitchAllocReq(outParams)))
-
-    val out = Valid(new SwitchBundle(nOutputs))
   })
   val g_i :: g_r :: g_r_stall :: g_v :: g_v_stall :: g_a :: g_c :: Nil = Enum(7)
 
   class InputState extends Bundle {
     val g = UInt(3.W)
     val r = UInt(nOutputs.W)
-    val o = UInt(log2Ceil(outParams.map(_.virtualChannelParams.size).max).W)
-    val p = UInt(log2Ceil(inParam.virtualChannelParams.map(_.bufferSize).max).W)
+    val o = UInt(log2Up(outParams.map(_.virtualChannelParams.size).max).W)
+    val p = UInt(log2Up(inParam.virtualChannelParams.map(_.bufferSize).max).W)
     val prio = UInt(prioBits.W)
-    val flits_arrived = UInt((1+log2Ceil(maxFlits)).W)
-    val flits_sent = UInt((1+log2Ceil(maxFlits)).W)
+    val flits_arrived = UInt((1+log2Up(maxFlits)).W)
+    val flits_sent = UInt((1+log2Up(maxFlits)).W)
     val tail_seen = Bool()
     val dest_id = UInt(idBits.W)
   }
@@ -135,8 +141,8 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams])
 
   io.out.valid := RegNext(buffer.io.read_req.valid)
   io.out.bits.flit := buffer.io.read_resp
-  val virt_channel_oh = Mux1H(salloc_fires, states.map(_.o))
-  io.out.bits.flit.virt_channel_id := RegNext(OHToUInt(virt_channel_oh))
+  val virt_channel = Mux1H(salloc_fires, states.map(_.o))
+  io.out.bits.flit.virt_channel_id := RegNext(virt_channel)
   val channel_oh = Mux1H(salloc_fires, states.map(_.r))
   io.out.bits.out_channel := RegNext(OHToUInt(channel_oh))
 

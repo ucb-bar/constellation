@@ -5,21 +5,21 @@ import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 
-class OutputUnitAlloc(val inParams: Seq[ChannelParams], val outParam: ChannelParams)(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
-  val in_channel = UInt(log2Ceil(inParams.size).W)
-  val in_virt_channel = UInt(log2Ceil(inParams.map(_.virtualChannelParams.size).max).W)
+class OutputUnitAlloc(val inParams: Seq[ChannelParams], val terminalInParams: Seq[ChannelParams], val outParam: ChannelParams)(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
+  val in_channel = UInt(log2Up(inParams.size + terminalInParams.size).W)
+  val in_virt_channel = UInt(log2Up((inParams ++ terminalInParams).map(_.virtualChannelParams.size).max).W)
   val out_virt_channel = UInt(outParam.virtualChannelParams.size.W)
 }
 
 
-class OutputUnit(inParams: Seq[ChannelParams], outParam: ChannelParams)(implicit val p: Parameters) extends Module with HasAstroNoCParams {
+class OutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[ChannelParams], outParam: ChannelParams)(implicit val p: Parameters) extends Module with HasAstroNoCParams {
   val nInputs = inParams.size
   val nVirtualChannels = outParam.virtualChannelParams.size
   val io = IO(new Bundle {
     val in = Flipped(Valid(new Flit))
-    val alloc = Flipped(Valid(new OutputUnitAlloc(inParams, outParam)))
+    val alloc = Flipped(Valid(new OutputUnitAlloc(inParams, terminalInParams, outParam)))
 
-    val credit_alloc = Input(Valid(UInt(log2Ceil(nVirtualChannels).W)))
+    val credit_alloc = Input(Valid(UInt(log2Up(nVirtualChannels).W)))
 
     val credit_available = Output(Vec(nVirtualChannels, Bool()))
     val channel_available = Output(Vec(nVirtualChannels, Bool()))
@@ -32,9 +32,9 @@ class OutputUnit(inParams: Seq[ChannelParams], outParam: ChannelParams)(implicit
   // The only useful bit is tracking credits on each virtual channel
   class OutputState(val bufferSize: Int) extends Bundle {
     val g = UInt(2.W)
-    val i_p = UInt(log2Ceil(nInputs).W)
-    val i_c = UInt(log2Ceil(inParams.map(_.virtualChannelParams.size).max).W)
-    val c = UInt(log2Ceil(bufferSize).W)
+    val i_p = UInt(log2Up(nInputs).W)
+    val i_c = UInt(log2Up(inParams.map(_.virtualChannelParams.size).max).W)
+    val c = UInt(log2Up(bufferSize).W)
   }
 
   val states = Reg(MixedVec(outParam.virtualChannelParams.map { u => new OutputState(u.bufferSize) }))

@@ -7,16 +7,16 @@ import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
 class VCAllocReq(val inParam: ChannelParams, val nOutputs: Int)(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
-  val in_virt_channel = UInt(log2Ceil(inParam.virtualChannelParams.size).W)
+  val in_virt_channel = UInt(log2Up(inParam.virtualChannelParams.size).W)
   val in_prio = UInt(prioBits.W)
   val out_channels = UInt(nOutputs.W)
   val dummy = UInt(1.W) //avoids firrtl bug
 }
 
 class VCAllocResp(val inParam: ChannelParams, val outParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
-  val in_virt_channel = UInt(log2Ceil(inParam.virtualChannelParams.size).W)
-  val out_virt_channel = UInt(log2Ceil(outParams.map(_.virtualChannelParams.size).max).W)
-  val out_channel = UInt(log2Ceil(outParams.size).W)
+  val in_virt_channel = UInt(log2Up(inParam.virtualChannelParams.size).W)
+  val out_virt_channel = UInt(log2Up(outParams.map(_.virtualChannelParams.size).max).W)
+  val out_channel = UInt(log2Up(outParams.size).W)
 }
 
 class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
@@ -24,22 +24,27 @@ class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends
     val req = MixedVec(inParams.map { u => Flipped(Decoupled(new VCAllocReq(u, outParams.size))) })
     val resp = MixedVec(inParams.map { u => Valid(new VCAllocResp(u, outParams)) })
 
+    val terminal_req = MixedVec(terminalInParams.map { u => Flipped(Decoupled(new VCAllocReq(u, outParams.size))) })
+    val terminal_resp = MixedVec(terminalInParams.map { u => Valid(new VCAllocResp(u, outParams)) })
+
     val channel_available = MixedVec(outParams.map { u => Vec(u.virtualChannelParams.size, Input(Bool())) })
-    val out_alloc = MixedVec(outParams.map { u => Valid(new OutputUnitAlloc(inParams ,u)) })
+    val out_alloc = MixedVec(outParams.map { u => Valid(new OutputUnitAlloc(inParams, terminalInParams, u)) })
   })
   val nOutChannels = outParams.map(_.virtualChannelParams.size).sum
 
   class InternalAlloc extends Bundle {
     val dummy = Bool() // avoids firrtl bug
-    val in_channel = UInt(log2Ceil(inParams.size).W)
-    val in_virt_channel = UInt(log2Ceil(inParams.map(_.virtualChannelParams.size).max).W)
-    val out_channel = UInt(log2Ceil(outParams.size).W)
-    val out_virt_channel = UInt(log2Ceil(outParams.map(_.virtualChannelParams.size).max).W)
+    val in_channel = UInt(log2Up(terminalInParams.size + inParams.size).W)
+    val in_virt_channel = UInt(log2Up(allInParams.map(_.virtualChannelParams.size).max).W)
+    val out_channel = UInt(log2Up(outParams.size).W)
+    val out_virt_channel = UInt(log2Up(outParams.map(_.virtualChannelParams.size).max).W)
   }
-  val req_matrix = Seq.fill(nOutChannels) { Seq.fill(nInputs) { Wire(Decoupled(new InternalAlloc)) } }
+  val req_matrix = Seq.fill(nOutChannels) { Seq.fill(nInputs + nTerminalInputs) { Wire(Decoupled(new InternalAlloc)) } }
 
   io.resp.foreach(_.bits := DontCare)
+  io.terminal_resp.foreach(_.bits := DontCare)
   (io.resp zip io.req).map { case (o,i) => o.bits.in_virt_channel := i.bits.in_virt_channel }
+  (io.terminal_resp zip io.req).map { case (o,i) => o.bits.in_virt_channel := i.bits.in_virt_channel }
 
   var idx = 0
   for (j <- 0 until outParams.map(_.virtualChannelParams.size).max) {
@@ -68,13 +73,36 @@ class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends
             io.resp(k).bits.out_virt_channel := j.U
           }
         }
+        for (k <- 0 until terminalInParams.size) {
+          val r = io.terminal_req(k)
+          val kk = k + inParams.size
+          val legalPathsMatrix = VecInit((0 until nPrios).map { o =>
+            rParams.vcAllocLegalInits(outParams(i).destId, j)(o).B
+          })
+
+          req_matrix(idx)(kk).valid := (r.valid &&
+            r.bits.out_channels(i) &&
+            io.channel_available(i)(j) &&
+            legalPathsMatrix(r.bits.in_prio)
+          )
+          req_matrix(idx)(kk).bits.in_channel := kk.U
+          req_matrix(idx)(kk).bits.in_virt_channel := r.bits.in_virt_channel
+          req_matrix(idx)(kk).bits.out_channel := i.U
+          req_matrix(idx)(kk).bits.out_virt_channel := j.U
+          req_matrix(idx)(kk).bits.dummy := r.bits.in_virt_channel
+          when (req_matrix(idx)(kk).fire()) {
+            io.terminal_resp(k).bits.out_channel := i.U
+            io.terminal_resp(k).bits.out_virt_channel := j.U
+          }
+
+        }
         idx += 1
       }
     }
   }
 
   val row_reqs = Seq.tabulate(nOutChannels) { i =>
-    val rr_arb = Module(new RRArbiter(new InternalAlloc, inParams.size))
+    val rr_arb = Module(new RRArbiter(new InternalAlloc, allInParams.size))
     (rr_arb.io.in zip req_matrix(i)).map { case (l,r) => l <> r }
     rr_arb.io.out
   }
@@ -107,5 +135,12 @@ class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends
     io.req(k).ready := fires.reduce(_||_)
     io.resp(k).valid := fires.reduce(_||_)
   }
-  require(idx == nOutChannels)
+  for (k <- 0 until terminalInParams.size) {
+    val kk = k + inParams.size
+    val fires = req_matrix.map(_(kk).fire())
+    assert(PopCount(fires) <= 1.U)
+    io.terminal_req(k).ready := fires.reduce(_||_)
+    io.terminal_resp(k).valid := fires.reduce(_||_)
+  }
+
 }

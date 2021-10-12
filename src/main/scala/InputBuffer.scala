@@ -11,16 +11,16 @@ class InputBuffer(inParam: ChannelParams)(implicit val p: Parameters) extends Mo
   val io = IO(new Bundle {
     val in = Flipped(Valid(new Flit))
 
-    val head = Output(UInt(log2Ceil(maxBufferSize).W))
+    val head = Output(UInt(log2Up(maxBufferSize).W))
 
     val read_req = Input(Valid(new Bundle {
-      val addr = UInt(log2Ceil(maxBufferSize).W)
-      val channel = UInt(log2Ceil(inParam.virtualChannelParams.size).W)
+      val addr = UInt(log2Up(maxBufferSize).W)
+      val channel = UInt(log2Up(inParam.virtualChannelParams.size).W)
     }))
     val read_resp = Output(new Flit)
   })
   val buffers = Reg(MixedVec(inParam.virtualChannelParams.map { u => Vec(u.bufferSize, new Flit) }))
-  val heads = Reg(MixedVec(inParam.virtualChannelParams.map { u => UInt(log2Ceil(u.bufferSize).W) }))
+  val heads = Reg(MixedVec(inParam.virtualChannelParams.map { u => UInt(log2Up(u.bufferSize).W) }))
 
   io.head := DontCare
   io.read_resp := DontCare

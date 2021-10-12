@@ -15,6 +15,7 @@ class TestHarness(implicit val p: Parameters) extends Module {
   })
 
   val noc = Module(new NoC)
+  noc.io := DontCare
 
   io.success := true.B
 }

@@ -7,13 +7,13 @@ import freechips.rocketchip.config.{Field, Parameters}
 
 
 class RouteComputerReq(val param: ChannelParams)(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
-  val src_virt_id = UInt(log2Ceil(param.virtualChannelParams.size).W)
+  val src_virt_id = UInt(log2Up(param.nVirtualChannels).W)
   val src_prio = UInt(prioBits.W)
   val dest_id = UInt(idBits.W)
 }
 
 class RouteComputerResp(val param: ChannelParams, val nOutputs: Int)(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
-  val src_virt_id = UInt(log2Ceil(param.virtualChannelParams.size).W)
+  val src_virt_id = UInt(log2Up(param.virtualChannelParams.size).W)
   val out_channels = UInt(nOutputs.W)
 }
 
@@ -21,8 +21,8 @@ class RouteComputerResp(val param: ChannelParams, val nOutputs: Int)(implicit va
 
 class RouteComputer(val rParams: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
   val io = IO(new Bundle {
-    val req = MixedVec(inParams.map { u => Flipped(Decoupled(new RouteComputerReq(u))) })
-    val resp = MixedVec(inParams.map { u => Valid(new RouteComputerResp(u, nOutputs)) })
+    val req = MixedVec(allInParams.map { u => Flipped(Decoupled(new RouteComputerReq(u))) })
+    val resp = MixedVec(allInParams.map { u => Valid(new RouteComputerResp(u, nOutputs)) })
   })
   val routingMatrix = outParams.map { u =>
     val mat = Wire(Vec(nNodes, Vec(nPrios, Bool())))
