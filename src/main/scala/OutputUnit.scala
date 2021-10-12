@@ -11,19 +11,25 @@ class OutputUnitAlloc(val inParams: Seq[ChannelParams], val terminalInParams: Se
   val out_virt_channel = UInt(outParam.virtualChannelParams.size.W)
 }
 
+class AbstractOutputUnitIO(val inParams: Seq[ChannelParams], val terminalInParams: Seq[ChannelParams], val outParam: ChannelParams)(implicit val p: Parameters) extends Bundle {
+  val nVirtualChannels = outParam.virtualChannelParams.size
+  val in = Flipped(Valid(new Flit))
+  val credit_available = Output(Vec(nVirtualChannels, Bool()))
+  val channel_available = Output(Vec(nVirtualChannels, Bool()))
+  val alloc = Flipped(Valid(new OutputUnitAlloc(inParams, terminalInParams, outParam)))
+}
 
-class OutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[ChannelParams], outParam: ChannelParams)(implicit val p: Parameters) extends Module with HasAstroNoCParams {
+abstract class AbstractOutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[ChannelParams], outParam: ChannelParams)(implicit val p: Parameters) extends Module with HasAstroNoCParams {
+  def io: AbstractOutputUnitIO
+}
+
+class OutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[ChannelParams], outParam: ChannelParams)(implicit p: Parameters) extends AbstractOutputUnit(inParams, terminalInParams, outParam)(p) {
   val nInputs = inParams.size
   val nVirtualChannels = outParam.virtualChannelParams.size
-  val io = IO(new Bundle {
-    val in = Flipped(Valid(new Flit))
-    val alloc = Flipped(Valid(new OutputUnitAlloc(inParams, terminalInParams, outParam)))
+  val io = IO(new AbstractOutputUnitIO(inParams, terminalInParams, outParam) {
+    val out = new Channel(outParam)
 
     val credit_alloc = Input(Valid(UInt(log2Up(nVirtualChannels).W)))
-
-    val credit_available = Output(Vec(nVirtualChannels, Bool()))
-    val channel_available = Output(Vec(nVirtualChannels, Bool()))
-    val out = new Channel(outParam)
   })
 
   val g_i :: g_a :: g_c :: Nil = Enum(3)
@@ -33,7 +39,7 @@ class OutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[ChannelPara
   class OutputState(val bufferSize: Int) extends Bundle {
     val g = UInt(2.W)
     val i_p = UInt(log2Up(nInputs).W)
-    val i_c = UInt(log2Up(inParams.map(_.virtualChannelParams.size).max).W)
+    val i_c = UInt(log2Up((inParams ++ terminalInParams).map(_.virtualChannelParams.size).max).W)
     val c = UInt(log2Up(bufferSize).W)
   }
 

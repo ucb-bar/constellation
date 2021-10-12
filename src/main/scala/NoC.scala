@@ -7,16 +7,20 @@ import freechips.rocketchip.config.{Field, Parameters}
 
 
 class NoC(implicit val p: Parameters) extends Module with HasAstroNoCParams{
-  val io = IO(new Bundle {
-    val in = Vec(inputNodes.size, Vec(nPrios, Flipped(Decoupled(new Flit))))
-  })
-
   val channelParams: Seq[ChannelParams] = Seq.tabulate(nNodes, nNodes) { case (i,j) =>
     val vChannels = topologyFunction(i, j)
     if (vChannels.isEmpty) None else Some(ChannelParams(i, j, vChannels))
   }.flatten.flatten
   val inParams = (0 until nNodes).map { i => channelParams.filter(_.destId == i) }
   val outParams = (0 until nNodes).map { i => channelParams.filter(_.srcId == i) }
+  val inputParams = (0 until nNodes).map { n => inputNodes.zipWithIndex.filter(_._1._2 == n).map { case ((nV,_),i) =>
+    ChannelParams(-1, n, Seq.fill(nV) { VirtualChannelParams(-1) }, inputId=i)
+  } }
+
+  val io = IO(new Bundle {
+    val in = MixedVec(inputNodes.map { n => Vec(n._1, Flipped(Decoupled(new Flit))) })
+  })
+
 
 
   // srcId, destId, virtChannelId, prio
@@ -81,9 +85,8 @@ class NoC(implicit val p: Parameters) extends Module with HasAstroNoCParams{
     i,
     inParams(i),
     outParams(i),
-    if (inputNodes.contains(i)) Seq(ChannelParams(-1, i, Seq.fill(nPrios) { VirtualChannelParams(-1) }, isInput=true)) else Nil,
+    inputParams(i),
     virtualLegalPathsFunction(i),
-    virtualLegalInitsFunction(i),
     routingFunctions(i)
   ))) }
 
@@ -94,8 +97,9 @@ class NoC(implicit val p: Parameters) extends Module with HasAstroNoCParams{
     dst.io.in.map { in =>
       in <> router_nodes(in.cParams.srcId).io.out.filter(_.cParams.destId == dstId)(0)
     }
-    val inputs = (io.in zip inputNodes).filter { case (_,i) => i == dstId }.map(_._1)
-    (dst.io.terminal_in zip inputs).map { case (l,r) => l <> r }
+    (dst.terminalInParams zip dst.io.terminal_in) map { case (u,i) =>
+      i <> io.in(u.inputId)
+    }
   }
 
 

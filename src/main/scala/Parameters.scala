@@ -16,12 +16,10 @@ case class AstroNoCConfig(
   topology: (Int, Int) => Seq[VirtualChannelParams] = (a: Int, b: Int) => Nil,
   // nodeId => (srcNodeId, inVChannelId, destNodeId, outVChannelId) => prio => legalPath
   virtualLegalPaths: Int => (Int, Int, Int, Int) => Int => Boolean = (a: Int) => (b: Int, c: Int, d: Int, e: Int) => (f: Int) => false,
-  // nodeId => (destNodeId, outVChannelId) => prio => legalPath
-  virtualInitialAllocs: Int => (Int, Int) => Int => Boolean = (a: Int) => (b: Int, c: Int) => (c: Int) => false,
   // nodeId => destId, nextId => prio => usePath
   routingFunctions: Int => (Int, Int) => (Int) => Boolean = (a: Int) => (b: Int, c: Int) => (c: Int) => false,
-  // nodeId => isInput
-  inputNodes: Seq[Int] = Nil
+  // Seq[(nVChannels, nodeId)]
+  inputNodes: Seq[(Int, Int)] = Nil
 )
 
 case object AstroNoCKey extends Field[AstroNoCConfig](AstroNoCConfig())
@@ -41,7 +39,6 @@ trait HasAstroNoCParams {
 
   val topologyFunction = params.topology
   val virtualLegalPathsFunction = params.virtualLegalPaths
-  val virtualLegalInitsFunction = params.virtualInitialAllocs
   val routingFunctions = params.routingFunctions
 
   val inputNodes = params.inputNodes
@@ -56,9 +53,14 @@ case class ChannelParams(
   srcId: Int,
   destId: Int,
   virtualChannelParams: Seq[VirtualChannelParams],
-  isInput: Boolean = false,
-  isOutput: Boolean = false
+  inputId: Int = -1,
+  outputId: Int = -1
 ) {
   val nVirtualChannels = virtualChannelParams.size
+  val isInput = inputId >= 0
+  val isOutput = outputId >= 0
+  require(!(srcId == -1 ^ isInput))
+  require(!(destId == -1 ^ isOutput))
+  require(!(isInput && isOutput))
 }
 

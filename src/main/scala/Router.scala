@@ -17,7 +17,6 @@ case class RouterParams(
   outParams: Seq[ChannelParams],
   terminalInParams: Seq[ChannelParams],
   vcAllocLegalPaths: (Int, Int, Int, Int) => Int => Boolean,
-  vcAllocLegalInits: (Int, Int) => Int => Boolean,
   routingFunction: (Int, Int) => Int => Boolean
 )
 
@@ -37,11 +36,12 @@ trait HasRouterParams extends HasAstroNoCParams {
 class Router(val rParams: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
   val io = IO(new Bundle {
     val in = MixedVec(inParams.map { u => Flipped(new Channel(u)) })
-    val terminal_in = Vec(nTerminalInputs, Vec(nPrios, Flipped(Decoupled(new Flit))))
+    val terminal_in = MixedVec(terminalInParams.map { u => Vec(u.nVirtualChannels, Flipped(Decoupled(new Flit))) })
     val out = MixedVec(outParams.map { u => new Channel(u) })
   })
 
-  require(nInputs + nTerminalInputs >= 1 && nOutputs >= 1)
+  require(nInputs + nTerminalInputs >= 1)
+  require(nOutputs >= 1)
   require(id < (1 << idBits))
   val input_units = inParams.map { u => Module(new InputUnit(u, outParams)) }
   val terminal_input_units = terminalInParams.map { u => Module(new TerminalInputUnit(u, outParams)) }
@@ -61,14 +61,9 @@ class Router(val rParams: RouterParams)(implicit val p: Parameters) extends Modu
   (all_input_units zip route_computer.io.resp).foreach {
     case (u,o) => u.io.router_resp <> o }
 
-  (vc_allocator.io.req zip input_units).foreach {
+  (vc_allocator.io.req zip all_input_units).foreach {
     case (i,u) => i <> u.io.vcalloc_req }
-  (input_units zip vc_allocator.io.resp).foreach {
-    case (u,o) => u.io.vcalloc_resp <> o }
-
-  (vc_allocator.io.terminal_req zip terminal_input_units).foreach {
-    case (i,u) => i <> u.io.vcalloc_req }
-  (terminal_input_units zip vc_allocator.io.terminal_resp).foreach {
+  (all_input_units zip vc_allocator.io.resp).foreach {
     case (u,o) => u.io.vcalloc_resp <> o }
 
 
