@@ -11,7 +11,7 @@ class TerminalOutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[Cha
   val nInputs = inParams.size
   require(outParam.nVirtualChannels == nPrios)
   val io = IO(new AbstractOutputUnitIO(inParams, terminalInParams, outParam) {
-    val out = Vec(nPrios, Decoupled(new Flit))
+    val out = Vec(outParam.nVirtualChannels, Decoupled(new Flit))
   })
 
   val channel_empty = Reg(Vec(nPrios, Bool()))
@@ -19,6 +19,8 @@ class TerminalOutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[Cha
   qs.zipWithIndex.map { case (q,i) =>
     q.io.enq.valid := io.in.valid && io.in.bits.virt_channel_id === i.U
     q.io.enq.bits := io.in.bits
+
+    io.out(i) <> q.io.deq
     assert(!(q.io.enq.valid && !q.io.enq.ready))
   }
   (qs zip io.credit_available).map { case (q,a) => a := q.io.count <= 1.U }

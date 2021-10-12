@@ -19,7 +19,9 @@ case class AstroNoCConfig(
   // nodeId => destId, nextId => prio => usePath
   routingFunctions: Int => (Int, Int) => (Int) => Boolean = (a: Int) => (b: Int, c: Int) => (c: Int) => false,
   // Seq[(nVChannels, nodeId)]
-  inputNodes: Seq[(Int, Int)] = Nil
+  inputNodes: Seq[(Int, Int)] = Nil,
+  // Seq[nodeId]
+  outputNodes: Seq[Int] = Nil
 )
 
 case object AstroNoCKey extends Field[AstroNoCConfig](AstroNoCConfig())
@@ -42,6 +44,15 @@ trait HasAstroNoCParams {
   val routingFunctions = params.routingFunctions
 
   val inputNodes = params.inputNodes
+  val outputNodes = params.outputNodes
+  val outputIdBits = log2Up(outputNodes.size)
+  val outChannelIdBits = log2Up((0 until nNodes).map { i => outputNodes.count(_ == i) }.max)
+
+  def outIdToDestId(outId: UInt): UInt = VecInit(outputNodes.map(_.U))(outId)
+  def outIdToDestChannelId(outId: UInt): UInt = {
+    VecInit(outputNodes.zipWithIndex.map { case (e,i) => outputNodes.take(i).count(_ == e).U })(outId)
+  }
+
 }
 
 

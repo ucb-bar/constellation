@@ -6,14 +6,15 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
-class TerminalInputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams])
-  (implicit p: Parameters) extends AbstractInputUnit(inParam, outParams)(p) {
+class TerminalInputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalOutParams: Seq[ChannelParams])
+  (implicit p: Parameters) extends AbstractInputUnit()(p) {
   val nOutputs = outParams.size
   require(inParam.isInput && !inParam.isOutput)
 
-  val io = IO(new AbstractInputUnitIO(inParam, outParams) {
+  val io = IO(new AbstractInputUnitIO(inParam, outParams, terminalOutParams) {
     val in = Flipped(Vec(inParam.nVirtualChannels, Decoupled(new Flit)))
   })
+  io.in.foreach { i => assert(!(i.fire() && outIdToDestId(i.bits.out_id) === inParam.destId.U)) }
 
   val route_buffers = Seq.fill(inParam.nVirtualChannels) { Module(new Queue(new Flit, 2)) }
   val route_qs = Seq.fill(inParam.nVirtualChannels) { Module(new Queue(new RouteComputerResp(inParam, nOutputs), 2)) }
@@ -23,7 +24,7 @@ class TerminalInputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams])
     route_buffers(i).io.enq.bits := io.in(i).bits
     route_arbiter.io.in(i).bits.src_virt_id := i.U
     route_arbiter.io.in(i).bits.src_prio := io.in(i).bits.prio
-    route_arbiter.io.in(i).bits.dest_id := io.in(i).bits.dest_id
+    route_arbiter.io.in(i).bits.dest_id := outIdToDestId(io.in(i).bits.out_id)
 
     route_buffers(i).io.enq.valid := io.in(i).valid && (route_arbiter.io.in(i).ready || !io.in(i).bits.head)
     route_arbiter.io.in(i).valid := io.in(i).valid && route_buffers(i).io.enq.ready && io.in(i).bits.head
@@ -38,7 +39,7 @@ class TerminalInputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams])
 
   val vcalloc_buffers = Seq.fill(inParam.nVirtualChannels) { Module(new Queue(new Flit, 2)) }
   val vcalloc_qs = Seq.fill(inParam.nVirtualChannels) { Module(new Queue(new VCAllocResp(inParam, outParams), 2)) }
-  val vcalloc_arbiter = Module(new Arbiter(new VCAllocReq(inParam, outParams.size), inParam.nVirtualChannels))
+  val vcalloc_arbiter = Module(new Arbiter(new VCAllocReq(inParam, outParams.size, terminalOutParams.size), inParam.nVirtualChannels))
   io.vcalloc_req <> vcalloc_arbiter.io.out
   (0 until inParam.nVirtualChannels).foreach { i =>
     vcalloc_buffers(i).io.enq.bits := route_buffers(i).io.deq.bits

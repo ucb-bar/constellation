@@ -11,11 +11,16 @@ class Channel(val cParams: ChannelParams)(implicit val p: Parameters) extends Bu
   val vc_free = Input(Valid(UInt(log2Up(cParams.virtualChannelParams.size).W)))
 }
 
+class IOChannel(val cParams: ChannelParams)(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
+  val flits = Vec(cParams.nVirtualChannels, Decoupled(new Flit))
+}
+
 case class RouterParams(
   id: Int,
   inParams: Seq[ChannelParams],
   outParams: Seq[ChannelParams],
   terminalInParams: Seq[ChannelParams],
+  terminalOutParams: Seq[ChannelParams],
   vcAllocLegalPaths: (Int, Int, Int, Int) => Int => Boolean,
   routingFunction: (Int, Int) => Int => Boolean
 )
@@ -26,35 +31,53 @@ trait HasRouterParams extends HasAstroNoCParams {
   val inParams = rParams.inParams
   val outParams = rParams.outParams
   val terminalInParams = rParams.terminalInParams
+  val terminalOutParams = rParams.terminalOutParams
   val allInParams = inParams ++ terminalInParams
+  val allOutParams = outParams ++ terminalOutParams
 
   val nInputs = inParams.size
   val nOutputs = outParams.size
   val nTerminalInputs = terminalInParams.size
+  val nTerminalOutputs = terminalOutParams.size
 }
 
 class Router(val rParams: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
   val io = IO(new Bundle {
     val in = MixedVec(inParams.map { u => Flipped(new Channel(u)) })
-    val terminal_in = MixedVec(terminalInParams.map { u => Vec(u.nVirtualChannels, Flipped(Decoupled(new Flit))) })
+    val terminal_in = MixedVec(terminalInParams.map { u => Flipped(new IOChannel(u)) })
     val out = MixedVec(outParams.map { u => new Channel(u) })
+    val terminal_out = MixedVec(terminalOutParams.map { u => new IOChannel(u) })
   })
 
   require(nInputs + nTerminalInputs >= 1)
-  require(nOutputs >= 1)
+  require(nOutputs + nTerminalOutputs >= 1)
   require(id < (1 << idBits))
-  val input_units = inParams.map { u => Module(new InputUnit(u, outParams)) }
-  val terminal_input_units = terminalInParams.map { u => Module(new TerminalInputUnit(u, outParams)) }
+
+  val input_units = inParams.map { u =>
+    Module(new InputUnit(u, outParams, terminalOutParams)) }
+  val terminal_input_units = terminalInParams.map { u =>
+    Module(new TerminalInputUnit(u, outParams, terminalOutParams)) }
   val all_input_units = input_units ++ terminal_input_units
-  val switch = Module(new Switch(nInputs + nTerminalInputs, nOutputs))
+
+  val output_units = outParams.map { u =>
+    Module(new OutputUnit(inParams, terminalInParams, u)) }
+  val terminal_output_units = terminalOutParams.map { u =>
+    Module(new TerminalOutputUnit(inParams, terminalInParams, u)) }
+  val all_output_units = output_units ++ terminal_output_units
+
+  val switch = Module(new Switch(nInputs + nTerminalInputs, nOutputs + nTerminalOutputs))
   val switch_allocator = Module(new SwitchAllocator(rParams))
   val vc_allocator = Module(new VCAllocator(rParams))
   val route_computer = Module(new RouteComputer(rParams))
-  val output_units = outParams.map { u => Module(new OutputUnit(inParams, terminalInParams, u)) }
 
-  (io.in zip input_units).foreach { case (i,u) => u.io.in <> i }
-  (io.terminal_in zip terminal_input_units).foreach { case (i,u) => u.io.in <> i }
-  (output_units zip io.out).foreach { case (u,o) => o <> u.io.out }
+  (io.in zip input_units).foreach {
+    case (i,u) => u.io.in <> i }
+  (io.terminal_in zip terminal_input_units).foreach {
+    case (i,u) => u.io.in <> i.flits }
+  (output_units zip io.out).foreach {
+    case (u,o) => o <> u.io.out }
+  (terminal_output_units zip io.terminal_out).foreach {
+    case (u,o) => o.flits <> u.io.out }
 
   (route_computer.io.req zip all_input_units).foreach {
     case (i,u) => i <> u.io.router_req }
@@ -67,20 +90,21 @@ class Router(val rParams: RouterParams)(implicit val p: Parameters) extends Modu
     case (u,o) => u.io.vcalloc_resp <> o }
 
 
-  (output_units zip vc_allocator.io.out_alloc).foreach {
+  (all_output_units zip vc_allocator.io.out_alloc).foreach {
     case (u,a) => u.io.alloc <> a }
-  (vc_allocator.io.channel_available zip output_units).foreach {
+  (vc_allocator.io.channel_available zip all_output_units).foreach {
     case (a,u) => a := u.io.channel_available }
 
-  all_input_units.foreach(u => (u.io.out_credit_available zip output_units).foreach {
+  all_input_units.foreach(u => (u.io.out_credit_available zip all_output_units).foreach {
     case (l,r) => l := r.io.credit_available })
   (all_input_units zip switch_allocator.io.req).foreach {
     case (u,r) => r <> u.io.salloc_req }
-  (output_units zip switch_allocator.io.credit_alloc).foreach { case (u,a) => u.io.credit_alloc := a }
+  (output_units zip switch_allocator.io.credit_alloc).foreach {
+    case (u,a) => u.io.credit_alloc := a }
 
   (switch.io.in zip all_input_units).foreach {
     case (i,u) => i <> u.io.out }
-  (output_units zip switch.io.out).foreach {
+  (all_output_units zip switch.io.out).foreach {
     case (u,o) => u.io.in <> o }
 
 }

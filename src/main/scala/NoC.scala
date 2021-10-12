@@ -13,12 +13,16 @@ class NoC(implicit val p: Parameters) extends Module with HasAstroNoCParams{
   }.flatten.flatten
   val inParams = (0 until nNodes).map { i => channelParams.filter(_.destId == i) }
   val outParams = (0 until nNodes).map { i => channelParams.filter(_.srcId == i) }
-  val inputParams = (0 until nNodes).map { n => inputNodes.zipWithIndex.filter(_._1._2 == n).map { case ((nV,_),i) =>
-    ChannelParams(-1, n, Seq.fill(nV) { VirtualChannelParams(-1) }, inputId=i)
-  } }
+  val inputParams = inputNodes.zipWithIndex.map { case ((nV,nId),i) =>
+    ChannelParams(-1, nId, Seq.fill(nV) { VirtualChannelParams(-1) }, inputId=i)
+  }
+  val outputParams = outputNodes.zipWithIndex.map { case (nId,i) =>
+    ChannelParams(nId,-1, Seq.fill(nPrios) { VirtualChannelParams(-1) }, outputId=i)
+  }
 
   val io = IO(new Bundle {
-    val in = MixedVec(inputNodes.map { n => Vec(n._1, Flipped(Decoupled(new Flit))) })
+    val in = MixedVec(inputParams.map { u => Flipped(new IOChannel(u)) })
+    val out = MixedVec(outputParams.map { u => new IOChannel(u) })
   })
 
 
@@ -85,13 +89,11 @@ class NoC(implicit val p: Parameters) extends Module with HasAstroNoCParams{
     i,
     inParams(i),
     outParams(i),
-    inputParams(i),
+    inputParams.filter(_.destId == i),
+    outputParams.filter(_.srcId == i),
     virtualLegalPathsFunction(i),
     routingFunctions(i)
   ))) }
-
-  val in_idxs = Array.fill(nNodes) { 0 }
-  val out_idxs = Array.fill(nNodes) { 0 }
 
   router_nodes.zipWithIndex.map { case (dst,dstId) =>
     dst.io.in.map { in =>
@@ -100,10 +102,8 @@ class NoC(implicit val p: Parameters) extends Module with HasAstroNoCParams{
     (dst.terminalInParams zip dst.io.terminal_in) map { case (u,i) =>
       i <> io.in(u.inputId)
     }
+    (dst.terminalOutParams zip dst.io.terminal_out) map { case (u,i) =>
+      io.out(u.outputId) <> i
+    }
   }
-
-
-
-
-  router_nodes.foreach(i => dontTouch(i.io))
 }

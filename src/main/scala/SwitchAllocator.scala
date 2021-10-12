@@ -15,12 +15,12 @@ class SwitchAllocReq(val outParams: Seq[ChannelParams])(implicit val p: Paramete
 class SwitchAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
   val io = IO(new Bundle {
     val req = MixedVec((inParams ++ terminalInParams).map(u =>
-      Vec(u.virtualChannelParams.size, Flipped(Decoupled(new SwitchAllocReq(outParams))))))
+      Vec(u.virtualChannelParams.size, Flipped(Decoupled(new SwitchAllocReq(allOutParams))))))
     val credit_alloc = MixedVec(outParams.map { u => Valid(UInt(log2Up(u.virtualChannelParams.size).W)) })
   })
   val nInputChannels = allInParams.map(_.virtualChannelParams.size).sum
 
-  val arbs = outParams.map { u => Module(new RRArbiter(UInt(log2Up(u.virtualChannelParams.size).W), nInputChannels)) }
+  val arbs = allOutParams.map { u => Module(new RRArbiter(UInt(log2Up(u.virtualChannelParams.size).W), nInputChannels)) }
   arbs.foreach(_.io.out.ready := true.B)
 
   var idx = 0
@@ -38,7 +38,7 @@ class SwitchAllocator(val rParams: RouterParams)(implicit val p: Parameters) ext
   }
   require(idx == nInputChannels)
 
-  (arbs zip io.credit_alloc).map { case (a,i) =>
+  (arbs.take(nOutputs) zip io.credit_alloc).map { case (a,i) =>
     i.valid := a.io.out.fire()
     i.bits := a.io.out.bits
   }

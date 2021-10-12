@@ -36,6 +36,13 @@ class RouteComputer(val rParams: RouterParams)(implicit val p: Parameters) exten
     req.ready := true.B
     resp.valid := req.valid
     resp.bits.src_virt_id := req.bits.src_virt_id
-    resp.bits.out_channels := VecInit(routingMatrix.map(_(req.bits.dest_id)(req.bits.src_prio))).asUInt
+    if (outParams.size == 0) {
+      assert(!req.valid)
+      resp.bits.out_channels := 0.U
+    } else {
+      resp.bits.out_channels := VecInit(
+        routingMatrix.map(_(req.bits.dest_id)(req.bits.src_prio))
+      ).asUInt
+    }
   }
 }
