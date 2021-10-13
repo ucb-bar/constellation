@@ -97,7 +97,7 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalO
     i.valid := s.g === g_v
     val bits = Wire(new VCAllocReq(inParam, outParams.size, terminalOutParams.size))
     bits.in_virt_channel := idx.U
-    bits.out_channels := s.o
+    bits.out_channels := s.r
     bits.in_prio := s.prio
     bits.dummy := idx.U
     i.bits <> bits
@@ -122,12 +122,13 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalO
     r.bits.out_channel := OHToUInt(s.r)
     r.bits.out_virt_channel := s.o
     when (r.fire()) {
-      s.p := WrapInc(s.p + 1.U, u.bufferSize)
-      s.flits_sent := s.flits_sent + 1.U
-    }
-    when (s.flits_sent === s.flits_arrived && s.tail_seen) {
-      s.g := g_i
-      tail_fired := true.B
+      s.p := WrapInc(s.p, u.bufferSize)
+      val n_f = s.flits_sent + 1.U
+      s.flits_sent := n_f
+      when (n_f === s.flits_arrived && s.tail_seen) {
+        s.g := g_i
+        tail_fired := true.B
+      }
     }
   }
   val salloc_fires = io.salloc_req.map(_.fire())

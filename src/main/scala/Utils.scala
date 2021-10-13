@@ -15,3 +15,17 @@ object WrapInc
     }
   }
 }
+
+
+class Pipeline[T <: Data](gen: T, entries: Int) extends Module {
+  require(entries > 0)
+  val io = IO(new QueueIO(gen, entries))
+
+  val regs = Seq.fill(entries) { Module(new Queue(gen, 1, pipe=true)) }
+
+  io.count := regs.map(_.io.count).reduce(_+&_)
+  regs(0).io.enq <> io.enq
+  io.deq <> regs(entries-1).io.deq
+
+  (regs.drop(1) zip regs.dropRight(1)).map { case (r,l) => l.io.enq <> r.io.deq }
+}

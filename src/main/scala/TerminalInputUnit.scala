@@ -17,7 +17,7 @@ class TerminalInputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], t
   io.in.foreach { i => assert(!(i.fire() && outIdToDestId(i.bits.out_id) === inParam.destId.U)) }
 
   val route_buffers = Seq.fill(inParam.nVirtualChannels) { Module(new Queue(new Flit, 2)) }
-  val route_qs = Seq.fill(inParam.nVirtualChannels) { Module(new Queue(new RouteComputerResp(inParam, nOutputs), 2)) }
+  val route_qs = Seq.fill(inParam.nVirtualChannels) { Module(new Queue(new RouteComputerResp(inParam, nOutputs), 4)) }
   val route_arbiter = Module(new Arbiter(new RouteComputerReq(inParam), inParam.nVirtualChannels))
   io.router_req <> route_arbiter.io.out
   (0 until inParam.nVirtualChannels).foreach { i =>

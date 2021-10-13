@@ -7,9 +7,9 @@ import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
 
-class SwitchAllocReq(val outParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
-  val out_channel = UInt(log2Up(outParams.size).W)
-  val out_virt_channel = UInt(log2Up(outParams.map(_.virtualChannelParams.size).max).W)
+class SwitchAllocReq(val allOutParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
+  val out_channel = UInt(log2Up(allOutParams.size).W)
+  val out_virt_channel = UInt(log2Up(allOutParams.map(_.virtualChannelParams.size).max).W)
 }
 
 class SwitchAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
@@ -20,23 +20,21 @@ class SwitchAllocator(val rParams: RouterParams)(implicit val p: Parameters) ext
   })
   val nInputChannels = allInParams.map(_.virtualChannelParams.size).sum
 
-  val arbs = allOutParams.map { u => Module(new RRArbiter(UInt(log2Up(u.virtualChannelParams.size).W), nInputChannels)) }
+  val in_arbs = io.req.map { r =>
+    val arb = Module(new Arbiter(new SwitchAllocReq(allOutParams), r.size))
+    arb.io.in <> r
+    arb
+  }
+  val arbs = allOutParams.map { u => Module(new RRArbiter(UInt(log2Up(u.virtualChannelParams.size).W), nInputs + nTerminalInputs)) }
   arbs.foreach(_.io.out.ready := true.B)
 
-  var idx = 0
-  for (j <- 0 until allInParams.map(_.virtualChannelParams.size).max) {
-    for (i <- 0 until allInParams.size) {
-      if (j < allInParams(i).virtualChannelParams.size) {
-        arbs.zipWithIndex.map { case (a,k) =>
-          a.io.in(idx).valid := io.req(i)(j).valid && io.req(i)(j).bits.out_channel === k.U
-          a.io.in(idx).bits := io.req(i)(j).bits.out_virt_channel
-        }
-        io.req(i)(j).ready := arbs.map(_.io.in(idx).ready).reduce(_||_)
-        idx += 1
-      }
+  in_arbs.zipWithIndex.foreach { case (o,j) =>
+    arbs.zipWithIndex.foreach { case (a,i) =>
+      a.io.in(j).valid := o.io.out.valid && o.io.out.bits.out_channel === i.U
+      a.io.in(j).bits := o.io.out.bits.out_virt_channel
     }
+    o.io.out.ready := arbs.map(_.io.in(j).ready).reduce(_||_)
   }
-  require(idx == nInputChannels)
 
   (arbs.take(nOutputs) zip io.credit_alloc).map { case (a,i) =>
     i.valid := a.io.out.fire()
