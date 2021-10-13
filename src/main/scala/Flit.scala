@@ -13,8 +13,5 @@ class Flit(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
   // virtual channel id when moving between nodes
   val virt_channel_id = UInt(virtChannelBits.W)
 
-  // how many flits in this packet
-  val flits_in_packet = UInt((1+log2Ceil(maxFlits)).W)
-
   val payload = UInt(flitPayloadBits.W)
 }

@@ -42,8 +42,8 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalO
     val o = UInt(log2Up((outParams ++ terminalOutParams).map(_.virtualChannelParams.size).max).W)
     val p = UInt(log2Up(inParam.virtualChannelParams.map(_.bufferSize).max).W)
     val prio = UInt(prioBits.W)
-    val flits_arrived = UInt((1+log2Up(maxFlits)).W)
-    val flits_sent = UInt((1+log2Up(maxFlits)).W)
+    val flits_arrived = UInt(flitIdBits.W)
+    val flits_sent = UInt(flitIdBits.W)
     val tail_seen = Bool()
     val dest_id = UInt(idBits.W)
   }
