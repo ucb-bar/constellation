@@ -124,7 +124,7 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalO
 
   val tail_fired = Wire(Vec(nVirtualChannels, Bool()))
   (states zip io.salloc_req).zipWithIndex.map { case ((s,r),i) =>
-    val c = Mux1H(UIntToOH(s.o), Mux1H(s.r, io.out_credit_available))
+    val c = (UIntToOH(s.o) & Mux1H(s.r, io.out_credit_available.map(_.asUInt))) =/= 0.U
     r.valid := s.g === g_a && c && s.buffer_occupancy =/= 0.U && !tail_fired(i)
     r.bits.out_channel := OHToUInt(s.r)
     r.bits.out_virt_channel := s.o
