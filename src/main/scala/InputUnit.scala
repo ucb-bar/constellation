@@ -41,15 +41,25 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalO
     val r = UInt((nTerminalOutputs + nOutputs).W)
     val o = UInt(log2Up((outParams ++ terminalOutParams).map(_.virtualChannelParams.size).max).W)
     val p = UInt(log2Up(inParam.virtualChannelParams.map(_.bufferSize).max).W)
+    val buffer_occupancy = UInt(log2Up(1+inParam.virtualChannelParams.map(_.bufferSize).max).W)
     val prio = UInt(prioBits.W)
-    val flits_arrived = UInt(flitIdBits.W)
-    val flits_sent = UInt(flitIdBits.W)
     val tail_seen = Bool()
     val dest_id = UInt(idBits.W)
   }
   val states = Reg(Vec(nVirtualChannels, new InputState))
   val buffer = Module(new InputBuffer(inParam))
   buffer.io.in := io.in.flit
+  (0 until nVirtualChannels).map { i =>
+    when (!io.salloc_req(i).fire() &&
+      (io.in.flit.fire() && io.in.flit.bits.virt_channel_id === i.U)) {
+
+      states(i).buffer_occupancy := states(i).buffer_occupancy + 1.U
+    } .elsewhen (io.salloc_req(i).fire() &&
+      !(io.in.flit.fire() && io.in.flit.bits.virt_channel_id === i.U)) {
+
+      states(i).buffer_occupancy := states(i).buffer_occupancy - 1.U
+    }
+  }
 
   when (io.in.flit.fire() && io.in.flit.bits.head) {
     val id = io.in.flit.bits.virt_channel_id
@@ -61,14 +71,11 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalO
     states(id).dest_id := dest_id
     states(id).r := UIntToOH(outIdToDestChannelId(io.in.flit.bits.out_id)) << outParams.size
     states(id).p := buffer.io.head
-    states(id).flits_sent := 0.U
-    states(id).flits_arrived := 1.U
     states(id).tail_seen := io.in.flit.bits.tail
     states(id).prio := io.in.flit.bits.prio
 
   } .elsewhen (io.in.flit.fire()) {
     val id = io.in.flit.bits.virt_channel_id
-    states(id).flits_arrived := states(id).flits_arrived + 1.U
     when (io.in.flit.bits.tail) {
       states(id).tail_seen := true.B
     }
@@ -115,34 +122,32 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalO
     states(id).g := g_a
   }
 
-  val tail_fired = WireInit(false.B)
-  ((states zip io.salloc_req) zip inParam.virtualChannelParams).map { case ((s,r),u) =>
+  val tail_fired = Wire(Vec(nVirtualChannels, Bool()))
+  (states zip io.salloc_req).zipWithIndex.map { case ((s,r),i) =>
     val c = Mux1H(UIntToOH(s.o), Mux1H(s.r, io.out_credit_available))
-    r.valid := s.g === g_a && c && s.flits_sent =/= s.flits_arrived
+    r.valid := s.g === g_a && c && s.buffer_occupancy =/= 0.U && !tail_fired(i)
     r.bits.out_channel := OHToUInt(s.r)
     r.bits.out_virt_channel := s.o
     when (r.fire()) {
-      s.p := WrapInc(s.p, u.bufferSize)
-      val n_f = s.flits_sent + 1.U
-      s.flits_sent := n_f
-      when (n_f === s.flits_arrived && s.tail_seen) {
-        s.g := g_i
-        tail_fired := true.B
-      }
+      s.p := WrapInc(s.p, inParam.virtualChannelParams(i).bufferSize)
+    }
+    tail_fired(i) := RegNext(r.fire()) && buffer.io.read_resp.tail
+    when (tail_fired(i)) {
+      s.g := g_i
     }
   }
   val salloc_fires = io.salloc_req.map(_.fire())
+  val salloc_fire_id = OHToUInt(salloc_fires)
   val salloc_fire = salloc_fires.reduce(_||_)
   assert(PopCount(salloc_fires) <= 1.U)
   buffer.io.read_req.valid := salloc_fire
   buffer.io.read_req.bits.addr := Mux1H(salloc_fires, states.map(_.p))
-  buffer.io.read_req.bits.channel := OHToUInt(salloc_fires)
+  buffer.io.read_req.bits.channel := salloc_fire_id
 
   io.in.credit_return.valid := RegNext(salloc_fire)
-  io.in.credit_return.bits := RegNext(OHToUInt(salloc_fires))
-  io.in.vc_free.valid := RegNext(salloc_fire && tail_fired)
-  io.in.vc_free.bits := RegNext(OHToUInt(salloc_fires))
-
+  io.in.credit_return.bits := RegNext(salloc_fire_id)
+  io.in.vc_free.valid := RegNext(salloc_fire) && buffer.io.read_resp.tail
+  io.in.vc_free.bits := RegNext(salloc_fire_id)
 
   io.out.valid := RegNext(buffer.io.read_req.valid)
   io.out.bits.flit := buffer.io.read_resp
@@ -151,8 +156,8 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalO
   val channel_oh = Mux1H(salloc_fires, states.map(_.r))
   io.out.bits.out_channel := RegNext(OHToUInt(channel_oh))
 
-  when (reset.asBool) { states.foreach(_.g := g_i) }
-
-
-
+  when (reset.asBool) {
+    states.foreach(_.g := g_i)
+    states.foreach(_.buffer_occupancy := 0.U)
+  }
 }
