@@ -25,7 +25,7 @@ object SelectFirstN
 }
 
 
-class InputGen(idx: Int, prio: Int)(implicit val p: Parameters) extends Module with HasAstroNoCParams {
+class InputGen(idx: Int, prio: Int, inputStallProbability: Double)(implicit val p: Parameters) extends Module with HasAstroNoCParams {
   val io = IO(new Bundle {
     val out = Decoupled(new Flit)
     val rob_ready = Input(Bool())
@@ -42,7 +42,8 @@ class InputGen(idx: Int, prio: Int)(implicit val p: Parameters) extends Module w
   val can_fire = (flits_left === 0.U) && io.rob_ready
 
   val packet_remaining = (LFSR(10) % maxFlits.U)
-  io.out.valid := LFSR(10)(2,0) =/= 0.U && flits_left === 0.U && io.rob_ready
+  val random_delay = LFSR(10) < (inputStallProbability * (1 << 10)).toInt.U
+  io.out.valid := !random_delay && flits_left === 0.U && io.rob_ready
   io.out.bits.head := true.B
   io.out.bits.tail := packet_remaining === 0.U
   io.out.bits.prio := prio.U
@@ -59,7 +60,7 @@ class InputGen(idx: Int, prio: Int)(implicit val p: Parameters) extends Module w
     flits_fired := 1.U
   }
   when (flits_left =/= 0.U) {
-    io.out.valid := LFSR(10)(2,0) =/= 0.U
+    io.out.valid := !random_delay
     io.out.bits.head := false.B
     io.out.bits.tail := flits_left === 1.U
     io.out.bits.out_id := head_flit.out_id
@@ -76,6 +77,8 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
   require(flitPayloadBits >= 64)
   val robSz = 128
   val totalTxs = 1000
+  val inputStallProbability = 0.0
+  val outputStallProbability = 0.0
 
   val io = IO(new Bundle {
     val to_noc = MixedVec(inputParams.map { u => new IOChannel(u) })
@@ -87,6 +90,8 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
   val nOutputs = outputParams.map(_.nVirtualChannels).sum
 
   val txs = RegInit(0.U(32.W))
+  val flits = RegInit(0.U(32.W))
+  dontTouch(flits)
 
   val tsc = RegInit(0.U((flitPayloadBits-16).W))
   tsc := tsc + 1.U
@@ -122,9 +127,10 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
   var idx = 0
   io.to_noc.map { i =>
     i.flits.zipWithIndex.map { case (f,o) =>
-      val igen = Module(new InputGen(idx, o))
+      val igen = Module(new InputGen(idx, o, inputStallProbability))
       igen.io.rob_idx := rob_alloc_ids(idx)
-      igen.io.rob_ready := rob_alloc_avail(idx) && (PopCount(~rob_valids) >= nInputs.U) && tsc >= 10.U && txs < totalTxs.U
+      igen.io.rob_ready := (rob_alloc_avail(idx) &&
+        (PopCount(~rob_valids) >= nInputs.U) && tsc >= 10.U && txs < totalTxs.U)
       igen.io.tsc := tsc
       f <> igen.io.out
       when (igen.io.fire) {
@@ -142,7 +148,7 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
   idx = 0
   io.from_noc.zipWithIndex map { case (o,i) =>
     o.flits.map { f =>
-      f.ready := LFSR(10)(2,0) =/= 0.U
+      f.ready := LFSR(10) >= (outputStallProbability * (1 << 10)).toInt.U
       when (f.fire()) {
         val rob_idx = f.bits.payload(15,8)
 
@@ -162,6 +168,8 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
     }
   }
   require(idx == nOutputs)
+
+  flits := flits + io.from_noc.map { i => PopCount(i.flits.map(_.fire())) }.reduce(_+&_)
 }
 
 class TestHarness(implicit val p: Parameters) extends Module {

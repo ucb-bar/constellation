@@ -41,6 +41,7 @@ class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends
 
   io.resp.foreach(_.bits := DontCare)
   (io.resp zip io.req).map { case (o,i) => o.bits.in_virt_channel := i.bits.in_virt_channel }
+  
 
   var idx = 0
   for (j <- 0 until allOutParams.map(_.virtualChannelParams.size).max) {
@@ -90,7 +91,8 @@ class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends
   for (j <- 0 until allOutParams.map(_.virtualChannelParams.size).max) {
     for (i <- 0 until allOutParams.size) {
       if (j < allOutParams(i).virtualChannelParams.size) {
-        out_arbs(i).io.in(j) <> row_reqs(idx)
+        // Reverse the arbiter to prefer higher channels first
+        out_arbs(i).io.in(out_arbs(i).n-j-1) <> row_reqs(idx)
         idx += 1
       }
     }

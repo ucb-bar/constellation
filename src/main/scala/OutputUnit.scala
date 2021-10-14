@@ -40,7 +40,7 @@ class OutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[ChannelPara
     val g = UInt(2.W)
     val i_p = UInt(log2Up(nInputs).W)
     val i_c = UInt(log2Up((inParams ++ terminalInParams).map(_.virtualChannelParams.size).max).W)
-    val c = UInt(log2Up(bufferSize).W)
+    val c = UInt(log2Up(1+bufferSize).W)
   }
 
   val states = Reg(MixedVec(outParam.virtualChannelParams.map { u => new OutputState(u.bufferSize) }))
