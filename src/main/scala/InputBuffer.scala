@@ -19,26 +19,36 @@ class InputBuffer(inParam: ChannelParams)(implicit val p: Parameters) extends Mo
     }))
     val read_resp = Output(new Flit)
   })
-  val buffers = Reg(MixedVec(inParam.virtualChannelParams.map { u => Vec(u.bufferSize, new Flit) }))
-  val heads = Reg(MixedVec(inParam.virtualChannelParams.map { u => UInt(log2Up(u.bufferSize).W) }))
-
-  io.head := DontCare
-  io.read_resp := DontCare
-  for (i <- 0 until inParam.virtualChannelParams.size) {
-    when (io.in.bits.virt_channel_id === i.U) {
-      io.head := heads(i)
-      when (io.in.fire()) {
-        heads(i) := WrapInc(heads(i), inParam.virtualChannelParams(i).bufferSize)
-        buffers(i)(heads(i)) := io.in.bits
-      }
-    }
-    when (RegNext(io.read_req.bits.channel === i.U)) {
-      io.read_resp := buffers(i)(RegNext(io.read_req.bits.addr))
-    }
+  val bufferSz = inParam.virtualChannelParams.map(_.bufferSize).sum
+  val (buffer, read, write) = if (inParam.useSyncReadBuffer) {
+    val mem = SyncReadMem(bufferSz, new Flit)
+    def read(x: UInt, en: Bool): Flit = mem.read(x, en)
+    def write(x: UInt, d: Flit): Unit = mem.write(x, d)
+    (mem, read(_,_), write(_,_))
+  } else {
+    val mem = Reg(Vec(bufferSz, new Flit))
+    def read(x: UInt, en: Bool): Flit = RegEnable(mem(x), en)
+    def write(x: UInt, d: Flit): Unit = mem(x) := d
+    (mem, read(_,_), write(_,_))
   }
 
+  val heads = Reg(Vec(inParam.nVirtualChannels, UInt(log2Up(inParam.virtualChannelParams.map(_.bufferSize).max).W)))
+  val bases = VecInit(inParam.virtualChannelParams.map(_.bufferSize).scanLeft(0)(_+_).dropRight(1).map(_.U))
+
+  val in_virt_id = io.in.bits.virt_channel_id
+  when (io.in.valid) {
+    val base = bases(in_virt_id)
+    val head = heads(in_virt_id)
+    val waddr = base +& head
+    write(waddr, io.in.bits)
+    heads(in_virt_id) := WrapInc(heads(in_virt_id),
+      VecInit(inParam.virtualChannelParams.map(_.bufferSize.U))(in_virt_id))
+  }
+
+  io.head := heads(in_virt_id)
+
+  val raddr = bases(io.read_req.bits.channel) +& io.read_req.bits.addr
+  io.read_resp := read(raddr, io.read_req.valid)
 
   when (reset.asBool) { heads.foreach(_ := 0.U) }
-
-
 }

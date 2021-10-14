@@ -3,8 +3,7 @@ package astronoc
 import chisel3._
 import chisel3.util._
 
-object WrapInc
-{
+object WrapInc {
   // "n" is the number of increments, so we wrap at n-1.
   def apply(value: UInt, n: Int): UInt = {
     if (isPow2(n)) {
@@ -13,6 +12,11 @@ object WrapInc
       val wrap = (value === (n-1).U)
       Mux(wrap, 0.U, value + 1.U)
     }
+  }
+
+  def apply(value: UInt, n: UInt): UInt = {
+    val wrap = value === n - 1.U
+    Mux(wrap, 0.U, value + 1.U)
   }
 }
 

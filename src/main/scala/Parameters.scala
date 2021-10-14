@@ -66,7 +66,8 @@ case class ChannelParams(
   destId: Int,
   virtualChannelParams: Seq[VirtualChannelParams],
   inputId: Int = -1,
-  outputId: Int = -1
+  outputId: Int = -1,
+  useSyncReadBuffer: Boolean = false
 ) {
   val nVirtualChannels = virtualChannelParams.size
   val isInput = inputId >= 0
