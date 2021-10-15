@@ -10,86 +10,71 @@ class TerminalInputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], t
   (implicit p: Parameters) extends AbstractInputUnit()(p) {
   val nOutputs = outParams.size
   require(inParam.isInput && !inParam.isOutput)
+  require(inParam.nVirtualChannels == 1)
 
   val io = IO(new AbstractInputUnitIO(inParam, outParams, terminalOutParams) {
-    val in = Flipped(Vec(inParam.nVirtualChannels, Decoupled(new Flit)))
+    val in = Flipped(Decoupled(new Flit))
   })
-  io.in.foreach { i => assert(!(i.fire() && outIdToDestId(i.bits.out_id) === inParam.destId.U)) }
+  assert(!(io.in.fire() && outIdToDestId(io.in.bits.out_id) === inParam.destId.U))
 
-  val route_buffers = Seq.fill(inParam.nVirtualChannels) { Module(new Queue(new Flit, 2)) }
-  val route_qs = Seq.fill(inParam.nVirtualChannels) { Module(new Queue(new RouteComputerResp(inParam, nOutputs), 4)) }
-  val route_arbiter = Module(new Arbiter(new RouteComputerReq(inParam), inParam.nVirtualChannels))
-  io.router_req <> route_arbiter.io.out
-  (0 until inParam.nVirtualChannels).foreach { i =>
-    route_buffers(i).io.enq.bits := io.in(i).bits
-    route_arbiter.io.in(i).bits.src_virt_id := i.U
-    route_arbiter.io.in(i).bits.src_prio := io.in(i).bits.prio
-    route_arbiter.io.in(i).bits.dest_id := outIdToDestId(io.in(i).bits.out_id)
+  val route_buffer = Module(new Queue(new Flit, 2))
+  val route_q = Module(new Queue(new RouteComputerResp(inParam, nOutputs), 4))
 
-    route_buffers(i).io.enq.valid := io.in(i).valid && (route_arbiter.io.in(i).ready || !io.in(i).bits.head)
-    route_arbiter.io.in(i).valid := io.in(i).valid && route_buffers(i).io.enq.ready && io.in(i).bits.head
-    io.in(i).ready := route_buffers(i).io.enq.ready && (route_arbiter.io.in(i).ready || !io.in(i).bits.head)
-  }
+  route_buffer.io.enq.bits := io.in.bits
+  io.router_req.bits.src_virt_id := 0.U
+  io.router_req.bits.src_prio := io.in.bits.prio
+  io.router_req.bits.dest_id := outIdToDestId(io.in.bits.out_id)
 
-  route_qs.zipWithIndex.foreach { case (q,i) =>
-    q.io.enq.valid := io.router_resp.valid && io.router_resp.bits.src_virt_id === i.U
-    q.io.enq.bits := io.router_resp.bits
-    assert(!(q.io.enq.valid && !q.io.enq.ready))
-  }
+  route_buffer.io.enq.valid := io.in.valid && (io.router_req.ready || !io.in.bits.head)
+  io.router_req.valid := io.in.valid && route_buffer.io.enq.ready && io.in.bits.head
+  io.in.ready := route_buffer.io.enq.ready && (io.router_req.ready || !io.in.bits.head)
 
-  val vcalloc_buffers = Seq.fill(inParam.nVirtualChannels) { Module(new Queue(new Flit, 2)) }
-  val vcalloc_qs = Seq.fill(inParam.nVirtualChannels) { Module(new Queue(new VCAllocResp(inParam, outParams), 2)) }
-  val vcalloc_arbiter = Module(new Arbiter(new VCAllocReq(inParam, outParams.size, terminalOutParams.size), inParam.nVirtualChannels))
-  io.vcalloc_req <> vcalloc_arbiter.io.out
-  (0 until inParam.nVirtualChannels).foreach { i =>
-    vcalloc_buffers(i).io.enq.bits := route_buffers(i).io.deq.bits
+  route_q.io.enq.valid := io.router_resp.valid
+  route_q.io.enq.bits := io.router_resp.bits
+  assert(!(route_q.io.enq.valid && !route_q.io.enq.ready))
 
-    vcalloc_arbiter.io.in(i).bits.in_virt_channel := i.U
-    vcalloc_arbiter.io.in(i).bits.in_prio := route_buffers(i).io.deq.bits.prio
-    vcalloc_arbiter.io.in(i).bits.out_channels := route_qs(i).io.deq.bits.out_channels
-    vcalloc_arbiter.io.in(i).bits.dummy := i.U
+  val vcalloc_buffer = Module(new Queue(new Flit, 2))
+  val vcalloc_q = Module(new Queue(new VCAllocResp(inParam, outParams), 2))
 
-    val head = route_buffers(i).io.deq.bits.head
-    val tail = route_buffers(i).io.deq.bits.tail
-    vcalloc_buffers(i).io.enq.valid := (route_buffers(i).io.deq.valid &&
-      (route_qs(i).io.deq.valid || !head) &&
-      (vcalloc_arbiter.io.in(i).ready || !head)
-    )
-    vcalloc_arbiter.io.in(i).valid := (route_buffers(i).io.deq.valid && route_qs(i).io.deq.valid &&
-      head && vcalloc_buffers(i).io.enq.ready)
-    route_buffers(i).io.deq.ready := (vcalloc_buffers(i).io.enq.ready &&
-      (route_qs(i).io.deq.valid || !head) &&
-      (vcalloc_arbiter.io.in(i).ready || !head)
-    )
-    route_qs(i).io.deq.ready := (route_buffers(i).io.deq.fire() && tail)
-  }
+  vcalloc_buffer.io.enq.bits := route_buffer.io.deq.bits
 
-  vcalloc_qs.zipWithIndex.foreach { case (q,i) =>
-    q.io.enq.valid := io.vcalloc_resp.valid && io.vcalloc_resp.bits.in_virt_channel === i.U
-    q.io.enq.bits := io.vcalloc_resp.bits
-    assert(!(q.io.enq.valid && !q.io.enq.ready))
-  }
+  io.vcalloc_req.bits.in_virt_channel := 0.U
+  io.vcalloc_req.bits.in_prio := route_buffer.io.deq.bits.prio
+  io.vcalloc_req.bits.out_channels := route_q.io.deq.bits.out_channels
+  io.vcalloc_req.bits.dummy := 0.U
 
-  val out_oh = Wire(Vec(inParam.nVirtualChannels, Bool()))
-  (0 until inParam.nVirtualChannels).foreach { i =>
-    io.salloc_req(i).bits.out_channel := vcalloc_qs(i).io.deq.bits.out_channel
-    io.salloc_req(i).bits.out_virt_channel := vcalloc_qs(i).io.deq.bits.out_virt_channel
+  val head = route_buffer.io.deq.bits.head
+  val tail = route_buffer.io.deq.bits.tail
+  vcalloc_buffer.io.enq.valid := (route_buffer.io.deq.valid &&
+    (route_q.io.deq.valid || !head) &&
+    (io.vcalloc_req.ready || !head)
+  )
+  io.vcalloc_req.valid := (route_buffer.io.deq.valid && route_q.io.deq.valid &&
+    head && vcalloc_buffer.io.enq.ready)
+  route_buffer.io.deq.ready := (vcalloc_buffer.io.enq.ready &&
+    (route_q.io.deq.valid || !head) &&
+    (io.vcalloc_req.ready || !head))
+  route_q.io.deq.ready := (route_buffer.io.deq.fire() && tail)
 
 
-    val c = Mux1H(UIntToOH(vcalloc_qs(i).io.deq.bits.out_virt_channel),
-      Mux1H(vcalloc_qs(i).io.deq.bits.out_channel, io.out_credit_available))
-    val tail = vcalloc_buffers(i).io.deq.bits.tail
-    io.salloc_req(i).valid := vcalloc_buffers(i).io.deq.valid && vcalloc_qs(i).io.deq.valid && route_qs(i).io.deq.valid && c
-    vcalloc_buffers(i).io.deq.ready := io.salloc_req(i).ready && vcalloc_qs(i).io.deq.valid && route_qs(i).io.deq.valid && c
-    vcalloc_qs(i).io.deq.ready := tail && vcalloc_buffers(i).io.deq.fire()
-    route_qs(i).io.deq.ready := tail && vcalloc_buffers(i).io.deq.fire()
-    out_oh(i) := vcalloc_buffers(i).io.deq.fire()
-  }
-  assert(PopCount(out_oh) <= 1.U)
+  vcalloc_q.io.enq.valid := io.vcalloc_resp.valid
+  vcalloc_q.io.enq.bits := io.vcalloc_resp.bits
+  assert(!(vcalloc_q.io.enq.valid && !vcalloc_q.io.enq.ready))
 
-  io.out.valid := RegNext(out_oh.reduce(_||_))
-  io.out.bits.flit := RegNext(Mux1H(out_oh, vcalloc_buffers.map(_.io.deq.bits)))
-  io.out.bits.flit.virt_channel_id := RegNext(Mux1H(out_oh, vcalloc_qs.map(_.io.deq.bits.out_virt_channel)))
-  io.out.bits.out_channel := RegNext(Mux1H(out_oh, vcalloc_qs.map(_.io.deq.bits.out_channel)))
+  io.salloc_req(0).bits.out_channel := vcalloc_q.io.deq.bits.out_channel
+  io.salloc_req(0).bits.out_virt_channel := vcalloc_q.io.deq.bits.out_virt_channel
+
+  val c = Mux1H(UIntToOH(vcalloc_q.io.deq.bits.out_virt_channel),
+    Mux1H(vcalloc_q.io.deq.bits.out_channel, io.out_credit_available))
+  val vcalloc_tail = vcalloc_buffer.io.deq.bits.tail
+  io.salloc_req(0).valid := vcalloc_buffer.io.deq.valid && vcalloc_q.io.deq.valid && route_q.io.deq.valid && c
+  vcalloc_buffer.io.deq.ready := io.salloc_req(0).ready && vcalloc_q.io.deq.valid && route_q.io.deq.valid && c
+  vcalloc_q.io.deq.ready := vcalloc_tail && vcalloc_buffer.io.deq.fire()
+  route_q.io.deq.ready := vcalloc_tail && vcalloc_buffer.io.deq.fire()
+
+  io.out.valid := RegNext(vcalloc_buffer.io.deq.fire())
+  io.out.bits.flit := RegNext(vcalloc_buffer.io.deq.bits)
+  io.out.bits.flit.virt_channel_id := RegNext(vcalloc_q.io.deq.bits.out_virt_channel)
+  io.out.bits.out_channel := RegNext(vcalloc_q.io.deq.bits.out_channel)
 
 }

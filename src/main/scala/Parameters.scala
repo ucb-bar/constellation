@@ -18,8 +18,8 @@ case class AstroNoCConfig(
   virtualLegalPaths: Int => (Int, Int, Int, Int) => Int => Boolean = (a: Int) => (b: Int, c: Int, d: Int, e: Int) => (f: Int) => false,
   // nodeId => destId, nextId => prio => usePath
   routingFunctions: Int => (Int, Int) => (Int) => Boolean = (a: Int) => (b: Int, c: Int) => (c: Int) => false,
-  // Seq[(nVChannels, nodeId)]
-  inputNodes: Seq[(Int, Int)] = Nil,
+  // Seq[nodeId]
+  inputNodes: Seq[Int] = Nil,
   // Seq[nodeId]
   outputNodes: Seq[Int] = Nil
 )

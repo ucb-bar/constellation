@@ -13,11 +13,11 @@ class NoC(implicit val p: Parameters) extends Module with HasAstroNoCParams{
   }.flatten.flatten
   val inParams = (0 until nNodes).map { i => channelParams.filter(_.destId == i) }
   val outParams = (0 until nNodes).map { i => channelParams.filter(_.srcId == i) }
-  val inputParams = inputNodes.zipWithIndex.map { case ((nV,nId),i) =>
-    ChannelParams(-1, nId, Seq.fill(nV) { VirtualChannelParams(-1) }, inputId=i)
+  val inputParams = inputNodes.zipWithIndex.map { case (nId,i) =>
+    ChannelParams(-1, nId, Seq(VirtualChannelParams(-1)), inputId=i)
   }
   val outputParams = outputNodes.zipWithIndex.map { case (nId,i) =>
-    ChannelParams(nId,-1, Seq.fill(nPrios) { VirtualChannelParams(-1) }, outputId=i)
+    ChannelParams(nId, -1, Seq(VirtualChannelParams(-1)), outputId=i)
   }
 
   val io = IO(new Bundle {

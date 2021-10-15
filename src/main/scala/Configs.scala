@@ -18,7 +18,7 @@ class UnidirectionalLineConfig(nNodes: Int = 3, inputNodes: Seq[Int] = Seq(0), o
     routingFunctions = (n: Int) => (dst: Int, nxt: Int) => (prio: Int) => {
       if (n < nxt) dst >= nxt else dst <= nxt
     },
-    inputNodes = inputNodes.map { i => (1, i) },
+    inputNodes = inputNodes,
     outputNodes = outputNodes
   )
 })

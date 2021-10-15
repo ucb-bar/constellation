@@ -124,52 +124,42 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
   txs := txs + PopCount(rob_allocs)
   io.success := txs >= totalTxs.U && rob_valids === 0.U
 
-  var idx = 0
-  io.to_noc.map { i =>
-    i.flits.zipWithIndex.map { case (f,o) =>
-      val igen = Module(new InputGen(idx, o, inputStallProbability))
-      igen.io.rob_idx := rob_alloc_ids(idx)
-      igen.io.rob_ready := (rob_alloc_avail(idx) &&
-        (PopCount(~rob_valids) >= nInputs.U) && tsc >= 10.U && txs < totalTxs.U)
-      igen.io.tsc := tsc
-      f <> igen.io.out
-      when (igen.io.fire) {
-        rob_allocs(rob_alloc_ids(idx)) := true.B
-        rob(rob_alloc_ids(idx)).payload := igen.io.out.bits.payload
-        rob(rob_alloc_ids(idx)).out_id := igen.io.out.bits.out_id
-        rob(rob_alloc_ids(idx)).n_flits := igen.io.n_flits
-        rob(rob_alloc_ids(idx)).flits_returned := 0.U
-      }
-      idx += 1
+  io.to_noc.zipWithIndex.map { case (i,idx) =>
+    val igen = Module(new InputGen(idx, 0, inputStallProbability))
+    igen.io.rob_idx := rob_alloc_ids(idx)
+    igen.io.rob_ready := (rob_alloc_avail(idx) &&
+      (PopCount(~rob_valids) >= nInputs.U) && tsc >= 10.U && txs < totalTxs.U)
+    igen.io.tsc := tsc
+    i.flit <> igen.io.out
+    when (igen.io.fire) {
+      rob_allocs(rob_alloc_ids(idx)) := true.B
+      rob(rob_alloc_ids(idx)).payload := igen.io.out.bits.payload
+      rob(rob_alloc_ids(idx)).out_id := igen.io.out.bits.out_id
+      rob(rob_alloc_ids(idx)).n_flits := igen.io.n_flits
+      rob(rob_alloc_ids(idx)).flits_returned := 0.U
     }
   }
-  require(idx == nInputs)
 
-  idx = 0
   io.from_noc.zipWithIndex map { case (o,i) =>
-    o.flits.map { f =>
-      f.ready := LFSR(10) >= (outputStallProbability * (1 << 10)).toInt.U
-      when (f.fire()) {
-        val rob_idx = f.bits.payload(15,8)
+    o.flit.ready := LFSR(10) >= (outputStallProbability * (1 << 10)).toInt.U
+    when (o.flit.fire()) {
+      val rob_idx = o.flit.bits.payload(15,8)
 
-        assert(rob_valids(rob_idx) &&
-          (rob(rob_idx).payload === f.bits.payload) &&
-          (f.bits.out_id === i.U) &&
-          (rob(rob_idx).flits_returned < rob(rob_idx).n_flits))
+      assert(rob_valids(rob_idx) &&
+        (rob(rob_idx).payload === o.flit.bits.payload) &&
+        (o.flit.bits.out_id === i.U) &&
+        (rob(rob_idx).flits_returned < rob(rob_idx).n_flits))
 
-        rob(rob_idx).flits_returned := rob(rob_idx).flits_returned + 1.U
-        rob(rob_idx).payload := rob(rob_idx).payload + 1.U
+      rob(rob_idx).flits_returned := rob(rob_idx).flits_returned + 1.U
+      rob(rob_idx).payload := rob(rob_idx).payload + 1.U
 
-        when (f.bits.tail) {
-          rob_frees(rob_idx) := true.B
-        }
-        idx += 1
+      when (o.flit.bits.tail) {
+        rob_frees(rob_idx) := true.B
       }
     }
   }
-  require(idx == nOutputs)
 
-  flits := flits + io.from_noc.map { i => PopCount(i.flits.map(_.fire())) }.reduce(_+&_)
+  flits := flits + io.from_noc.map(_.flit.fire().asUInt).reduce(_+&_)
 }
 
 class TestHarness(implicit val p: Parameters) extends Module {

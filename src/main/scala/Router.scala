@@ -12,7 +12,7 @@ class Channel(val cParams: ChannelParams)(implicit val p: Parameters) extends Bu
 }
 
 class IOChannel(val cParams: ChannelParams)(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
-  val flits = Vec(cParams.nVirtualChannels, Decoupled(new Flit))
+  val flit = Decoupled(new Flit)
 }
 
 case class RouterParams(
@@ -73,11 +73,11 @@ class Router(val rParams: RouterParams)(implicit val p: Parameters) extends Modu
   (io.in zip input_units).foreach {
     case (i,u) => u.io.in <> i }
   (io.terminal_in zip terminal_input_units).foreach {
-    case (i,u) => u.io.in <> i.flits }
+    case (i,u) => u.io.in <> i.flit }
   (output_units zip io.out).foreach {
     case (u,o) => o <> u.io.out }
   (terminal_output_units zip io.terminal_out).foreach {
-    case (u,o) => o.flits <> u.io.out }
+    case (u,o) => o.flit <> u.io.out }
 
   (route_computer.io.req zip all_input_units).foreach {
     case (i,u) => i <> u.io.router_req }
