@@ -41,13 +41,13 @@ class InputGen(idx: Int, prio: Int, inputStallProbability: Double)(implicit val 
 
   val can_fire = (flits_left === 0.U) && io.rob_ready
 
-  val packet_remaining = (LFSR(10) % maxFlits.U)
-  val random_delay = LFSR(10) < (inputStallProbability * (1 << 10)).toInt.U
+  val packet_remaining = (LFSR(20) % maxFlits.U)
+  val random_delay = LFSR(20) < (inputStallProbability * (1 << 10)).toInt.U
   io.out.valid := !random_delay && flits_left === 0.U && io.rob_ready
   io.out.bits.head := true.B
   io.out.bits.tail := packet_remaining === 0.U
   io.out.bits.prio := prio.U
-  io.out.bits.out_id := LFSR(10) % outputNodes.size.U
+  io.out.bits.out_id := LFSR(20) % outputNodes.size.U
   io.out.bits.virt_channel_id := idx.U
   io.out.bits.payload := (io.tsc << 16) | (io.rob_idx << 8)
 
@@ -141,7 +141,7 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
   }
 
   io.from_noc.zipWithIndex map { case (o,i) =>
-    o.flit.ready := LFSR(10) >= (outputStallProbability * (1 << 10)).toInt.U
+    o.flit.ready := LFSR(20) >= (outputStallProbability * (1 << 10)).toInt.U
     when (o.flit.fire()) {
       val rob_idx = o.flit.bits.payload(15,8)
 
