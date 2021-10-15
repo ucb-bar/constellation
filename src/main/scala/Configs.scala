@@ -24,5 +24,7 @@ class UnidirectionalLineConfig(nNodes: Int = 3, inputNodes: Seq[Int] = Seq(0), o
 })
 
 class TestConfig00 extends UnidirectionalLineConfig(2, Seq(0), Seq(1))
-class TestConfig01 extends UnidirectionalLineConfig(3, Seq(0), Seq(1, 2))
-class TestConfig02 extends UnidirectionalLineConfig(3, Seq(0, 0), Seq(1, 2))
+class TestConfig01 extends UnidirectionalLineConfig(2, Seq(0), Seq(1, 1))
+class TestConfig02 extends UnidirectionalLineConfig(2, Seq(0, 0), Seq(1, 1))
+class TestConfig03 extends UnidirectionalLineConfig(3, Seq(0), Seq(1, 2))
+class TestConfig04 extends UnidirectionalLineConfig(3, Seq(0, 0), Seq(1, 2))
