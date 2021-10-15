@@ -41,7 +41,7 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalO
     val r = UInt((nTerminalOutputs + nOutputs).W)
     val o = UInt(log2Up((outParams ++ terminalOutParams).map(_.virtualChannelParams.size).max).W)
     val p = UInt(log2Up(inParam.virtualChannelParams.map(_.bufferSize).max).W)
-    val buffer_occupancy = UInt(log2Up(1+inParam.virtualChannelParams.map(_.bufferSize).max).W)
+    val c = UInt(log2Up(1+inParam.virtualChannelParams.map(_.bufferSize).max).W)
     val prio = UInt(prioBits.W)
     val tail_seen = Bool()
     val dest_id = UInt(idBits.W)
@@ -53,11 +53,11 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalO
     when (!io.salloc_req(i).fire() &&
       (io.in.flit.fire() && io.in.flit.bits.virt_channel_id === i.U)) {
 
-      states(i).buffer_occupancy := states(i).buffer_occupancy + 1.U
+      states(i).c := states(i).c + 1.U
     } .elsewhen (io.salloc_req(i).fire() &&
       !(io.in.flit.fire() && io.in.flit.bits.virt_channel_id === i.U)) {
 
-      states(i).buffer_occupancy := states(i).buffer_occupancy - 1.U
+      states(i).c := states(i).c - 1.U
     }
   }
 
@@ -123,8 +123,8 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalO
   }
 
   (states zip io.salloc_req).zipWithIndex.map { case ((s,r),i) =>
-    val c = (UIntToOH(s.o) & Mux1H(s.r, io.out_credit_available.map(_.asUInt))) =/= 0.U
-    r.valid := s.g === g_a && c && s.buffer_occupancy =/= 0.U
+    val credit_available = (UIntToOH(s.o) & Mux1H(s.r, io.out_credit_available.map(_.asUInt))) =/= 0.U
+    r.valid := s.g === g_a && credit_available && s.c =/= 0.U
     r.bits.out_channel := OHToUInt(s.r)
     r.bits.out_virt_channel := s.o
     buffer.io.tail_read_req(i) := s.p
@@ -158,6 +158,6 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalO
 
   when (reset.asBool) {
     states.foreach(_.g := g_i)
-    states.foreach(_.buffer_occupancy := 0.U)
+    states.foreach(_.c := 0.U)
   }
 }
