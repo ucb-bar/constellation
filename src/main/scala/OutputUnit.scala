@@ -33,8 +33,6 @@ class OutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[ChannelPara
 
   val g_i :: g_a :: g_c :: Nil = Enum(3)
 
-  // Technically the output unit doesn't do anything here with this state tracking
-  // The only useful bit is tracking credits on each virtual channel
   class OutputState(val bufferSize: Int) extends Bundle {
     val g = UInt(2.W)
     val i_p = UInt(log2Up(nInputs).W)
@@ -67,8 +65,8 @@ class OutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[ChannelPara
     }
   }
 
-  (io.credit_available zip states).map { case (c,s) =>
-    c := s.c =/= 0.U
+  (io.credit_available zip states).zipWithIndex.map { case ((c,s),i) =>
+    c := s.c =/= 0.U || (io.out.credit_return.valid && io.out.credit_return.bits === i.U)
   }
 
   states.zipWithIndex.map { case (s,i) =>

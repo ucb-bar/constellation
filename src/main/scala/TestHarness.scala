@@ -122,7 +122,11 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
   val rob_alloc_avail = rob_alloc_ids.map { i => !rob_valids(i) }
 
   txs := txs + PopCount(rob_allocs)
-  io.success := txs >= totalTxs.U && rob_valids === 0.U
+  val success = txs >= totalTxs.U && rob_valids === 0.U
+  io.success := RegNext(success, false.B)
+  when (success) {
+    printf("%d flits, %d cycles\n", flits, tsc)
+  }
 
   io.to_noc.zipWithIndex.map { case (i,idx) =>
     val igen = Module(new InputGen(idx, 0, inputStallProbability))

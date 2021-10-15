@@ -9,7 +9,7 @@ class UnidirectionalLineConfig(nNodes: Int = 3, inputNodes: Seq[Int] = Seq(0), o
   case AstroNoCKey => up(AstroNoCKey, site).copy(
     nNodes = nNodes,
     nPrios = 1,
-    topology = (a: Int, b: Int) => if ((b-a) == 1) Seq.tabulate(3) { i => VirtualChannelParams(bufferSize=i+3) } else Nil,
+    topology = (a: Int, b: Int) => if ((b-a) == 1) Seq.fill(3) { VirtualChannelParams(bufferSize=3) } else Nil,
     virtualLegalPaths = {
       (n: Int) => (src: Int, srcV: Int, dst: Int, dstV: Int) => (prio: Int) => {
         true
