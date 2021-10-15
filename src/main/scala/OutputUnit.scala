@@ -46,12 +46,20 @@ class OutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[ChannelPara
   (states zip io.channel_available).map { case (s,a) => a := s.g === g_i }
   io.out.flit := io.in
 
+  when (io.out.vc_free.fire()) {
+    states.zipWithIndex.map { case (s,i) =>
+      when (io.out.vc_free.bits === i.U) {
+        assert(s.g =/= g_i)
+        s.g := g_i
+        io.channel_available(i) := true.B
+      }
+    }
+  }
+
   when (io.alloc.fire()) {
     val id = io.alloc.bits.out_virt_channel
     states.zipWithIndex.map { case (s,i) =>
       when (id === i.U) {
-        assert(s.g === g_i)
-
         s.g := g_a
         s.i_p := io.alloc.bits.in_channel
         s.i_c := io.alloc.bits.in_virt_channel
@@ -70,14 +78,6 @@ class OutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[ChannelPara
   }
 
 
-  when (io.out.vc_free.fire()) {
-    states.zipWithIndex.map { case (s,i) =>
-      when (io.out.vc_free.bits === i.U) {
-        assert(s.g =/= g_i)
-        s.g := g_i
-      }
-    }
-  }
 
   when (reset.asBool) {
     states.foreach(_.g := g_i)
