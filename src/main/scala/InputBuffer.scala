@@ -18,6 +18,7 @@ class InputBuffer(inParam: ChannelParams)(implicit val p: Parameters) extends Mo
       val channel = UInt(log2Up(inParam.virtualChannelParams.size).W)
     }))
     val read_resp = Output(new Flit)
+    val read_resp_tail = Output(Bool())
   })
   val bufferSz = inParam.virtualChannelParams.map(_.bufferSize).sum
   val (buffer, read, write) = if (inParam.useSyncReadBuffer) {
@@ -31,6 +32,7 @@ class InputBuffer(inParam: ChannelParams)(implicit val p: Parameters) extends Mo
     def write(x: UInt, d: Flit): Unit = mem(x) := d
     (mem, read(_,_), write(_,_))
   }
+  val tails = Reg(Vec(bufferSz, Bool()))
 
   val heads = Reg(Vec(inParam.nVirtualChannels, UInt(log2Up(inParam.virtualChannelParams.map(_.bufferSize).max).W)))
   val bases = VecInit(inParam.virtualChannelParams.map(_.bufferSize).scanLeft(0)(_+_).dropRight(1).map(_.U))
@@ -41,6 +43,7 @@ class InputBuffer(inParam: ChannelParams)(implicit val p: Parameters) extends Mo
     val head = heads(in_virt_id)
     val waddr = base +& head
     write(waddr, io.in.bits)
+    tails(waddr) := io.in.bits.tail
     heads(in_virt_id) := WrapInc(heads(in_virt_id),
       VecInit(inParam.virtualChannelParams.map(_.bufferSize.U))(in_virt_id))
   }
@@ -49,6 +52,7 @@ class InputBuffer(inParam: ChannelParams)(implicit val p: Parameters) extends Mo
 
   val raddr = bases(io.read_req.bits.channel) +& io.read_req.bits.addr
   io.read_resp := read(raddr, io.read_req.valid)
+  io.read_resp_tail := tails(raddr)
 
   when (reset.asBool) { heads.foreach(_ := 0.U) }
 }

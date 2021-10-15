@@ -144,10 +144,10 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalO
   buffer.io.read_req.bits.addr := Mux1H(salloc_fires, states.map(_.p))
   buffer.io.read_req.bits.channel := salloc_fire_id
 
-  io.in.credit_return.valid := RegNext(salloc_fire)
-  io.in.credit_return.bits := RegNext(salloc_fire_id)
-  io.in.vc_free.valid := RegNext(salloc_fire) && buffer.io.read_resp.tail
-  io.in.vc_free.bits := RegNext(salloc_fire_id)
+  io.in.credit_return.valid := salloc_fire
+  io.in.credit_return.bits := salloc_fire_id
+  io.in.vc_free.valid := salloc_fire && buffer.io.read_resp_tail
+  io.in.vc_free.bits := salloc_fire_id
 
   io.out.valid := RegNext(buffer.io.read_req.valid)
   io.out.bits.flit := buffer.io.read_resp

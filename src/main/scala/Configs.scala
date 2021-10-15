@@ -8,7 +8,8 @@ import freechips.rocketchip.config.{Field, Parameters, Config}
 class UnidirectionalLineConfig(nNodes: Int = 3, inputNodes: Seq[Int] = Seq(0), outputNodes: Seq[Int] = Seq(1, 2)) extends Config((site, here, up) => {
   case AstroNoCKey => up(AstroNoCKey, site).copy(
     nNodes = nNodes,
-    topology = (a: Int, b: Int) => if ((b-a) == 1) Seq.tabulate(3) { i => VirtualChannelParams(bufferSize=4-i) } else Nil,
+    nPrios = 1,
+    topology = (a: Int, b: Int) => if ((b-a) == 1) Seq.tabulate(3) { i => VirtualChannelParams(bufferSize=i+3) } else Nil,
     virtualLegalPaths = {
       (n: Int) => (src: Int, srcV: Int, dst: Int, dstV: Int) => (prio: Int) => {
         true

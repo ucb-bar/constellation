@@ -6,7 +6,6 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
-
 class TerminalOutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[ChannelParams], outParam: ChannelParams)(implicit p: Parameters) extends AbstractOutputUnit(inParams, terminalInParams, outParam)(p) {
   val nInputs = inParams.size
   require(outParam.nVirtualChannels == nPrios)
@@ -30,6 +29,7 @@ class TerminalOutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[Cha
   }
   when (io.in.fire() && io.in.bits.tail) {
     channel_empty(io.in.bits.virt_channel_id) := true.B
+    io.channel_available(io.in.bits.virt_channel_id) := true.B
   }
 
   when (reset.asBool) { channel_empty.foreach(_ := true.B) }

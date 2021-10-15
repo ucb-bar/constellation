@@ -28,7 +28,6 @@ class OutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[ChannelPara
   val nVirtualChannels = outParam.virtualChannelParams.size
   val io = IO(new AbstractOutputUnitIO(inParams, terminalInParams, outParam) {
     val out = new Channel(outParam)
-
     val credit_alloc = Input(Valid(UInt(log2Up(nVirtualChannels).W)))
   })
 
