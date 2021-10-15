@@ -97,7 +97,7 @@ class SwitchAllocator(val rParams: RouterParams)(implicit val p: Parameters) ext
       a.io.in(j).valid := o.io.out.valid && o.io.out.bits.out_channel === i.U
       a.io.in(j).bits := o.io.out.bits
     }
-    o.io.out.ready := arbs.map(_.io.in(j).ready).reduce(_||_)
+    o.io.out.ready := arbs.map(_.io.in(j).fire()).reduce(_||_)
   }
 
   (arbs.take(nOutputs) zip io.credit_alloc).map { case (a,i) =>

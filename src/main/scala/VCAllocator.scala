@@ -14,16 +14,16 @@ class VCAllocReq(val inParam: ChannelParams, val nOutputs: Int, val nTerminalOut
   val dummy = UInt(1.W) //avoids firrtl bug
 }
 
-class VCAllocResp(val inParam: ChannelParams, val outParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
+class VCAllocResp(val inParam: ChannelParams, val allOutParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
   val in_virt_channel = UInt(log2Up(inParam.virtualChannelParams.size).W)
-  val out_virt_channel = UInt(log2Up((Seq(1) ++ outParams.map(_.virtualChannelParams.size)).max).W)
-  val out_channel = UInt(log2Up(outParams.size).W)
+  val out_virt_channel = UInt(log2Up((Seq(1) ++ allOutParams.map(_.virtualChannelParams.size)).max).W)
+  val out_channel = UInt(log2Up(allOutParams.size).W)
 }
 
 class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
   val io = IO(new Bundle {
     val req = MixedVec(allInParams.map { u => Flipped(Decoupled(new VCAllocReq(u, outParams.size, terminalOutParams.size))) })
-    val resp = MixedVec(allInParams.map { u => Valid(new VCAllocResp(u, outParams)) })
+    val resp = MixedVec(allInParams.map { u => Valid(new VCAllocResp(u, allOutParams)) })
 
     val channel_available = MixedVec(allOutParams.map { u => Vec(u.virtualChannelParams.size, Input(Bool())) })
     val out_alloc = MixedVec(allOutParams.map { u => Valid(new OutputUnitAlloc(inParams, terminalInParams, u)) })

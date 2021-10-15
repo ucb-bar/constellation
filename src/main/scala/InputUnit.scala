@@ -11,7 +11,7 @@ class AbstractInputUnitIO(val inParam: ChannelParams, val outParams: Seq[Channel
   val router_resp = Flipped(Valid(new RouteComputerResp(inParam, outParams.size)))
 
   val vcalloc_req = Decoupled(new VCAllocReq(inParam, outParams.size, terminalOutParams.size))
-  val vcalloc_resp = Flipped(Valid(new VCAllocResp(inParam, outParams)))
+  val vcalloc_resp = Flipped(Valid(new VCAllocResp(inParam, outParams ++ terminalOutParams)))
 
   val out_credit_available = Input(MixedVec((outParams ++ terminalOutParams).map { u => Vec(u.virtualChannelParams.size, Bool()) }))
 
