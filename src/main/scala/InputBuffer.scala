@@ -18,7 +18,8 @@ class InputBuffer(inParam: ChannelParams)(implicit val p: Parameters) extends Mo
       val channel = UInt(log2Up(inParam.virtualChannelParams.size).W)
     }))
     val read_resp = Output(new Flit)
-    val read_resp_tail = Output(Bool())
+    val tail_read_req = MixedVec(inParam.virtualChannelParams.map(u => Input(UInt(log2Ceil(u.bufferSize).W))))
+    val tail_read_resp = Vec(inParam.nVirtualChannels, Output(Bool()))
   })
   val bufferSz = inParam.virtualChannelParams.map(_.bufferSize).sum
   val (buffer, read, write) = if (inParam.useSyncReadBuffer) {
@@ -52,7 +53,9 @@ class InputBuffer(inParam: ChannelParams)(implicit val p: Parameters) extends Mo
 
   val raddr = bases(io.read_req.bits.channel) +& io.read_req.bits.addr
   io.read_resp := read(raddr, io.read_req.valid)
-  io.read_resp_tail := tails(raddr)
+  (io.tail_read_resp zip io.tail_read_req).zipWithIndex.map { case ((resp,req),i) =>
+    resp := tails(bases(i.U) +& req)
+  }
 
   when (reset.asBool) { heads.foreach(_ := 0.U) }
 }

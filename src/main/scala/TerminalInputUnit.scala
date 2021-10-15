@@ -63,6 +63,7 @@ class TerminalInputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], t
 
   io.salloc_req(0).bits.out_channel := vcalloc_q.io.deq.bits.out_channel
   io.salloc_req(0).bits.out_virt_channel := vcalloc_q.io.deq.bits.out_virt_channel
+  io.salloc_req(0).bits.tail := vcalloc_buffer.io.deq.bits.tail
 
   val c = Mux1H(UIntToOH(vcalloc_q.io.deq.bits.out_virt_channel),
     Mux1H(vcalloc_q.io.deq.bits.out_channel, io.out_credit_available))

@@ -122,17 +122,17 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalO
     states(id).g := g_a
   }
 
-  val tail_fired = Wire(Vec(nVirtualChannels, Bool()))
   (states zip io.salloc_req).zipWithIndex.map { case ((s,r),i) =>
     val c = (UIntToOH(s.o) & Mux1H(s.r, io.out_credit_available.map(_.asUInt))) =/= 0.U
-    r.valid := s.g === g_a && c && s.buffer_occupancy =/= 0.U && !tail_fired(i)
+    r.valid := s.g === g_a && c && s.buffer_occupancy =/= 0.U
     r.bits.out_channel := OHToUInt(s.r)
     r.bits.out_virt_channel := s.o
+    buffer.io.tail_read_req(i) := s.p
+    r.bits.tail := buffer.io.tail_read_resp(i)
     when (r.fire()) {
       s.p := WrapInc(s.p, inParam.virtualChannelParams(i).bufferSize)
     }
-    tail_fired(i) := RegNext(r.fire()) && buffer.io.read_resp.tail
-    when (tail_fired(i)) {
+    when (r.fire() && buffer.io.tail_read_resp(i)) {
       s.g := g_i
     }
   }
@@ -146,7 +146,7 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalO
 
   io.in.credit_return.valid := salloc_fire
   io.in.credit_return.bits := salloc_fire_id
-  io.in.vc_free.valid := salloc_fire && buffer.io.read_resp_tail
+  io.in.vc_free.valid := salloc_fire && buffer.io.tail_read_resp(salloc_fire_id)
   io.in.vc_free.bits := salloc_fire_id
 
   io.out.valid := RegNext(buffer.io.read_req.valid)
