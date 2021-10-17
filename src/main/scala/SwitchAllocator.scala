@@ -86,7 +86,7 @@ class SwitchAllocator(val rParams: RouterParams)(implicit val p: Parameters) ext
   }
   val arbs = Seq.fill(nAllOutputs) { Module(new CustomLockingArbiter(
     new SwitchAllocReq(outParams, terminalOutParams),
-    nAllOutputs,
+    nAllInputs,
     (d: SwitchAllocReq) => d.tail,
     rr = true
   )) }
