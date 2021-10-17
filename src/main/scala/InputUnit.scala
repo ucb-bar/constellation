@@ -19,9 +19,9 @@ class AbstractInputUnitIO(
   val vcalloc_req = Decoupled(new VCAllocReq(cParam, nOutputs, nTerminalOutputs))
   val vcalloc_resp = Flipped(Valid(new VCAllocResp(cParam, outParams, terminalOutParams)))
 
-  val out_credit_available = Input(MixedVec(allOutParams.map { u => Vec(u.virtualChannelParams.size, Bool()) }))
+  val out_credit_available = Input(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) }))
 
-  val salloc_req = Vec(nVirtualChannels, Decoupled(new SwitchAllocReq(allOutParams)))
+  val salloc_req = Vec(nVirtualChannels, Decoupled(new SwitchAllocReq(outParams, terminalOutParams)))
 
   val out = Valid(new SwitchBundle(nAllOutputs))
 }
