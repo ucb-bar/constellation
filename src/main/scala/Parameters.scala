@@ -34,7 +34,7 @@ trait HasAstroNoCParams {
 
   val nNodes = params.nNodes
   val flitPayloadBits = params.flitPayloadBits
-  val idBits = log2Ceil(params.nNodes)
+  val nodeIdBits = log2Ceil(params.nNodes)
   val maxFlits = params.maxFlits
   val flitIdBits = log2Up(params.maxFlits+1)
   val nPrios = params.nPrios

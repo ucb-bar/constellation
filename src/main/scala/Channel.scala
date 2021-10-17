@@ -26,6 +26,13 @@ case class ChannelParams(
   require(!(isInput && isOutput))
 }
 
+trait HasChannelParams extends HasAstroNoCParams {
+  val cParam: ChannelParams
+
+  val virtualChannelParams = cParam.virtualChannelParams
+  val nVirtualChannels = cParam.nVirtualChannels
+}
+
 class Channel(val cParams: ChannelParams)(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
   val flit = Valid(new Flit)
   val credit_return = Input(Valid(UInt(log2Up(cParams.virtualChannelParams.size).W)))

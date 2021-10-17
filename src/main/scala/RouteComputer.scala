@@ -9,7 +9,7 @@ import freechips.rocketchip.config.{Field, Parameters}
 class RouteComputerReq(val param: ChannelParams)(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
   val src_virt_id = UInt(log2Up(param.nVirtualChannels).W)
   val src_prio = UInt(prioBits.W)
-  val dest_id = UInt(idBits.W)
+  val dest_id = UInt(nodeIdBits.W)
 }
 
 class RouteComputerResp(val param: ChannelParams, val nOutputs: Int)(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {

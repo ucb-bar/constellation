@@ -6,7 +6,7 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 
 case class RouterParams(
-  id: Int,
+  nodeId: Int,
   inParams: Seq[ChannelParams],
   outParams: Seq[ChannelParams],
   terminalInParams: Seq[ChannelParams],
@@ -15,20 +15,38 @@ case class RouterParams(
   routingFunction: (Int, Int) => Int => Boolean
 )
 
-trait HasRouterParams extends HasAstroNoCParams {
+trait HasRouterOutputParams extends HasAstroNoCParams {
+  val nodeId: Int
+  val outParams: Seq[ChannelParams]
+  val terminalOutParams: Seq[ChannelParams]
+
+  def allOutParams = outParams ++ terminalOutParams
+
+  def nOutputs = outParams.size
+  def nTerminalOutputs = terminalOutParams.size
+  def nAllOutputs = allOutParams.size
+}
+
+trait HasRouterInputParams extends HasAstroNoCParams {
+  val nodeId: Int
+  val inParams: Seq[ChannelParams]
+  val terminalInParams: Seq[ChannelParams]
+
+  def allInParams = inParams ++ terminalInParams
+
+  def nInputs = inParams.size
+  def nTerminalInputs = terminalInParams.size
+  def nAllInputs = allInParams.size
+}
+
+trait HasRouterParams extends HasRouterOutputParams with HasRouterInputParams
+{
   val rParams: RouterParams
-  val id = rParams.id
+  val nodeId = rParams.nodeId
   val inParams = rParams.inParams
   val outParams = rParams.outParams
   val terminalInParams = rParams.terminalInParams
   val terminalOutParams = rParams.terminalOutParams
-  val allInParams = inParams ++ terminalInParams
-  val allOutParams = outParams ++ terminalOutParams
-
-  val nInputs = inParams.size
-  val nOutputs = outParams.size
-  val nTerminalInputs = terminalInParams.size
-  val nTerminalOutputs = terminalOutParams.size
 
   def possibleTransition(inParam: ChannelParams, outParam: ChannelParams): Boolean = Seq.tabulate(
     inParam.nVirtualChannels,
@@ -40,6 +58,9 @@ trait HasRouterParams extends HasAstroNoCParams {
 }
 
 class Router(val rParams: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
+  allOutParams.foreach(u => require(u.srcId == nodeId))
+  allInParams.foreach(u => require(u.destId == nodeId))
+
   val io = IO(new Bundle {
     val in = MixedVec(inParams.map { u => Flipped(new Channel(u)) })
     val terminal_in = MixedVec(terminalInParams.map { u => Flipped(new IOChannel(u)) })
@@ -47,9 +68,9 @@ class Router(val rParams: RouterParams)(implicit val p: Parameters) extends Modu
     val terminal_out = MixedVec(terminalOutParams.map { u => new IOChannel(u) })
   })
 
-  require(nInputs + nTerminalInputs >= 1)
-  require(nOutputs + nTerminalOutputs >= 1)
-  require(id < (1 << idBits))
+  require(nAllInputs >= 1)
+  require(nAllOutputs >= 1)
+  require(nodeId < (1 << nodeIdBits))
 
   val input_units = inParams.map { u =>
     Module(new InputUnit(u, outParams, terminalOutParams)) }
@@ -94,7 +115,7 @@ class Router(val rParams: RouterParams)(implicit val p: Parameters) extends Modu
     case (a,u) => a := u.io.channel_available }
 
   all_input_units.foreach(in => all_output_units.zipWithIndex.foreach { case (out,outIdx) =>
-    if (possibleTransition(in.inParam, out.outParam)) {
+    if (possibleTransition(in.cParam, out.outParam)) {
       in.io.out_credit_available(outIdx) := out.io.credit_available
     } else {
       in.io.out_credit_available(outIdx).foreach(_ := false.B)

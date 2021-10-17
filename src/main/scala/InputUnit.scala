@@ -6,48 +6,58 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
-class AbstractInputUnitIO(val inParam: ChannelParams, val outParams: Seq[ChannelParams], val terminalOutParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle {
-  val router_req = Decoupled(new RouteComputerReq(inParam))
-  val router_resp = Flipped(Valid(new RouteComputerResp(inParam, outParams.size)))
+class AbstractInputUnitIO(
+  val cParam: ChannelParams,
+  val outParams: Seq[ChannelParams],
+  val terminalOutParams: Seq[ChannelParams])
+  (implicit val p: Parameters) extends Bundle with HasRouterOutputParams with HasChannelParams {
+  val nodeId = cParam.destId
 
-  val vcalloc_req = Decoupled(new VCAllocReq(inParam, outParams.size, terminalOutParams.size))
-  val vcalloc_resp = Flipped(Valid(new VCAllocResp(inParam, outParams ++ terminalOutParams)))
+  val router_req = Decoupled(new RouteComputerReq(cParam))
+  val router_resp = Flipped(Valid(new RouteComputerResp(cParam, nOutputs)))
 
-  val out_credit_available = Input(MixedVec((outParams ++ terminalOutParams).map { u => Vec(u.virtualChannelParams.size, Bool()) }))
+  val vcalloc_req = Decoupled(new VCAllocReq(cParam, nOutputs, nTerminalOutputs))
+  val vcalloc_resp = Flipped(Valid(new VCAllocResp(cParam, allOutParams)))
 
-  val salloc_req = Vec(inParam.nVirtualChannels, Decoupled(new SwitchAllocReq(outParams ++ terminalOutParams)))
+  val out_credit_available = Input(MixedVec(allOutParams.map { u => Vec(u.virtualChannelParams.size, Bool()) }))
 
-  val out = Valid(new SwitchBundle(outParams.size + terminalOutParams.size))
+  val salloc_req = Vec(nVirtualChannels, Decoupled(new SwitchAllocReq(allOutParams)))
+
+  val out = Valid(new SwitchBundle(nAllOutputs))
 }
 
-abstract class AbstractInputUnit(val inParam: ChannelParams)(implicit val p: Parameters) extends Module with HasAstroNoCParams {
+abstract class AbstractInputUnit(
+  val cParam: ChannelParams,
+  val outParams: Seq[ChannelParams],
+  val terminalOutParams: Seq[ChannelParams]
+)(implicit val p: Parameters) extends Module with HasRouterOutputParams with HasChannelParams {
+  require(nVirtualChannels <= (1 << virtChannelBits))
+
+  val nodeId = cParam.destId
+
   def io: AbstractInputUnitIO
 }
 
-class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalOutParams: Seq[ChannelParams])
-  (implicit p: Parameters) extends AbstractInputUnit(inParam)(p) {
-  val nOutputs = outParams.size
-  val nTerminalOutputs = terminalOutParams.size
-  val nVirtualChannels = inParam.virtualChannelParams.size
-  require(nVirtualChannels <= (1 << virtChannelBits))
+class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOutParams: Seq[ChannelParams])
+  (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, terminalOutParams)(p) {
 
-  val io = IO(new AbstractInputUnitIO(inParam, outParams, terminalOutParams) {
-    val in = Flipped(new Channel(inParam))
+  val io = IO(new AbstractInputUnitIO(cParam, outParams, terminalOutParams) {
+    val in = Flipped(new Channel(cParam))
   })
   val g_i :: g_r :: g_r_stall :: g_v :: g_v_stall :: g_a :: g_c :: Nil = Enum(7)
 
   class InputState extends Bundle {
     val g = UInt(3.W)
-    val r = UInt((nTerminalOutputs + nOutputs).W)
-    val o = UInt(log2Up((outParams ++ terminalOutParams).map(_.virtualChannelParams.size).max).W)
-    val p = UInt(log2Up(inParam.virtualChannelParams.map(_.bufferSize).max).W)
-    val c = UInt(log2Up(1+inParam.virtualChannelParams.map(_.bufferSize).max).W)
+    val r = UInt(nAllOutputs.W)
+    val o = UInt(log2Up((allOutParams).map(_.virtualChannelParams.size).max).W)
+    val p = UInt(log2Up(virtualChannelParams.map(_.bufferSize).max).W)
+    val c = UInt(log2Up(1+virtualChannelParams.map(_.bufferSize).max).W)
     val prio = UInt(prioBits.W)
     val tail_seen = Bool()
-    val dest_id = UInt(idBits.W)
+    val dest_id = UInt(nodeIdBits.W)
   }
   val states = Reg(Vec(nVirtualChannels, new InputState))
-  val buffer = Module(new InputBuffer(inParam))
+  val buffer = Module(new InputBuffer(cParam))
   buffer.io.in := io.in.flit
   (0 until nVirtualChannels).map { i =>
     when (!io.salloc_req(i).fire() &&
@@ -67,9 +77,9 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalO
     assert(states(id).g === g_i)
 
     val dest_id = outIdToDestId(io.in.flit.bits.out_id)
-    states(id).g := Mux(dest_id === inParam.destId.U, g_v, g_r)
+    states(id).g := Mux(dest_id === nodeId.U, g_v, g_r)
     states(id).dest_id := dest_id
-    states(id).r := UIntToOH(outIdToDestChannelId(io.in.flit.bits.out_id)) << outParams.size
+    states(id).r := UIntToOH(outIdToDestChannelId(io.in.flit.bits.out_id)) << nOutputs
     states(id).p := buffer.io.head
     states(id).tail_seen := io.in.flit.bits.tail
     states(id).prio := io.in.flit.bits.prio
@@ -81,7 +91,7 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalO
     }
   }
 
-  val route_arbiter = Module(new RRArbiter(new RouteComputerReq(inParam), nVirtualChannels))
+  val route_arbiter = Module(new RRArbiter(new RouteComputerReq(cParam), nVirtualChannels))
   (route_arbiter.io.in zip states).zipWithIndex.map { case ((i,s),idx) =>
     i.valid := s.g === g_r
     i.bits.dest_id := s.dest_id
@@ -99,10 +109,10 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalO
   }
 
   val vcalloc_arbiter = Module(new RRArbiter(
-    new VCAllocReq(inParam, outParams.size, terminalOutParams.size), nVirtualChannels))
+    new VCAllocReq(cParam, nOutputs, nTerminalOutputs), nVirtualChannels))
   (vcalloc_arbiter.io.in zip states).zipWithIndex.map { case ((i,s),idx) =>
     i.valid := s.g === g_v
-    val bits = Wire(new VCAllocReq(inParam, outParams.size, terminalOutParams.size))
+    val bits = Wire(new VCAllocReq(cParam, nOutputs, nTerminalOutputs))
     bits.in_virt_channel := idx.U
     bits.out_channels := s.r
     bits.in_prio := s.prio
@@ -130,7 +140,7 @@ class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalO
     buffer.io.tail_read_req(i) := s.p
     r.bits.tail := buffer.io.tail_read_resp(i)
     when (r.fire()) {
-      s.p := WrapInc(s.p, inParam.virtualChannelParams(i).bufferSize)
+      s.p := WrapInc(s.p, virtualChannelParams(i).bufferSize)
     }
     when (r.fire() && buffer.io.tail_read_resp(i)) {
       s.g := g_i

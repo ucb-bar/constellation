@@ -6,25 +6,28 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
-class TerminalInputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalOutParams: Seq[ChannelParams])
-  (implicit p: Parameters) extends AbstractInputUnit(inParam)(p) {
-  val nOutputs = outParams.size
-  require(inParam.isInput && !inParam.isOutput)
-  require(inParam.nVirtualChannels == 1)
+class TerminalInputUnit(
+  cParam: ChannelParams,
+  outParams: Seq[ChannelParams],
+  terminalOutParams: Seq[ChannelParams])
+  (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, terminalOutParams)(p) {
 
-  val io = IO(new AbstractInputUnitIO(inParam, outParams, terminalOutParams) {
+  require(cParam.isInput && !cParam.isOutput)
+  require(nVirtualChannels == 1)
+
+  val io = IO(new AbstractInputUnitIO(cParam, outParams, terminalOutParams) {
     val in = Flipped(Decoupled(new Flit))
   })
 
   val route_buffer = Module(new Queue(new Flit, 2))
-  val route_q = Module(new Queue(new RouteComputerResp(inParam, nOutputs + terminalOutParams.size), 2))
+  val route_q = Module(new Queue(new RouteComputerResp(cParam, nAllOutputs), 2))
 
   route_buffer.io.enq.bits := io.in.bits
   io.router_req.bits.src_virt_id := 0.U
   io.router_req.bits.src_prio := io.in.bits.prio
   io.router_req.bits.dest_id := outIdToDestId(io.in.bits.out_id)
 
-  val out_is_in = outIdToDestId(io.in.bits.out_id) === inParam.destId.U
+  val out_is_in = outIdToDestId(io.in.bits.out_id) === nodeId.U
   route_buffer.io.enq.valid := io.in.valid && (
     io.router_req.ready || !io.in.bits.head || (out_is_in && !io.router_resp.valid))
   io.router_req.valid := io.in.valid && route_buffer.io.enq.ready && io.in.bits.head && !out_is_in
@@ -36,12 +39,12 @@ class TerminalInputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], t
   when (io.in.fire() && io.in.bits.head && out_is_in) {
     route_q.io.enq.valid := true.B
     route_q.io.enq.bits.src_virt_id := 0.U
-    route_q.io.enq.bits.out_channels := UIntToOH(outIdToDestChannelId(io.in.bits.out_id)) << outParams.size
+    route_q.io.enq.bits.out_channels := UIntToOH(outIdToDestChannelId(io.in.bits.out_id)) << nOutputs
   }
   assert(!(route_q.io.enq.valid && !route_q.io.enq.ready))
 
   val vcalloc_buffer = Module(new Queue(new Flit, 2))
-  val vcalloc_q = Module(new Queue(new VCAllocResp(inParam, outParams ++ terminalOutParams), 2))
+  val vcalloc_q = Module(new Queue(new VCAllocResp(cParam, allOutParams), 2))
 
   vcalloc_buffer.io.enq.bits := route_buffer.io.deq.bits
 
