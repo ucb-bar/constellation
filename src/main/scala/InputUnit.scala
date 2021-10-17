@@ -23,7 +23,7 @@ class AbstractInputUnitIO(
 
   val salloc_req = Vec(nVirtualChannels, Decoupled(new SwitchAllocReq(outParams, terminalOutParams)))
 
-  val out = Valid(new SwitchBundle(nAllOutputs))
+  val out = Valid(new SwitchBundle(outParams, terminalOutParams))
 }
 
 abstract class AbstractInputUnit(
@@ -31,8 +31,6 @@ abstract class AbstractInputUnit(
   val outParams: Seq[ChannelParams],
   val terminalOutParams: Seq[ChannelParams]
 )(implicit val p: Parameters) extends Module with HasRouterOutputParams with HasChannelParams {
-  require(nVirtualChannels <= (1 << virtChannelBits))
-
   val nodeId = cParam.destId
 
   def io: AbstractInputUnitIO
@@ -163,7 +161,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
   io.out.valid := RegNext(buffer.io.read_req.valid)
   io.out.bits.flit := buffer.io.read_resp
   val virt_channel = Mux1H(salloc_fires, states.map(_.o))
-  io.out.bits.flit.virt_channel_id := RegNext(virt_channel)
+  io.out.bits.out_virt_channel := RegNext(virt_channel)
   val channel_oh = Mux1H(salloc_fires, states.map(_.r))
   io.out.bits.out_channel := RegNext(OHToUInt(channel_oh))
 

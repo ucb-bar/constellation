@@ -16,10 +16,10 @@ class TerminalInputUnit(
   require(nVirtualChannels == 1)
 
   val io = IO(new AbstractInputUnitIO(cParam, outParams, terminalOutParams) {
-    val in = Flipped(Decoupled(new Flit))
+    val in = Flipped(Decoupled(new Flit(cParam)))
   })
 
-  val route_buffer = Module(new Queue(new Flit, 2))
+  val route_buffer = Module(new Queue(new Flit(cParam), 2))
   val route_q = Module(new Queue(new RouteComputerResp(cParam, nAllOutputs), 2))
 
   route_buffer.io.enq.bits := io.in.bits
@@ -43,7 +43,7 @@ class TerminalInputUnit(
   }
   assert(!(route_q.io.enq.valid && !route_q.io.enq.ready))
 
-  val vcalloc_buffer = Module(new Queue(new Flit, 2))
+  val vcalloc_buffer = Module(new Queue(new Flit(cParam), 2))
   val vcalloc_q = Module(new Queue(new VCAllocResp(cParam, outParams, terminalOutParams), 2))
 
   vcalloc_buffer.io.enq.bits := route_buffer.io.deq.bits
@@ -85,7 +85,7 @@ class TerminalInputUnit(
 
   io.out.valid := RegNext(vcalloc_buffer.io.deq.fire())
   io.out.bits.flit := RegNext(vcalloc_buffer.io.deq.bits)
-  io.out.bits.flit.virt_channel_id := RegNext(vcalloc_q.io.deq.bits.out_virt_channel)
+  io.out.bits.out_virt_channel := RegNext(vcalloc_q.io.deq.bits.out_virt_channel)
   io.out.bits.out_channel := RegNext(vcalloc_q.io.deq.bits.out_channel)
 
 }

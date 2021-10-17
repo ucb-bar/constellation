@@ -5,13 +5,12 @@ import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 
-class Flit(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
+class Flit(val cParam: ChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   val head = Bool()
   val tail = Bool()
   val prio = UInt(prioBits.W)
   val out_id = UInt(outputIdBits.W)
-  // virtual channel id when moving between nodes
-  val virt_channel_id = UInt(virtChannelBits.W)
+  val virt_channel_id = UInt(virtualChannelBits.W)
 
   val payload = UInt(flitPayloadBits.W)
 }

@@ -6,16 +6,17 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
-class SwitchBundle(val nOutputs: Int)(implicit val p: Parameters) extends Bundle {
-  val flit = new Flit
-  val out_channel = UInt(log2Up(nOutputs).W)
+class SwitchBundle(val outParams: Seq[ChannelParams], val terminalOutParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle with HasRouterOutputParams{
+  val flit = new Flit(allOutParams(0))
+  val out_channel = UInt(log2Up(nAllOutputs).W)
+  val out_virt_channel = UInt(log2Up(allOutParams.map(_.nVirtualChannels).max).W)
 }
 
-class Switch(nInputs: Int, nOutputs: Int)(implicit val p: Parameters) extends Module with HasAstroNoCParams {
+class Switch(val rParams: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
 
   val io = IO(new Bundle {
-    val in = Vec(nInputs, Input(Valid(new SwitchBundle(nOutputs))))
-    val out = Vec(nOutputs, Output(Valid(new Flit)))
+    val in = Vec(nAllInputs, Input(Valid(new SwitchBundle(outParams, terminalOutParams))))
+    val out = MixedVec(allOutParams.map { u => Output(Valid(new Flit(u))) })
   })
 
   io.out.zipWithIndex.map { case (o,x) =>
@@ -23,5 +24,6 @@ class Switch(nInputs: Int, nOutputs: Int)(implicit val p: Parameters) extends Mo
     assert(PopCount(oh) <= 1.U)
     o.valid := oh.reduce(_||_)
     o.bits := Mux1H(oh, io.in.map(_.bits.flit))
+    o.bits.virt_channel_id := Mux1H(oh, io.in.map(_.bits.out_virt_channel))
   }
 }

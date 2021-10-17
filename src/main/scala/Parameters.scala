@@ -11,7 +11,6 @@ case class AstroNoCConfig(
   maxFlits: Int = 8,
   nPrios: Int = 2,
 
-  virtChannelBits: Int = 2,
   // srcNodeId, destNodeId => virtualChannelParams
   topology: (Int, Int) => Seq[VirtualChannelParams] = (a: Int, b: Int) => Nil,
   // srcNodeId, destNodeId => depth
@@ -40,7 +39,8 @@ trait HasAstroNoCParams {
   val nPrios = params.nPrios
   require (nPrios >= 1)
   val prioBits = log2Up(params.nPrios)
-  val virtChannelBits = params.virtChannelBits
+  // val virtualChannelBits = log2Up(Seq.tabulate(nNodes, nNodes) {
+  //   case (i,j) => params.topology(i, j).size }.flatten.max)
 
   val topologyFunction = params.topology
   val channelDepths = params.channelDepths

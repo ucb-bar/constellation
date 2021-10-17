@@ -12,11 +12,11 @@ class TerminalOutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[Cha
   require(nVirtualChannels == 1)
 
   val io = IO(new AbstractOutputUnitIO(inParams, terminalInParams, cParam) {
-    val out = Decoupled(new Flit)
+    val out = Decoupled(new Flit(cParam))
   })
 
   val channel_empty = RegInit(true.B)
-  val q = Module(new Queue(new Flit, 3))
+  val q = Module(new Queue(new Flit(cParam), 3))
   q.io.enq.valid := io.in.valid
   q.io.enq.bits := io.in.bits
   io.out <> q.io.deq

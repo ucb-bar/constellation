@@ -82,7 +82,7 @@ class Router(val rParams: RouterParams)(implicit val p: Parameters) extends Modu
     Module(new TerminalOutputUnit(inParams, terminalInParams, u)) }
   val all_output_units = output_units ++ terminal_output_units
 
-  val switch = Module(new Switch(nInputs + nTerminalInputs, nOutputs + nTerminalOutputs))
+  val switch = Module(new Switch(rParams))
   val switch_allocator = Module(new SwitchAllocator(rParams))
   val vc_allocator = Module(new VCAllocator(rParams))
   val route_computer = Module(new RouteComputer(rParams))

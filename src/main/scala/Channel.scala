@@ -43,7 +43,7 @@ trait HasChannelParams extends HasAstroNoCParams {
 class Channel(val cParam: ChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   require(!isTerminalChannel)
 
-  val flit = Valid(new Flit)
+  val flit = Valid(new Flit(cParam))
   val credit_return = Input(Valid(UInt(virtualChannelBits.W)))
   val vc_free = Input(Valid(UInt(virtualChannelBits.W)))
 }
@@ -51,7 +51,7 @@ class Channel(val cParam: ChannelParams)(implicit val p: Parameters) extends Bun
 class IOChannel(val cParam: ChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   require(isTerminalChannel)
 
-  val flit = Decoupled(new Flit)
+  val flit = Decoupled(new Flit(cParam))
 }
 
 object ChannelBuffer {

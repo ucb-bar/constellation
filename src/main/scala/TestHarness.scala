@@ -25,9 +25,9 @@ object SelectFirstN
 }
 
 
-class InputGen(idx: Int, prio: Int, inputStallProbability: Double)(implicit val p: Parameters) extends Module with HasAstroNoCParams {
+class InputGen(idx: Int, prio: Int, cParams: ChannelParams, inputStallProbability: Double)(implicit val p: Parameters) extends Module with HasAstroNoCParams {
   val io = IO(new Bundle {
-    val out = Decoupled(new Flit)
+    val out = Decoupled(new Flit(cParams))
     val rob_ready = Input(Bool())
     val rob_idx = Input(UInt())
     val tsc = Input(UInt(64.W))
@@ -37,7 +37,7 @@ class InputGen(idx: Int, prio: Int, inputStallProbability: Double)(implicit val 
 
   val flits_left = RegInit(0.U(flitIdBits.W))
   val flits_fired = RegInit(0.U(flitIdBits.W))
-  val head_flit = Reg(new Flit)
+  val head_flit = Reg(new Flit(cParams))
 
   val can_fire = (flits_left === 0.U) && io.rob_ready
 
@@ -129,7 +129,7 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
   }
 
   io.to_noc.zipWithIndex.map { case (i,idx) =>
-    val igen = Module(new InputGen(idx, 0, inputStallProbability))
+    val igen = Module(new InputGen(idx, 0, inputParams(idx), inputStallProbability))
     igen.io.rob_idx := rob_alloc_ids(idx)
     igen.io.rob_ready := (rob_alloc_avail(idx) &&
       (PopCount(~rob_valids) >= nInputs.U) && tsc >= 10.U && txs < totalTxs.U)
