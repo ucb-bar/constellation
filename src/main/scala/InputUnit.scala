@@ -40,6 +40,7 @@ abstract class AbstractInputUnit(
 
 class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOutParams: Seq[ChannelParams])
   (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, terminalOutParams)(p) {
+  require(!isTerminalInputChannel)
 
   val io = IO(new AbstractInputUnitIO(cParam, outParams, terminalOutParams) {
     val in = Flipped(new Channel(cParam))
@@ -49,9 +50,9 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
   class InputState extends Bundle {
     val g = UInt(3.W)
     val r = UInt(nAllOutputs.W)
-    val o = UInt(log2Up((allOutParams).map(_.virtualChannelParams.size).max).W)
-    val p = UInt(log2Up(virtualChannelParams.map(_.bufferSize).max).W)
-    val c = UInt(log2Up(1+virtualChannelParams.map(_.bufferSize).max).W)
+    val o = UInt(log2Up(allOutParams.map(_.virtualChannelParams.size).max).W)
+    val p = UInt(log2Up(maxBufferSize).W)
+    val c = UInt(log2Up(1+maxBufferSize).W)
     val prio = UInt(prioBits.W)
     val tail_seen = Bool()
     val dest_id = UInt(nodeIdBits.W)

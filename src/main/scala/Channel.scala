@@ -13,17 +13,17 @@ case class ChannelParams(
   srcId: Int,
   destId: Int,
   virtualChannelParams: Seq[VirtualChannelParams],
-  inputId: Int = -1,
-  outputId: Int = -1,
+  terminalInputId: Int = -1,
+  terminalOutputId: Int = -1,
   useSyncReadBuffer: Boolean = false,
   depth: Int = 0
 ) {
   val nVirtualChannels = virtualChannelParams.size
-  val isInput = inputId >= 0
-  val isOutput = outputId >= 0
-  require(!(srcId == -1 ^ isInput))
-  require(!(destId == -1 ^ isOutput))
-  require(!(isInput && isOutput))
+  val isTerminalInput = terminalInputId >= 0
+  val isTerminalOutput = terminalOutputId >= 0
+  require(!(srcId == -1 ^ isTerminalInput))
+  require(!(destId == -1 ^ isTerminalOutput))
+  require(!(isTerminalInput && isTerminalOutput))
 }
 
 trait HasChannelParams extends HasAstroNoCParams {
@@ -31,34 +31,45 @@ trait HasChannelParams extends HasAstroNoCParams {
 
   val virtualChannelParams = cParam.virtualChannelParams
   val nVirtualChannels = cParam.nVirtualChannels
+  val virtualChannelBits = log2Up(nVirtualChannels)
+
+  val maxBufferSize = virtualChannelParams.map(_.bufferSize).max
+
+  val isTerminalInputChannel = cParam.isTerminalInput
+  val isTerminalOutputChannel = cParam.isTerminalOutput
+  val isTerminalChannel = isTerminalInputChannel || isTerminalOutputChannel
 }
 
-class Channel(val cParams: ChannelParams)(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
+class Channel(val cParam: ChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
+  require(!isTerminalChannel)
+
   val flit = Valid(new Flit)
-  val credit_return = Input(Valid(UInt(log2Up(cParams.virtualChannelParams.size).W)))
-  val vc_free = Input(Valid(UInt(log2Up(cParams.virtualChannelParams.size).W)))
+  val credit_return = Input(Valid(UInt(virtualChannelBits.W)))
+  val vc_free = Input(Valid(UInt(virtualChannelBits.W)))
 }
 
-class IOChannel(val cParams: ChannelParams)(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
+class IOChannel(val cParam: ChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
+  require(isTerminalChannel)
+
   val flit = Decoupled(new Flit)
 }
 
 object ChannelBuffer {
-  def apply(in: Channel, cParams: ChannelParams)(implicit p: Parameters): Channel = {
-    val buffer = Module(new ChannelBuffer(cParams))
+  def apply(in: Channel, cParam: ChannelParams)(implicit p: Parameters): Channel = {
+    val buffer = Module(new ChannelBuffer(cParam))
     buffer.io.in <> in
     buffer.io.out
   }
 }
 
-class ChannelBuffer(val cParams: ChannelParams)(implicit val p: Parameters) extends Module with HasAstroNoCParams {
+class ChannelBuffer(val cParam: ChannelParams)(implicit val p: Parameters) extends Module with HasChannelParams {
   val io = IO(new Bundle {
-    val in = Flipped(new Channel(cParams))
-    val out = new Channel(cParams)
+    val in = Flipped(new Channel(cParam))
+    val out = new Channel(cParam)
   })
 
-  io.out.flit := Pipe(io.in.flit, cParams.depth)
-  io.in.credit_return := Pipe(io.out.credit_return, cParams.depth)
-  io.in.vc_free := Pipe(io.out.vc_free, cParams.depth)
+  io.out.flit := Pipe(io.in.flit, cParam.depth)
+  io.in.credit_return := Pipe(io.out.credit_return, cParam.depth)
+  io.in.vc_free := Pipe(io.out.vc_free, cParam.depth)
 
 }

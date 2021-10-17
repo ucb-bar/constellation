@@ -14,10 +14,10 @@ class NoC(implicit val p: Parameters) extends Module with HasAstroNoCParams{
   val inParams = (0 until nNodes).map { i => channelParams.filter(_.destId == i) }
   val outParams = (0 until nNodes).map { i => channelParams.filter(_.srcId == i) }
   val inputParams = inputNodes.zipWithIndex.map { case (nId,i) =>
-    ChannelParams(-1, nId, Seq(VirtualChannelParams(-1)), inputId=i)
+    ChannelParams(-1, nId, Seq(VirtualChannelParams(-1)), terminalInputId=i)
   }
   val outputParams = outputNodes.zipWithIndex.map { case (nId,i) =>
-    ChannelParams(nId, -1, Seq(VirtualChannelParams(-1)), outputId=i)
+    ChannelParams(nId, -1, Seq(VirtualChannelParams(-1)), terminalOutputId=i)
   }
 
   val io = IO(new Bundle {
@@ -98,15 +98,15 @@ class NoC(implicit val p: Parameters) extends Module with HasAstroNoCParams{
   router_nodes.zipWithIndex.map { case (dst,dstId) =>
     dst.io.in.map { in =>
       in <> ChannelBuffer(
-        router_nodes(in.cParams.srcId).io.out.filter(_.cParams.destId == dstId)(0),
-        in.cParams
+        router_nodes(in.cParam.srcId).io.out.filter(_.cParam.destId == dstId)(0),
+        in.cParam
       )
     }
     (dst.terminalInParams zip dst.io.terminal_in) map { case (u,i) =>
-      i <> io.in(u.inputId)
+      i <> io.in(u.terminalInputId)
     }
     (dst.terminalOutParams zip dst.io.terminal_out) map { case (u,i) =>
-      io.out(u.outputId) <> i
+      io.out(u.terminalOutputId) <> i
     }
   }
 }

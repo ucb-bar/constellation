@@ -12,7 +12,7 @@ class TerminalInputUnit(
   terminalOutParams: Seq[ChannelParams])
   (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, terminalOutParams)(p) {
 
-  require(cParam.isInput && !cParam.isOutput)
+  require(isTerminalInputChannel && !isTerminalOutputChannel)
   require(nVirtualChannels == 1)
 
   val io = IO(new AbstractInputUnitIO(cParam, outParams, terminalOutParams) {

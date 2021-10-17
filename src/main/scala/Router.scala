@@ -52,7 +52,7 @@ trait HasRouterParams extends HasRouterOutputParams with HasRouterInputParams
     inParam.nVirtualChannels,
     outParam.nVirtualChannels,
     nPrios) { case (inV, outV, prio) =>
-      rParams.vcAllocLegalPaths(inParam.srcId, inV, outParam.destId, outV)(prio) || (inParam.isInput && outParam.isOutput)
+      rParams.vcAllocLegalPaths(inParam.srcId, inV, outParam.destId, outV)(prio) || (inParam.isTerminalInput && outParam.isTerminalOutput)
   }.flatten.flatten.reduce(_||_)
 
 }
