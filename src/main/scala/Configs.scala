@@ -69,7 +69,7 @@ class UnidirectionalRingConfig(
     nNodes = nNodes,
     nPrios = 1,
     topology = (a: Int, b: Int) => {
-      if ((b-a) == 1 || (b == 0 && a == (nNodes-1))) Seq.fill(4) { VirtualChannelParams(bufferSize=4) } else Nil
+      if ((b-a) == 1 || (b == 0 && a == (nNodes-1))) Seq.fill(5) { VirtualChannelParams(bufferSize=5) } else Nil
     },
     channelDepths = (a: Int, b: Int) => channelDepth,
     virtualLegalPaths = {
@@ -92,7 +92,7 @@ class TestConfig03 extends UnidirectionalLineConfig(2, Seq(0, 0), Seq(0, 1, 1))
 class TestConfig04 extends UnidirectionalLineConfig(3, Seq(0, 0), Seq(0, 1, 1, 2, 2))
 class TestConfig05 extends UnidirectionalLineConfig(3, Seq(0, 1, 1), Seq(1, 1, 2))
 
-class TestConfig06 extends UnidirectionalLineConfig(2, Seq(0), Seq(1), 1, 8, 8)
+class TestConfig06 extends UnidirectionalLineConfig(2, Seq(0), Seq(1), 1, 5, 4)
 
 class TestConfig07 extends BidirectionalLineConfig(2, Seq(0, 1), Seq(0, 1))
 class TestConfig08 extends BidirectionalLineConfig(3, Seq(0, 1), Seq(0, 1, 2))

@@ -133,7 +133,8 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
 
   (states zip io.salloc_req).zipWithIndex.map { case ((s,r),i) =>
     val credit_available = (UIntToOH(s.o) & Mux1H(s.r, io.out_credit_available.map(_.asUInt))) =/= 0.U
-    r.valid := s.g === g_a && credit_available && s.c =/= 0.U
+    r.valid := s.g === g_a && credit_available && (s.c =/= 0.U ||
+      (io.in.flit.valid && io.in.flit.bits.virt_channel_id === i.U))
     r.bits.out_channel := OHToUInt(s.r)
     r.bits.out_virt_channel := s.o
     buffer.io.tail_read_req(i) := s.p

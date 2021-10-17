@@ -32,28 +32,46 @@ class InputBuffer(val cParam: ChannelParams)(implicit val p: Parameters) extends
     def write(x: UInt, d: Flit): Unit = mem(x) := d
     (mem, read(_,_), write(_,_))
   }
+
   val tails = Reg(Vec(bufferSz, Bool()))
 
   val heads = Reg(Vec(nVirtualChannels, UInt(log2Up(maxBufferSize).W)))
   val bases = VecInit(virtualChannelParams.map(_.bufferSize).scanLeft(0)(_+_).dropRight(1).map(_.U))
 
   val in_virt_id = io.in.bits.virt_channel_id
+  val in_base = bases(in_virt_id)
+  val in_head = heads(in_virt_id)
+
   when (io.in.valid) {
-    val base = bases(in_virt_id)
-    val head = heads(in_virt_id)
-    val waddr = base +& head
+    val waddr = in_base +& in_head
     write(waddr, io.in.bits)
     tails(waddr) := io.in.bits.tail
     heads(in_virt_id) := WrapInc(heads(in_virt_id),
       VecInit(virtualChannelParams.map(_.bufferSize.U))(in_virt_id))
   }
 
+  def bypass(x: Flit, addr: UInt, channel: UInt): Flit = {
+    val out = WireInit(x)
+    when (RegNext(io.in.valid && (addr === in_head) && (channel === in_virt_id))) {
+      out := RegNext(io.in.bits)
+    }
+    out
+  }
+  def bypass_tail(x: Bool, addr: UInt, channel: UInt): Bool = {
+    val out = WireInit(x)
+    when (io.in.valid && (addr === in_head) && (channel === in_virt_id)) {
+      out := io.in.bits.tail
+    }
+    out
+  }
+
+
   io.head := heads(in_virt_id)
 
   val raddr = bases(io.read_req.bits.channel) +& io.read_req.bits.addr
-  io.read_resp := read(raddr, io.read_req.valid)
+  io.read_resp := bypass(read(raddr, io.read_req.valid), io.read_req.bits.addr, io.read_req.bits.channel)
   (io.tail_read_resp zip io.tail_read_req).zipWithIndex.map { case ((resp,req),i) =>
-    resp := tails(bases(i.U) +& req)
+    resp := bypass_tail(tails(bases(i.U) +& req), io.read_req.bits.addr, io.read_req.bits.channel)
   }
 
   when (reset.asBool) { heads.foreach(_ := 0.U) }
