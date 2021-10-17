@@ -113,7 +113,7 @@ class Router(val rParams: RouterParams)(implicit val p: Parameters) extends Modu
     case (a,u) => a := u.io.channel_available }
 
   all_input_units.foreach(in => all_output_units.zipWithIndex.foreach { case (out,outIdx) =>
-    if (possibleTransition(in.cParam, out.outParam)) {
+    if (possibleTransition(in.cParam, out.cParam)) {
       in.io.out_credit_available(outIdx) := out.io.credit_available
     } else {
       in.io.out_credit_available(outIdx).foreach(_ := false.B)

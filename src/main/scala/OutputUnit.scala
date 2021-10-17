@@ -5,30 +5,47 @@ import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 
-class OutputUnitAlloc(val inParams: Seq[ChannelParams], val terminalInParams: Seq[ChannelParams], val outParam: ChannelParams)(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
-  val in_channel = UInt(log2Up(inParams.size + terminalInParams.size).W)
-  val in_virt_channel = UInt(log2Up((inParams ++ terminalInParams).map(_.virtualChannelParams.size).max).W)
-  val out_virt_channel = UInt(outParam.virtualChannelParams.size.W)
+class OutputUnitAlloc(
+  val inParams: Seq[ChannelParams],
+  val terminalInParams: Seq[ChannelParams],
+  val cParam: ChannelParams
+)(implicit val p: Parameters) extends Bundle with HasRouterInputParams with HasChannelParams {
+  val nodeId = cParam.srcId
+
+  val in_channel = UInt(log2Up(nAllInputs).W)
+  val in_virt_channel = UInt(log2Up(allInParams.map(_.nVirtualChannels).max).W)
+  val out_virt_channel = UInt(nVirtualChannels.W)
 }
 
-class AbstractOutputUnitIO(val inParams: Seq[ChannelParams], val terminalInParams: Seq[ChannelParams], val outParam: ChannelParams)(implicit val p: Parameters) extends Bundle {
-  val nVirtualChannels = outParam.virtualChannelParams.size
+class AbstractOutputUnitIO(
+  val inParams: Seq[ChannelParams],
+  val terminalInParams: Seq[ChannelParams],
+  val cParam: ChannelParams
+)(implicit val p: Parameters) extends Bundle with HasRouterInputParams with HasChannelParams {
+  val nodeId = cParam.srcId
+
   val in = Flipped(Valid(new Flit))
   val credit_available = Output(Vec(nVirtualChannels, Bool()))
   val channel_available = Output(Vec(nVirtualChannels, Bool()))
-  val alloc = Flipped(Valid(new OutputUnitAlloc(inParams, terminalInParams, outParam)))
+  val alloc = Flipped(Valid(new OutputUnitAlloc(inParams, terminalInParams, cParam)))
 }
 
-abstract class AbstractOutputUnit(val outParam: ChannelParams)(implicit val p: Parameters) extends Module with HasAstroNoCParams {
+abstract class AbstractOutputUnit(
+  val inParams: Seq[ChannelParams],
+  val terminalInParams: Seq[ChannelParams],
+  val cParam: ChannelParams
+)(implicit val p: Parameters) extends Module with HasRouterInputParams with HasChannelParams {
+  val nodeId = cParam.srcId
+
   def io: AbstractOutputUnitIO
 }
 
-class OutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[ChannelParams], outParam: ChannelParams)(implicit p: Parameters) extends AbstractOutputUnit(outParam)(p) {
-  val nInputs = inParams.size
-  val nVirtualChannels = outParam.virtualChannelParams.size
-  val io = IO(new AbstractOutputUnitIO(inParams, terminalInParams, outParam) {
-    val out = new Channel(outParam)
-    val credit_alloc = Input(Valid(UInt(log2Up(nVirtualChannels).W)))
+class OutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[ChannelParams], cParam: ChannelParams)
+  (implicit p: Parameters) extends AbstractOutputUnit(inParams, terminalInParams, cParam)(p) {
+
+  val io = IO(new AbstractOutputUnitIO(inParams, terminalInParams, cParam) {
+    val out = new Channel(cParam)
+    val credit_alloc = Input(Valid(UInt(virtualChannelBits.W)))
   })
 
   val g_i :: g_a :: g_c :: Nil = Enum(3)
@@ -36,11 +53,11 @@ class OutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[ChannelPara
   class OutputState(val bufferSize: Int) extends Bundle {
     val g = UInt(2.W)
     val i_p = UInt(log2Up(nInputs).W)
-    val i_c = UInt(log2Up((inParams ++ terminalInParams).map(_.virtualChannelParams.size).max).W)
+    val i_c = UInt(log2Up(allInParams.map(_.virtualChannelParams.size).max).W)
     val c = UInt(log2Up(1+bufferSize).W)
   }
 
-  val states = Reg(MixedVec(outParam.virtualChannelParams.map { u => new OutputState(u.bufferSize) }))
+  val states = Reg(MixedVec(virtualChannelParams.map { u => new OutputState(u.bufferSize) }))
   (states zip io.channel_available).map { case (s,a) => a := s.g === g_i }
   io.out.flit := io.in
 

@@ -9,8 +9,8 @@ import freechips.rocketchip.util._
 class AbstractInputUnitIO(
   val cParam: ChannelParams,
   val outParams: Seq[ChannelParams],
-  val terminalOutParams: Seq[ChannelParams])
-  (implicit val p: Parameters) extends Bundle with HasRouterOutputParams with HasChannelParams {
+  val terminalOutParams: Seq[ChannelParams]
+)(implicit val p: Parameters) extends Bundle with HasRouterOutputParams with HasChannelParams {
   val nodeId = cParam.destId
 
   val router_req = Decoupled(new RouteComputerReq(cParam))
