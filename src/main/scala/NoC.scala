@@ -9,7 +9,7 @@ import freechips.rocketchip.config.{Field, Parameters}
 class NoC(implicit val p: Parameters) extends Module with HasAstroNoCParams{
   val channelParams: Seq[ChannelParams] = Seq.tabulate(nNodes, nNodes) { case (i,j) =>
     val vChannels = topologyFunction(i, j)
-    if (vChannels.isEmpty) None else Some(ChannelParams(i, j, vChannels))
+    if (vChannels.isEmpty) None else Some(ChannelParams(i, j, vChannels, depth=channelDepths(i, j)))
   }.flatten.flatten
   val inParams = (0 until nNodes).map { i => channelParams.filter(_.destId == i) }
   val outParams = (0 until nNodes).map { i => channelParams.filter(_.srcId == i) }
@@ -97,7 +97,10 @@ class NoC(implicit val p: Parameters) extends Module with HasAstroNoCParams{
 
   router_nodes.zipWithIndex.map { case (dst,dstId) =>
     dst.io.in.map { in =>
-      in <> router_nodes(in.cParams.srcId).io.out.filter(_.cParams.destId == dstId)(0)
+      in <> ChannelBuffer(
+        router_nodes(in.cParams.srcId).io.out.filter(_.cParams.destId == dstId)(0),
+        in.cParams
+      )
     }
     (dst.terminalInParams zip dst.io.terminal_in) map { case (u,i) =>
       i <> io.in(u.inputId)

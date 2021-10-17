@@ -14,6 +14,8 @@ case class AstroNoCConfig(
   virtChannelBits: Int = 2,
   // srcNodeId, destNodeId => virtualChannelParams
   topology: (Int, Int) => Seq[VirtualChannelParams] = (a: Int, b: Int) => Nil,
+  // srcNodeId, destNodeId => depth
+  channelDepths: (Int, Int) => Int = (a: Int, b: Int) => 0,
   // nodeId => (srcNodeId, inVChannelId, destNodeId, outVChannelId) => prio => legalPath
   virtualLegalPaths: Int => (Int, Int, Int, Int) => Int => Boolean = (a: Int) => (b: Int, c: Int, d: Int, e: Int) => (f: Int) => false,
   // nodeId => destId, nextId => prio => usePath
@@ -41,6 +43,7 @@ trait HasAstroNoCParams {
   val virtChannelBits = params.virtChannelBits
 
   val topologyFunction = params.topology
+  val channelDepths = params.channelDepths
   val virtualLegalPathsFunction = params.virtualLegalPaths
   val routingFunctions = params.routingFunctions
 
@@ -54,26 +57,5 @@ trait HasAstroNoCParams {
     VecInit(outputNodes.zipWithIndex.map { case (e,i) => outputNodes.take(i).count(_ == e).U })(outId)
   }
 
-}
-
-
-case class VirtualChannelParams(
-  bufferSize: Int
-)
-
-case class ChannelParams(
-  srcId: Int,
-  destId: Int,
-  virtualChannelParams: Seq[VirtualChannelParams],
-  inputId: Int = -1,
-  outputId: Int = -1,
-  useSyncReadBuffer: Boolean = false
-) {
-  val nVirtualChannels = virtualChannelParams.size
-  val isInput = inputId >= 0
-  val isOutput = outputId >= 0
-  require(!(srcId == -1 ^ isInput))
-  require(!(destId == -1 ^ isOutput))
-  require(!(isInput && isOutput))
 }
 

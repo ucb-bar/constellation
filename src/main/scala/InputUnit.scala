@@ -20,12 +20,12 @@ class AbstractInputUnitIO(val inParam: ChannelParams, val outParams: Seq[Channel
   val out = Valid(new SwitchBundle(outParams.size + terminalOutParams.size))
 }
 
-abstract class AbstractInputUnit(implicit val p: Parameters) extends Module with HasAstroNoCParams {
+abstract class AbstractInputUnit(val inParam: ChannelParams)(implicit val p: Parameters) extends Module with HasAstroNoCParams {
   def io: AbstractInputUnitIO
 }
 
 class InputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalOutParams: Seq[ChannelParams])
-  (implicit p: Parameters) extends AbstractInputUnit()(p) {
+  (implicit p: Parameters) extends AbstractInputUnit(inParam)(p) {
   val nOutputs = outParams.size
   val nTerminalOutputs = terminalOutParams.size
   val nVirtualChannels = inParam.virtualChannelParams.size

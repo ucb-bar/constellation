@@ -7,7 +7,7 @@ import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
 class TerminalInputUnit(inParam: ChannelParams, outParams: Seq[ChannelParams], terminalOutParams: Seq[ChannelParams])
-  (implicit p: Parameters) extends AbstractInputUnit()(p) {
+  (implicit p: Parameters) extends AbstractInputUnit(inParam)(p) {
   val nOutputs = outParams.size
   require(inParam.isInput && !inParam.isOutput)
   require(inParam.nVirtualChannels == 1)

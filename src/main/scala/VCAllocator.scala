@@ -41,7 +41,7 @@ class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends
 
   io.resp.foreach(_.bits := DontCare)
   (io.resp zip io.req).map { case (o,i) => o.bits.in_virt_channel := i.bits.in_virt_channel }
-  
+  io.req.foreach { r => when (r.valid) { assert(PopCount(r.bits.out_channels) >= 1.U) } }
 
   var idx = 0
   for (j <- 0 until allOutParams.map(_.virtualChannelParams.size).max) {
@@ -100,7 +100,7 @@ class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends
   require(idx == nOutChannels)
 
   out_arbs.foreach(_.io.out.ready := true.B)
-  (out_arbs zip io.out_alloc).map { case (o,a) => 
+  (out_arbs zip io.out_alloc).map { case (o,a) =>
     a.valid := o.io.out.fire()
     a.bits.in_channel := o.io.out.bits.in_channel
     a.bits.in_virt_channel := o.io.out.bits.in_virt_channel

@@ -93,11 +93,19 @@ class SwitchAllocator(val rParams: RouterParams)(implicit val p: Parameters) ext
   arbs.foreach(_.io.out.ready := true.B)
 
   in_arbs.zipWithIndex.foreach { case (o,j) =>
+    val fires = Wire(Vec(arbs.size, Bool()))
     arbs.zipWithIndex.foreach { case (a,i) =>
-      a.io.in(j).valid := o.io.out.valid && o.io.out.bits.out_channel === i.U
-      a.io.in(j).bits := o.io.out.bits
+      if (possibleTransition(allInParams(j), allOutParams(i))) {
+        a.io.in(j).valid := o.io.out.valid && o.io.out.bits.out_channel === i.U
+        a.io.in(j).bits := o.io.out.bits
+        fires(i) := a.io.in(j).fire()
+      } else {
+        a.io.in(j).valid := false.B
+        a.io.in(j).bits := DontCare
+        fires(i) := false.B
+      }
     }
-    o.io.out.ready := arbs.map(_.io.in(j).fire()).reduce(_||_)
+    o.io.out.ready := fires.reduce(_||_)
   }
 
   (arbs.take(nOutputs) zip io.credit_alloc).map { case (a,i) =>

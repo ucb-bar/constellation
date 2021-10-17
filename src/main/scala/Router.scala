@@ -5,16 +5,6 @@ import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 
-class Channel(val cParams: ChannelParams)(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
-  val flit = Valid(new Flit)
-  val credit_return = Input(Valid(UInt(log2Up(cParams.virtualChannelParams.size).W)))
-  val vc_free = Input(Valid(UInt(log2Up(cParams.virtualChannelParams.size).W)))
-}
-
-class IOChannel(val cParams: ChannelParams)(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
-  val flit = Decoupled(new Flit)
-}
-
 case class RouterParams(
   id: Int,
   inParams: Seq[ChannelParams],
@@ -39,6 +29,14 @@ trait HasRouterParams extends HasAstroNoCParams {
   val nOutputs = outParams.size
   val nTerminalInputs = terminalInParams.size
   val nTerminalOutputs = terminalOutParams.size
+
+  def possibleTransition(inParam: ChannelParams, outParam: ChannelParams): Boolean = Seq.tabulate(
+    inParam.nVirtualChannels,
+    outParam.nVirtualChannels,
+    nPrios) { case (inV, outV, prio) =>
+      rParams.vcAllocLegalPaths(inParam.srcId, inV, outParam.destId, outV)(prio) || (inParam.isInput && outParam.isOutput)
+  }.flatten.flatten.reduce(_||_)
+
 }
 
 class Router(val rParams: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
@@ -95,8 +93,14 @@ class Router(val rParams: RouterParams)(implicit val p: Parameters) extends Modu
   (vc_allocator.io.channel_available zip all_output_units).foreach {
     case (a,u) => a := u.io.channel_available }
 
-  all_input_units.foreach(u => (u.io.out_credit_available zip all_output_units).foreach {
-    case (l,r) => l := r.io.credit_available })
+  all_input_units.foreach(in => all_output_units.zipWithIndex.foreach { case (out,outIdx) =>
+    if (possibleTransition(in.inParam, out.outParam)) {
+      in.io.out_credit_available(outIdx) := out.io.credit_available
+    } else {
+      in.io.out_credit_available(outIdx).foreach(_ := false.B)
+    }
+    dontTouch(in.io.out_credit_available)
+  })
   (all_input_units zip switch_allocator.io.req).foreach {
     case (u,r) => r <> u.io.salloc_req }
   (output_units zip switch_allocator.io.credit_alloc).foreach {

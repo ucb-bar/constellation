@@ -19,11 +19,11 @@ class AbstractOutputUnitIO(val inParams: Seq[ChannelParams], val terminalInParam
   val alloc = Flipped(Valid(new OutputUnitAlloc(inParams, terminalInParams, outParam)))
 }
 
-abstract class AbstractOutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[ChannelParams], outParam: ChannelParams)(implicit val p: Parameters) extends Module with HasAstroNoCParams {
+abstract class AbstractOutputUnit(val outParam: ChannelParams)(implicit val p: Parameters) extends Module with HasAstroNoCParams {
   def io: AbstractOutputUnitIO
 }
 
-class OutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[ChannelParams], outParam: ChannelParams)(implicit p: Parameters) extends AbstractOutputUnit(inParams, terminalInParams, outParam)(p) {
+class OutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[ChannelParams], outParam: ChannelParams)(implicit p: Parameters) extends AbstractOutputUnit(outParam)(p) {
   val nInputs = inParams.size
   val nVirtualChannels = outParam.virtualChannelParams.size
   val io = IO(new AbstractOutputUnitIO(inParams, terminalInParams, outParam) {
