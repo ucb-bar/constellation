@@ -6,14 +6,14 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 
 
-class RouteComputerReq(val param: ChannelParams)(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
-  val src_virt_id = UInt(log2Up(param.nVirtualChannels).W)
+class RouteComputerReq(val cParam: ChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
+  val src_virt_id = UInt(virtualChannelBits.W)
   val src_prio = UInt(prioBits.W)
   val dest_id = UInt(nodeIdBits.W)
 }
 
-class RouteComputerResp(val param: ChannelParams, val nOutputs: Int)(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
-  val src_virt_id = UInt(log2Up(param.virtualChannelParams.size).W)
+class RouteComputerResp(val cParam: ChannelParams, val nOutputs: Int)(implicit val p: Parameters) extends Bundle with HasChannelParams {
+  val src_virt_id = UInt(virtualChannelBits.W)
   val out_channels = UInt(nOutputs.W)
 }
 

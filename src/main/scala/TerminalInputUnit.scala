@@ -44,7 +44,7 @@ class TerminalInputUnit(
   assert(!(route_q.io.enq.valid && !route_q.io.enq.ready))
 
   val vcalloc_buffer = Module(new Queue(new Flit, 2))
-  val vcalloc_q = Module(new Queue(new VCAllocResp(cParam, allOutParams), 2))
+  val vcalloc_q = Module(new Queue(new VCAllocResp(cParam, outParams, terminalOutParams), 2))
 
   vcalloc_buffer.io.enq.bits := route_buffer.io.deq.bits
 

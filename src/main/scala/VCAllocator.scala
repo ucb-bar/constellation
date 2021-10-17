@@ -6,24 +6,24 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
-class VCAllocReq(val inParam: ChannelParams, val nOutputs: Int, val nTerminalOutputs: Int)(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
-  val in_virt_channel = UInt(log2Up(inParam.virtualChannelParams.size).W)
+class VCAllocReq(val cParam: ChannelParams, val nOutputs: Int, val nTerminalOutputs: Int)(implicit val p: Parameters) extends Bundle with HasChannelParams {
+  val in_virt_channel = UInt(virtualChannelBits.W)
   val in_prio = UInt(prioBits.W)
 
   val out_channels = UInt((nOutputs+nTerminalOutputs).W)
   val dummy = UInt(1.W) //avoids firrtl bug
 }
 
-class VCAllocResp(val inParam: ChannelParams, val allOutParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle with HasAstroNoCParams {
-  val in_virt_channel = UInt(log2Up(inParam.virtualChannelParams.size).W)
+class VCAllocResp(val cParam: ChannelParams, val outParams: Seq[ChannelParams], val terminalOutParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle with HasChannelParams with HasRouterOutputParams {
+  val in_virt_channel = UInt(virtualChannelBits.W)
   val out_virt_channel = UInt(log2Up((Seq(1) ++ allOutParams.map(_.virtualChannelParams.size)).max).W)
-  val out_channel = UInt(log2Up(allOutParams.size).W)
+  val out_channel = UInt(log2Up(nAllOutputs).W)
 }
 
 class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
   val io = IO(new Bundle {
     val req = MixedVec(allInParams.map { u => Flipped(Decoupled(new VCAllocReq(u, outParams.size, terminalOutParams.size))) })
-    val resp = MixedVec(allInParams.map { u => Valid(new VCAllocResp(u, allOutParams)) })
+    val resp = MixedVec(allInParams.map { u => Valid(new VCAllocResp(u, outParams, terminalOutParams)) })
 
     val channel_available = MixedVec(allOutParams.map { u => Vec(u.virtualChannelParams.size, Input(Bool())) })
     val out_alloc = MixedVec(allOutParams.map { u => Valid(new OutputUnitAlloc(inParams, terminalInParams, u)) })

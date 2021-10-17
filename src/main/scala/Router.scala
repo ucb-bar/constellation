@@ -16,7 +16,6 @@ case class RouterParams(
 )
 
 trait HasRouterOutputParams extends HasAstroNoCParams {
-  val nodeId: Int
   val outParams: Seq[ChannelParams]
   val terminalOutParams: Seq[ChannelParams]
 
@@ -28,7 +27,6 @@ trait HasRouterOutputParams extends HasAstroNoCParams {
 }
 
 trait HasRouterInputParams extends HasAstroNoCParams {
-  val nodeId: Int
   val inParams: Seq[ChannelParams]
   val terminalInParams: Seq[ChannelParams]
 
