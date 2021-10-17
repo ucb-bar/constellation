@@ -68,11 +68,11 @@ class SwitchAllocReq(val outParams: Seq[ChannelParams], val terminalOutParams: S
 
 class SwitchAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
   val io = IO(new Bundle {
-    val req = MixedVec((inParams ++ terminalInParams).map(u =>
-      Vec(u.virtualChannelParams.size, Flipped(Decoupled(new SwitchAllocReq(outParams, terminalOutParams))))))
-    val credit_alloc = MixedVec(outParams.map { u => Valid(UInt(log2Up(u.virtualChannelParams.size).W)) })
+    val req = MixedVec(allInParams.map(u =>
+      Vec(u.nVirtualChannels, Flipped(Decoupled(new SwitchAllocReq(outParams, terminalOutParams))))))
+    val credit_alloc = MixedVec(outParams.map { u => Valid(UInt(log2Up(u.nVirtualChannels).W)) })
   })
-  val nInputChannels = allInParams.map(_.virtualChannelParams.size).sum
+  val nInputChannels = allInParams.map(_.nVirtualChannels).sum
 
   val in_arbs = io.req.map { r =>
     val arb = Module(new CustomLockingArbiter(
@@ -84,9 +84,9 @@ class SwitchAllocator(val rParams: RouterParams)(implicit val p: Parameters) ext
     arb.io.in <> r
     arb
   }
-  val arbs = Seq.fill(nOutputs + nTerminalOutputs) { Module(new CustomLockingArbiter(
+  val arbs = Seq.fill(nAllOutputs) { Module(new CustomLockingArbiter(
     new SwitchAllocReq(outParams, terminalOutParams),
-    nInputs + nTerminalInputs,
+    nAllOutputs,
     (d: SwitchAllocReq) => d.tail,
     rr = true
   )) }
