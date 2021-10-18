@@ -46,13 +46,20 @@ trait HasRouterParams extends HasRouterOutputParams with HasRouterInputParams
   val terminalInParams = rParams.terminalInParams
   val terminalOutParams = rParams.terminalOutParams
 
-  def possibleTransition(inParam: ChannelParams, outParam: ChannelParams): Boolean = Seq.tabulate(
-    inParam.nVirtualChannels,
-    outParam.nVirtualChannels,
-    nPrios) { case (inV, outV, prio) =>
-      rParams.vcAllocLegalPaths(inParam.srcId, inV, outParam.destId, outV)(prio) || (inParam.isTerminalInput && outParam.isTerminalOutput)
-  }.flatten.flatten.reduce(_||_)
-
+  def possibleTransition(inParam: ChannelParams, outParam: ChannelParams): Boolean = {
+    val legalVirtualTransition = Seq.tabulate(
+      inParam.nVirtualChannels,
+      outParam.nVirtualChannels,
+      nPrios) { case (inV, outV, prio) =>
+        (rParams.vcAllocLegalPaths(inParam.srcId, inV, outParam.destId, outV)(prio) ||
+          (inParam.isTerminalInput && outParam.isTerminalOutput))
+    }.flatten.flatten.reduce(_||_)
+    val legalPhysicalTransition = outputNodes.map(out => Seq.tabulate(nPrios) { case (prio) =>
+      rParams.routingFunction(out, outParam.destId)(prio)
+    }).flatten.reduce(_||_)
+    require(!(legalVirtualTransition && !legalPhysicalTransition))
+    legalVirtualTransition && legalPhysicalTransition
+  }
 }
 
 class Router(val rParams: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {

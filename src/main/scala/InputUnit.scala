@@ -90,7 +90,9 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
     }
   }
 
-  val route_arbiter = Module(new RRArbiter(new RouteComputerReq(cParam), nVirtualChannels))
+  val route_arbiter = Module(new GrantHoldArbiter(
+    new RouteComputerReq(cParam), nVirtualChannels,
+    (t: RouteComputerReq) => true.B, rr = true))
   (route_arbiter.io.in zip states).zipWithIndex.map { case ((i,s),idx) =>
     i.valid := s.g === g_r
     i.bits.dest_id := s.dest_id
@@ -107,8 +109,9 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
     states(id).r := io.router_resp.bits.out_channels
   }
 
-  val vcalloc_arbiter = Module(new RRArbiter(
-    new VCAllocReq(cParam, nOutputs, nTerminalOutputs), nVirtualChannels))
+  val vcalloc_arbiter = Module(new GrantHoldArbiter(
+    new VCAllocReq(cParam, nOutputs, nTerminalOutputs), nVirtualChannels,
+    (x: VCAllocReq) => true.B, rr = true))
   (vcalloc_arbiter.io.in zip states).zipWithIndex.map { case ((i,s),idx) =>
     i.valid := s.g === g_v
     val bits = Wire(new VCAllocReq(cParam, nOutputs, nTerminalOutputs))

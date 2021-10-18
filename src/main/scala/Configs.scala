@@ -63,18 +63,21 @@ class UnidirectionalRingConfig(
   nNodes: Int = 2,
   inputNodes: Seq[Int] = Seq(0),
   outputNodes: Seq[Int] = Seq(1),
-  channelDepth: Int = 1
+  channelDepth: Int = 1,
+  nVirtualChannels: Int = 5
 ) extends Config((site, here, up) => {
   case AstroNoCKey => up(AstroNoCKey, site).copy(
     nNodes = nNodes,
     nPrios = 1,
     topology = (a: Int, b: Int) => {
-      if ((b-a) == 1 || (b == 0 && a == (nNodes-1))) Seq.fill(5) { VirtualChannelParams(bufferSize=5) } else Nil
+      if ((b-a) == 1 || (b == 0 && a == (nNodes-1))) Seq.fill(nVirtualChannels) { VirtualChannelParams(bufferSize=5) } else Nil
     },
     channelDepths = (a: Int, b: Int) => channelDepth,
     virtualLegalPaths = {
       (n: Int) => (src: Int, srcV: Int, dst: Int, dstV: Int) => (prio: Int) => {
-        true
+        if (src == -1)  { dstV != 0 } else {
+          !(dstV < srcV && dstV == 0 && n != nNodes - 1)
+        }
       }
     },
     routingFunctions = (n: Int) => (dst: Int, nxt: Int) => (prio: Int) => {
@@ -100,3 +103,5 @@ class TestConfig09 extends BidirectionalLineConfig(4, Seq(1, 2), Seq(0, 1, 2, 3)
 class TestConfig10 extends BidirectionalLineConfig(4, Seq(1, 1, 2, 2), Seq(0, 0, 1, 1, 2, 2, 3, 3))
 
 class TestConfig11 extends UnidirectionalRingConfig(2, Seq(0), Seq(1))
+class TestConfig12 extends UnidirectionalRingConfig(4, Seq(0, 2), Seq(1, 3))
+class TestConfig13 extends UnidirectionalRingConfig(10, Seq(0, 2, 4, 8), Seq(1, 3, 5, 7, 9))
