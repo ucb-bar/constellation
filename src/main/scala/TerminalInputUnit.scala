@@ -44,7 +44,8 @@ class TerminalInputUnit(
   assert(!(route_q.io.enq.valid && !route_q.io.enq.ready))
 
   val vcalloc_buffer = Module(new Queue(new Flit(cParam), 2))
-  val vcalloc_q = Module(new Queue(new VCAllocResp(cParam, outParams, terminalOutParams), 2))
+  val vcalloc_q = Module(new Queue(new VCAllocResp(cParam, outParams, terminalOutParams),
+    1, pipe=true))
 
   vcalloc_buffer.io.enq.bits := route_buffer.io.deq.bits
 
@@ -60,10 +61,11 @@ class TerminalInputUnit(
     (io.vcalloc_req.ready || !head)
   )
   io.vcalloc_req.valid := (route_buffer.io.deq.valid && route_q.io.deq.valid &&
-    head && vcalloc_buffer.io.enq.ready)
+    head && vcalloc_buffer.io.enq.ready && vcalloc_q.io.enq.ready)
   route_buffer.io.deq.ready := (vcalloc_buffer.io.enq.ready &&
     (route_q.io.deq.valid || !head) &&
-    (io.vcalloc_req.ready || !head))
+    (io.vcalloc_req.ready || !head) &&
+    (vcalloc_q.io.enq.ready || !head))
   route_q.io.deq.ready := (route_buffer.io.deq.fire() && tail)
 
 

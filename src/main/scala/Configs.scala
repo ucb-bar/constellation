@@ -111,3 +111,4 @@ class TestConfig10 extends BidirectionalLineConfig(4, Seq(1, 1, 2, 2), Seq(0, 0,
 class TestConfig11 extends UnidirectionalRingConfig(2, Seq(0), Seq(1))
 class TestConfig12 extends UnidirectionalRingConfig(4, Seq(0, 2), Seq(1, 3))
 class TestConfig13 extends UnidirectionalRingConfig(10, Seq(0, 2, 4, 6, 8), Seq(1, 3, 5, 7, 9))
+class TestConfig14 extends UnidirectionalRingConfig(10, 0 until 10, 0 until 10)

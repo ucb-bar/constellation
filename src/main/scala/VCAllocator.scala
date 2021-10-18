@@ -81,7 +81,7 @@ class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends
   }
 
   val row_reqs = Seq.tabulate(nOutChannels) { i =>
-    val rr_arb = Module(new RRArbiter(new InternalAlloc, nAllInputs))
+    val rr_arb = Module(new Arbiter(new InternalAlloc, nAllInputs))
     (rr_arb.io.in zip req_matrix(i)).map { case (l,r) => l <> r }
     rr_arb.io.out
   }
