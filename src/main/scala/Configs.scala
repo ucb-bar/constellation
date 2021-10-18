@@ -25,7 +25,7 @@ class UnidirectionalLineConfig(
         true
       }
     },
-    routingFunctions = (n: Int) => (dst: Int, nxt: Int) => (prio: Int) => {
+    routingFunctions = (n: Int) => (src: Int, dst: Int, nxt: Int) => (prio: Int) => {
       true
     },
     inputNodes = inputNodes,
@@ -51,7 +51,7 @@ class BidirectionalLineConfig(
         dst != src
       }
     },
-    routingFunctions = (n: Int) => (dst: Int, nxt: Int) => (prio: Int) => {
+    routingFunctions = (n: Int) => (src: Int, dst: Int, nxt: Int) => (prio: Int) => {
       if (n < nxt) dst >= nxt else dst <= nxt
     },
     inputNodes = inputNodes,
@@ -86,7 +86,7 @@ class UnidirectionalRingConfig(
         }
       }
     },
-    routingFunctions = (n: Int) => (dst: Int, nxt: Int) => (prio: Int) => {
+    routingFunctions = (n: Int) => (src: Int, dst: Int, nxt: Int) => (prio: Int) => {
       true
     },
     inputNodes = inputNodes,
@@ -99,7 +99,8 @@ class BidirectionalRingConfig(
   inputNodes: Seq[Int] = Seq(0),
   outputNodes: Seq[Int] = Seq(1),
   channelDepth: Int = 1,
-  nVirtualChannels: Int = 5
+  nVirtualChannels: Int = 5,
+  randomRouting: Boolean = false
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
@@ -132,15 +133,25 @@ class BidirectionalRingConfig(
         }
       }
     },
-    routingFunctions = (n: Int) => (dst: Int, nxt: Int) => (prio: Int) => {
-      val cwDist = (dst + nNodes - n) % nNodes
-      val ccwDist = (n + nNodes - dst) % nNodes
-      if (cwDist < ccwDist) {
-        (nxt + nNodes - n) % nNodes == 1
-      } else if (cwDist > ccwDist) {
-        (n + nNodes - nxt) % nNodes == 1
+    routingFunctions = (n: Int) => (src: Int, dst: Int, nxt: Int) => (prio: Int) => {
+      if (randomRouting) {
+        if (src == -1) {
+          true
+        } else if ((n + nNodes - src) % nNodes == 1) {
+          (nxt + nNodes - n) % nNodes == 1
+        } else {
+          (n + nNodes - nxt) % nNodes == 1
+        }
       } else {
-        true
+        val cwDist = (dst + nNodes - n) % nNodes
+        val ccwDist = (n + nNodes - dst) % nNodes
+        if (cwDist < ccwDist) {
+          (nxt + nNodes - n) % nNodes == 1
+        } else if (cwDist > ccwDist) {
+          (n + nNodes - nxt) % nNodes == 1
+        } else {
+          true
+        }
       }
     },
     inputNodes = inputNodes,
@@ -170,3 +181,5 @@ class TestConfig14 extends UnidirectionalRingConfig(10, 0 until 10, 0 until 10)
 class TestConfig15 extends BidirectionalRingConfig(2, Seq(0, 1), Seq(0, 1))
 class TestConfig16 extends BidirectionalRingConfig(4, Seq(0, 2), Seq(1, 3))
 class TestConfig17 extends BidirectionalRingConfig(10, 0 until 10, 0 until 10)
+
+class TestConfig18 extends BidirectionalRingConfig(10, 0 until 10, 0 until 10, randomRouting=true)

@@ -24,15 +24,15 @@ class RouteComputer(val rParams: RouterParams)(implicit val p: Parameters) exten
     val req = MixedVec(allInParams.map { u => Flipped(Decoupled(new RouteComputerReq(u))) })
     val resp = MixedVec(allInParams.map { u => Valid(new RouteComputerResp(u, nOutputs)) })
   })
-  val routingMatrix = outParams.map { u =>
+  val routingMatrix = outParams.map { outP => allInParams.map { inP =>
     val mat = Wire(Vec(nNodes, Vec(nPrios, Bool())))
-    (0 until nNodes).map { d => (0 until nPrios).map { prio =>
-      mat(d)(prio) := rParams.routingFunction(d, u.destId)(prio).B
-    } }
+    Seq.tabulate(nNodes, nPrios) { case (dst,prio) =>
+      mat(dst)(prio) := rParams.routingFunction(inP.srcId, dst, outP.destId)(prio).B
+    }
     mat
-  }
+  }}
 
-  (io.req zip io.resp) map { case (req, resp) =>
+  (io.req zip io.resp).zipWithIndex.map { case ((req, resp), i) =>
     req.ready := true.B
     resp.valid := req.valid
     resp.bits.src_virt_id := req.bits.src_virt_id
@@ -41,7 +41,7 @@ class RouteComputer(val rParams: RouterParams)(implicit val p: Parameters) exten
       resp.bits.out_channels := 0.U
     } else {
       resp.bits.out_channels := VecInit(
-        routingMatrix.map(_(req.bits.dest_id)(req.bits.src_prio))
+        routingMatrix.map(_(i)(req.bits.dest_id)(req.bits.src_prio))
       ).asUInt
     }
   }

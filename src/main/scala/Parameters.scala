@@ -17,8 +17,8 @@ case class NoCConfig(
   channelDepths: (Int, Int) => Int = (a: Int, b: Int) => 0,
   // nodeId => (srcNodeId, inVChannelId, destNodeId, outVChannelId) => prio => legalPath
   virtualLegalPaths: Int => (Int, Int, Int, Int) => Int => Boolean = (a: Int) => (b: Int, c: Int, d: Int, e: Int) => (f: Int) => false,
-  // nodeId => destId, nextId => prio => usePath
-  routingFunctions: Int => (Int, Int) => (Int) => Boolean = (a: Int) => (b: Int, c: Int) => (c: Int) => false,
+  // nodeId => lastId, destId, nextId => prio => usePath
+  routingFunctions: Int => (Int, Int, Int) => (Int) => Boolean = _ => (_, _, _) => _ => false,
   // Seq[nodeId]
   inputNodes: Seq[Int] = Nil,
   // Seq[nodeId]
