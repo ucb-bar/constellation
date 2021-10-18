@@ -48,6 +48,11 @@ trait HasRouterParams extends HasRouterOutputParams with HasRouterInputParams
 
   def possibleTransition(inParam: ChannelParams, outParam: ChannelParams): Boolean = {
 
+    // Always allow transition to output if the packet has reached
+    // its destination
+    if (outParam.destId == -1)
+      return true
+
     val legalVirtualTransition = Seq.tabulate(
       inParam.nVirtualChannels,
       outParam.nVirtualChannels,

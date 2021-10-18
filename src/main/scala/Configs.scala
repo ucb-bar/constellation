@@ -116,13 +116,13 @@ class BidirectionalRingConfig(
           dstV != 0
         } else if (srcV == 0) {
           dstV == 0
-        } else if (dst > src) {
+        } else if ((dst + nNodes - n) % nNodes == 1) {
           if (n == nNodes - 1) {
             dstV < srcV
           } else {
             dstV <= srcV && dstV != 0
           }
-        } else if (dst < src) {
+        } else if ((n + nNodes - dst) % nNodes == 1) {
           if (n == 0) {
             dstV < srcV
           } else {
