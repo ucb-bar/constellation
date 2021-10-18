@@ -38,47 +38,79 @@ class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends
     val out_virt_channel = UInt(log2Up(allOutParams.map(_.nVirtualChannels).max).W)
   }
   val req_matrix = Seq.fill(nOutChannels) { Seq.fill(nAllInputs) { Wire(Decoupled(new InternalAlloc)) } }
+  req_matrix.foreach(_.foreach(dontTouch(_)))
 
   io.resp.foreach(_.bits := DontCare)
   (io.resp zip io.req).map { case (o,i) => o.bits.in_virt_channel := i.bits.in_virt_channel }
   io.req.foreach { r => when (r.valid) { assert(PopCount(r.bits.out_channels) >= 1.U) } }
 
+  // if (nodeId == 0) {
+  //   for (k <- 0 until nAllInputs) {
+  //     for (m <- 0 until allInParams(k).nVirtualChannels) {
+  //       for (i <- 0 until nOutputs) {
+  //         for (j <- 0 until allOutParams(i).nVirtualChannels) {
+  //           println((allInParams(k).srcId, m, outParams(i).destId, j,
+  //             rParams.vcAllocLegalPaths(allInParams(k).srcId, m, outParams(i).destId, j)(0)))
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
+
+  def connectReqMatrix(idx: Int, i: Int, j: Int, k: Int) = {
+    val r = io.req(k)
+    val legalPath = if (i < nOutputs) {
+      val legalPathsMatrix = VecInit((0 until allInParams(k).nVirtualChannels).map { m =>
+        VecInit((0 until nPrios).map { o =>
+          rParams.vcAllocLegalPaths(allInParams(k).srcId, m, outParams(i).destId, j)(o).B
+        })
+      })
+      legalPathsMatrix(r.bits.in_virt_channel)(r.bits.in_prio)
+    } else {
+      r.bits.in_prio === j.U
+    }
+    //println(idx, i, j, k)
+    req_matrix(idx)(k).valid := (r.valid &&
+      r.bits.out_channels(i) &&
+      io.channel_available(i)(j) &&
+      legalPath
+    )
+    req_matrix(idx)(k).bits.in_channel := k.U
+    req_matrix(idx)(k).bits.in_virt_channel := r.bits.in_virt_channel
+    req_matrix(idx)(k).bits.out_channel := i.U
+    req_matrix(idx)(k).bits.out_virt_channel := j.U
+    req_matrix(idx)(k).bits.dummy := r.bits.in_virt_channel
+    when (req_matrix(idx)(k).fire()) {
+      io.resp(k).bits.out_channel := i.U
+        io.resp(k).bits.out_virt_channel := j.U
+    }
+  }
+
   var idx = 0
   for (j <- 0 until allOutParams.map(_.nVirtualChannels).max) {
     for (i <- 0 until nAllOutputs) {
       if (j < allOutParams(i).nVirtualChannels) {
-        for (k <- 0 until nAllInputs) {
-          val r = io.req(k)
-          val legalPath = if (i < nOutputs) {
-            val legalPathsMatrix = VecInit((0 until allInParams(k).nVirtualChannels).map { m =>
-              VecInit((0 until nPrios).map { o =>
-                rParams.vcAllocLegalPaths(allInParams(k).srcId, m, outParams(i).destId, j)(o).B
-              })
-            })
-            legalPathsMatrix(r.bits.in_virt_channel)(r.bits.in_prio)
-          } else {
-            r.bits.in_prio === j.U
-          }
-
-          req_matrix(idx)(k).valid := (r.valid &&
-            r.bits.out_channels(i) &&
-            io.channel_available(i)(j) &&
-            legalPath
-          )
-          req_matrix(idx)(k).bits.in_channel := k.U
-          req_matrix(idx)(k).bits.in_virt_channel := r.bits.in_virt_channel
-          req_matrix(idx)(k).bits.out_channel := i.U
-          req_matrix(idx)(k).bits.out_virt_channel := j.U
-          req_matrix(idx)(k).bits.dummy := r.bits.in_virt_channel
-          when (req_matrix(idx)(k).fire()) {
-            io.resp(k).bits.out_channel := i.U
-            io.resp(k).bits.out_virt_channel := j.U
-          }
+        for (k <- 0 until nInputs) {
+          connectReqMatrix(idx, i, j, k)
         }
         idx += 1
       }
     }
   }
+  require(idx == nOutChannels)
+  idx = 0
+  for (j <- 0 until allOutParams.map(_.nVirtualChannels).max) {
+    for (i <- 0 until nAllOutputs) {
+      if (j < allOutParams(i).nVirtualChannels) {
+        for (k <- nInputs until nAllInputs) {
+          connectReqMatrix(idx, i, j, k)
+        }
+        idx += 1
+      }
+    }
+  }
+  require(idx == nOutChannels)
+
 
   val row_reqs = Seq.tabulate(nOutChannels) { i =>
     val rr_arb = Module(new Arbiter(new InternalAlloc, nAllInputs))
