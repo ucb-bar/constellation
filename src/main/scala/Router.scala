@@ -1,4 +1,4 @@
-package astronoc
+package constellation
 
 import chisel3._
 import chisel3.util._
@@ -15,7 +15,7 @@ case class RouterParams(
   routingFunction: (Int, Int) => Int => Boolean
 )
 
-trait HasRouterOutputParams extends HasAstroNoCParams {
+trait HasRouterOutputParams extends HasNoCParams {
   val outParams: Seq[ChannelParams]
   val terminalOutParams: Seq[ChannelParams]
 
@@ -26,7 +26,7 @@ trait HasRouterOutputParams extends HasAstroNoCParams {
   def nAllOutputs = allOutParams.size
 }
 
-trait HasRouterInputParams extends HasAstroNoCParams {
+trait HasRouterInputParams extends HasNoCParams {
   val inParams: Seq[ChannelParams]
   val terminalInParams: Seq[ChannelParams]
 

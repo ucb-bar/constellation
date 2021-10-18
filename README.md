@@ -1,2 +1,2 @@
-AstroNoC: Attempt at a Suitable Test Rendition of a NoC
+Constellation: A Chisel NoC Generator
 =======================================================

@@ -1,11 +1,11 @@
-package astronoc
+package constellation
 
 import chisel3._
 import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 
-case class AstroNoCConfig(
+case class NoCConfig(
   nNodes: Int = 3,
   flitPayloadBits: Int = 64,
   maxFlits: Int = 8,
@@ -25,11 +25,11 @@ case class AstroNoCConfig(
   outputNodes: Seq[Int] = Nil
 )
 
-case object AstroNoCKey extends Field[AstroNoCConfig](AstroNoCConfig())
+case object NoCKey extends Field[NoCConfig](NoCConfig())
 
-trait HasAstroNoCParams {
+trait HasNoCParams {
   implicit val p: Parameters
-  val params = p(AstroNoCKey)
+  val params = p(NoCKey)
 
   val nNodes = params.nNodes
   val flitPayloadBits = params.flitPayloadBits

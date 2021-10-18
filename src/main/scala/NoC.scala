@@ -1,4 +1,4 @@
-package astronoc
+package constellation
 
 import chisel3._
 import chisel3.util._
@@ -6,7 +6,7 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 
 
-class NoC(implicit val p: Parameters) extends Module with HasAstroNoCParams{
+class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   val channelParams: Seq[ChannelParams] = Seq.tabulate(nNodes, nNodes) { case (i,j) =>
     val vChannels = topologyFunction(i, j)
     if (vChannels.isEmpty) None else Some(ChannelParams(i, j, vChannels, depth=channelDepths(i, j)))

@@ -1,4 +1,4 @@
-package astronoc
+package constellation
 
 import chisel3._
 import chisel3.util._
@@ -6,8 +6,6 @@ import chisel3.util.random.LFSR
 
 import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImpLike, LazyModuleImp}
 import freechips.rocketchip.config.{Field, Parameters}
-
-import astronoc._
 
 object SelectFirstN
 {
@@ -25,7 +23,7 @@ object SelectFirstN
 }
 
 
-class InputGen(idx: Int, prio: Int, cParams: ChannelParams, inputStallProbability: Double)(implicit val p: Parameters) extends Module with HasAstroNoCParams {
+class InputGen(idx: Int, prio: Int, cParams: ChannelParams, inputStallProbability: Double)(implicit val p: Parameters) extends Module with HasNoCParams {
   val io = IO(new Bundle {
     val out = Decoupled(new Flit(cParams))
     val rob_ready = Input(Bool())
@@ -73,7 +71,7 @@ class InputGen(idx: Int, prio: Int, cParams: ChannelParams, inputStallProbabilit
 
 }
 
-class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams])(implicit val p: Parameters) extends Module with HasAstroNoCParams {
+class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams])(implicit val p: Parameters) extends Module with HasNoCParams {
   require(flitPayloadBits >= 64)
   val robSz = 128
   val totalTxs = 10000

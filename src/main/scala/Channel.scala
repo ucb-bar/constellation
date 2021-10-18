@@ -1,4 +1,4 @@
-package astronoc
+package constellation
 
 import chisel3._
 import chisel3.util._
@@ -26,7 +26,7 @@ case class ChannelParams(
   require(!(isTerminalInput && isTerminalOutput))
 }
 
-trait HasChannelParams extends HasAstroNoCParams {
+trait HasChannelParams extends HasNoCParams {
   val cParam: ChannelParams
 
   val virtualChannelParams = cParam.virtualChannelParams

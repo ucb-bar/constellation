@@ -1,4 +1,4 @@
-package astronoc
+package constellation
 
 import chisel3._
 import chisel3.util._
@@ -13,7 +13,7 @@ class UnidirectionalLineConfig(
   bufferSize: Int = 3,
   nVirtualChannels: Int = 3
 ) extends Config((site, here, up) => {
-  case AstroNoCKey => up(AstroNoCKey, site).copy(
+  case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
     nPrios = 1,
     topology = (a: Int, b: Int) => {
@@ -39,7 +39,7 @@ class BidirectionalLineConfig(
   outputNodes: Seq[Int] = Seq(0, 1),
   channelDepth: Int = 1
 ) extends Config((site, here, up) => {
-  case AstroNoCKey => up(AstroNoCKey, site).copy(
+  case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
     nPrios = 1,
     topology = (a: Int, b: Int) => {
@@ -66,7 +66,7 @@ class UnidirectionalRingConfig(
   channelDepth: Int = 1,
   nVirtualChannels: Int = 5
 ) extends Config((site, here, up) => {
-  case AstroNoCKey => up(AstroNoCKey, site).copy(
+  case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
     nPrios = 1,
     topology = (a: Int, b: Int) => {
