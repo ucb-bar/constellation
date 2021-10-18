@@ -94,6 +94,60 @@ class UnidirectionalRingConfig(
   )
 })
 
+class BidirectionalRingConfig(
+  nNodes: Int = 2,
+  inputNodes: Seq[Int] = Seq(0),
+  outputNodes: Seq[Int] = Seq(1),
+  channelDepth: Int = 1,
+  nVirtualChannels: Int = 5
+) extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(
+    nNodes = nNodes,
+    nPrios = 1,
+    topology = (a: Int, b: Int) => {
+      if ((b + nNodes - a) % nNodes == 1 || (a + nNodes - b) % nNodes == 1)
+        Seq.fill(nVirtualChannels) { VirtualChannelParams(bufferSize=5) } else Nil
+    },
+    channelDepths = (a: Int, b: Int) => channelDepth,
+    virtualLegalPaths = {
+      (n: Int) => (src: Int, srcV: Int, dst: Int, dstV: Int) => (prio: Int) => {
+        if (src == -1)  {
+          dstV != 0
+        } else if (srcV == 0) {
+          dstV == 0
+        } else if (dst > src) {
+          if (n == nNodes - 1) {
+            dstV < srcV
+          } else {
+            dstV <= srcV && dstV != 0
+          }
+        } else if (dst < src) {
+          if (n == 0) {
+            dstV < srcV
+          } else {
+            dstV <= srcV && dstV != 0
+          }
+        } else {
+          false
+        }
+      }
+    },
+    routingFunctions = (n: Int) => (dst: Int, nxt: Int) => (prio: Int) => {
+      val cwDist = (dst + nNodes - n) % nNodes
+      val ccwDist = (n + nNodes - dst) % nNodes
+      if (cwDist < ccwDist) {
+        (nxt + nNodes - n) % nNodes == 1
+      } else if (cwDist > ccwDist) {
+        (n + nNodes - nxt) % nNodes == 1
+      } else {
+        true
+      }
+    },
+    inputNodes = inputNodes,
+    outputNodes = outputNodes
+  )
+})
+
 class TestConfig00 extends UnidirectionalLineConfig(2, Seq(0), Seq(1))
 class TestConfig01 extends UnidirectionalLineConfig(2, Seq(0), Seq(1, 1))
 class TestConfig02 extends UnidirectionalLineConfig(2, Seq(0, 0), Seq(1, 1))
@@ -112,3 +166,6 @@ class TestConfig11 extends UnidirectionalRingConfig(2, Seq(0), Seq(1))
 class TestConfig12 extends UnidirectionalRingConfig(4, Seq(0, 2), Seq(1, 3))
 class TestConfig13 extends UnidirectionalRingConfig(10, Seq(0, 2, 4, 6, 8), Seq(1, 3, 5, 7, 9))
 class TestConfig14 extends UnidirectionalRingConfig(10, 0 until 10, 0 until 10)
+
+class TestConfig15 extends BidirectionalRingConfig(2, Seq(0, 1), Seq(0, 1))
+class TestConfig16 extends BidirectionalRingConfig(4, Seq(0, 2), Seq(1, 3))
