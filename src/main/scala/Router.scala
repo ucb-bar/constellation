@@ -114,8 +114,8 @@ class Router(val rParams: RouterParams)(implicit val p: Parameters) extends Modu
     case (u,o) => u.io.vcalloc_resp <> o }
 
 
-  (all_output_units zip vc_allocator.io.out_alloc).foreach {
-    case (u,a) => u.io.alloc <> a }
+  (all_output_units zip vc_allocator.io.out_allocs).foreach {
+    case (u,a) => u.io.allocs <> a }
   (vc_allocator.io.channel_available zip all_output_units).foreach {
     case (a,u) => a := u.io.channel_available }
 

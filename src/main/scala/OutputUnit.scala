@@ -5,18 +5,6 @@ import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 
-class OutputUnitAlloc(
-  val inParams: Seq[ChannelParams],
-  val terminalInParams: Seq[ChannelParams],
-  val cParam: ChannelParams
-)(implicit val p: Parameters) extends Bundle with HasRouterInputParams with HasChannelParams {
-  val nodeId = cParam.srcId
-
-  val in_channel = UInt(log2Up(nAllInputs).W)
-  val in_virt_channel = UInt(log2Up(allInParams.map(_.nVirtualChannels).max).W)
-  val out_virt_channel = UInt(nVirtualChannels.W)
-}
-
 class AbstractOutputUnitIO(
   val inParams: Seq[ChannelParams],
   val terminalInParams: Seq[ChannelParams],
@@ -27,7 +15,7 @@ class AbstractOutputUnitIO(
   val in = Flipped(Valid(new Flit(cParam)))
   val credit_available = Output(Vec(nVirtualChannels, Bool()))
   val channel_available = Output(Vec(nVirtualChannels, Bool()))
-  val alloc = Flipped(Valid(new OutputUnitAlloc(inParams, terminalInParams, cParam)))
+  val allocs = Input(Vec(nVirtualChannels, Bool()))
 }
 
 abstract class AbstractOutputUnit(
@@ -71,15 +59,8 @@ class OutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[ChannelPara
     }
   }
 
-  when (io.alloc.fire()) {
-    val id = io.alloc.bits.out_virt_channel
-    states.zipWithIndex.map { case (s,i) =>
-      when (id === i.U) {
-        s.g := g_a
-        s.i_p := io.alloc.bits.in_channel
-        s.i_c := io.alloc.bits.in_virt_channel
-      }
-    }
+  (states zip io.allocs).map { case (s,a) =>
+    when (a) { s.g := g_a }
   }
 
   (io.credit_available zip states).zipWithIndex.map { case ((c,s),i) =>

@@ -24,7 +24,7 @@ class TerminalOutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[Cha
 
   io.credit_available(0) := q.io.count <= 1.U
   io.channel_available(0) := channel_empty
-  when (io.alloc.valid) {
+  when (io.allocs(0)) {
     channel_empty := false.B
   }
   when (io.in.fire() && io.in.bits.tail) {

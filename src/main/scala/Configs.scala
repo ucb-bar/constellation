@@ -169,3 +169,4 @@ class TestConfig14 extends UnidirectionalRingConfig(10, 0 until 10, 0 until 10)
 
 class TestConfig15 extends BidirectionalRingConfig(2, Seq(0, 1), Seq(0, 1))
 class TestConfig16 extends BidirectionalRingConfig(4, Seq(0, 2), Seq(1, 3))
+class TestConfig17 extends BidirectionalRingConfig(10, 0 until 10, 0 until 10)
