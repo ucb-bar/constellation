@@ -20,21 +20,33 @@ class VCAllocResp(val cParam: ChannelParams, val outParams: Seq[ChannelParams], 
   val out_channel = UInt(log2Up(nAllOutputs).W)
 }
 
-class Allocator(d0: Int, d1: Int) extends Module {
+class Allocator(d0: Int, d1: Int, revD0: Boolean = false, revD1: Boolean = false)
+    extends Module {
+
+  class ValidReady extends Bundle {
+    val valid = Input(Bool())
+    val ready = Output(Bool())
+    def fire() = valid && ready
+  }
+
   val io = IO(new Bundle {
-    val in = Vec(d0, Vec(d1, new Bundle {
-      val valid = Input(Bool())
-      val ready = Output(Bool())
-      def fire(): Bool = valid && ready
-    }))
+    val in = Vec(d0, Vec(d1, new ValidReady))
   })
+
+  val in = Wire(Vec(d0, Vec(d1, new ValidReady)))
+  (io.in zip (if (revD0) in.reverse else in)).map { case (io_row, in_row) =>
+    (io_row zip (if (revD1) in_row.reverse else in_row)).map { case (io_e, in_e) =>
+      io_e <> in_e
+    }
+  }
+
   val rank_1_arbs = Seq.fill(d0) { Module(new Arbiter(Bool(), d1)) }
   val rank_2_arbs = Seq.fill(d1) { Module(new Arbiter(Bool(), d0)) }
 
   Seq.tabulate(d0, d1) { case (y, x) =>
-    rank_1_arbs(y).io.in(x).valid := io.in(y)(x).valid
+    rank_1_arbs(y).io.in(x).valid := in(y)(x).valid
     rank_1_arbs(y).io.in(x).bits := DontCare
-    io.in(y)(x).ready := rank_1_arbs(y).io.in(x).ready
+    in(y)(x).ready := rank_1_arbs(y).io.in(x).ready
 
     rank_2_arbs(x).io.in(y).valid := (rank_1_arbs(y).io.out.valid &&
       rank_1_arbs(y).io.chosen === x.U)
@@ -70,7 +82,7 @@ class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends
   (io.resp zip io.req).map { case (o,i) => o.bits.in_virt_channel := i.bits.in_virt_channel }
   io.req.foreach { r => when (r.valid) { assert(PopCount(r.bits.out_channels) >= 1.U) } }
 
-  val allocator = Module(new Allocator(nOutChannels, nAllInputs))
+  val allocator = Module(new Allocator(nOutChannels, nAllInputs, revD0=true))
   allocator.io.in.foreach(_.foreach(_.valid := false.B))
 
   // if (nodeId == 0) {
