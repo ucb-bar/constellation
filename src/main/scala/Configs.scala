@@ -183,3 +183,4 @@ class TestConfig16 extends BidirectionalRingConfig(4, Seq(0, 2), Seq(1, 3))
 class TestConfig17 extends BidirectionalRingConfig(10, 0 until 10, 0 until 10)
 
 class TestConfig18 extends BidirectionalRingConfig(10, 0 until 10, 0 until 10, randomRouting=true)
+class TestConfig19 extends BidirectionalRingConfig(10, (0 until 10) ++ (0 until 10), (0 until 10) ++ (0 until 10), randomRouting=true)

@@ -7,21 +7,20 @@ import chisel3.util.random.LFSR
 import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImpLike, LazyModuleImp}
 import freechips.rocketchip.config.{Field, Parameters}
 
-object SelectFirstN
+object SelectFirstNUInt
 {
-  def apply(in: UInt, n: Int) = {
-    val sels = Wire(Vec(n, UInt(in.getWidth.W)))
+  def apply(in: UInt, n: Int): (Vec[UInt], Vec[Bool]) = {
+    val sels = Wire(Vec(n, UInt(log2Ceil(in.getWidth).W)))
+    val fires = Wire(Vec(n, Bool()))
     var mask = in
-
     for (i <- 0 until n) {
-      sels(i) := PriorityEncoderOH(mask)
-      mask = mask & ~sels(i)
+      sels(i) := PriorityEncoder(mask)
+      fires(i) := mask =/= 0.U
+      mask = mask & ~(1.U << sels(i))
     }
-
-    sels
+    (sels, fires)
   }
 }
-
 
 class InputGen(idx: Int, prio: Int, cParams: ChannelParams, inputStallProbability: Double)(implicit val p: Parameters) extends Module with HasNoCParams {
   val io = IO(new Bundle {
@@ -108,61 +107,66 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
     val flits_returned = UInt(flitIdBits.W)
   }
 
-  val rob = Reg(Vec(robSz, new RobEntry))
+  val rob_payload = Mem(robSz, UInt(flitPayloadBits.W))
+  val rob_out_id = Mem(robSz, UInt(log2Ceil(nOutputs).W))
+  val rob_n_flits = Mem(robSz, UInt(flitIdBits.W))
+  val rob_flits_returned = Mem(robSz, UInt(flitIdBits.W))
   val rob_valids = RegInit(0.U(robSz.W))
+  var rob_allocs = 0.U(robSz.W)
+  var rob_frees = 0.U(robSz.W)
 
-  val rob_allocs = WireInit(VecInit(Seq.fill(robSz) { false.B }))
-  val rob_frees = WireInit(VecInit(Seq.fill(robSz) { false.B }))
-  rob_valids := (rob_valids | rob_allocs.asUInt) & ~rob_frees.asUInt
-  idle := rob_allocs.asUInt === 0.U && rob_frees.asUInt === 0.U
 
-  val rob_alloc_ids = SelectFirstN(~rob_valids, nInputs).map(i => OHToUInt(i))
+  val (rob_alloc_ids, rob_alloc_fires) = SelectFirstNUInt(~rob_valids, nInputs)
   val rob_alloc_avail = rob_alloc_ids.map { i => !rob_valids(i) }
-
-  txs := txs + PopCount(rob_allocs)
   val success = txs >= totalTxs.U && rob_valids === 0.U
   io.success := RegNext(success, false.B)
   when (success) {
     printf("%d flits, %d cycles\n", flits, tsc)
   }
 
+  val tx_fire = Wire(Vec(nInputs, Bool()))
   io.to_noc.zipWithIndex.map { case (i,idx) =>
     val igen = Module(new InputGen(idx, 0, inputParams(idx), inputStallProbability))
-    igen.io.rob_idx := rob_alloc_ids(idx)
-    igen.io.rob_ready := (rob_alloc_avail(idx) &&
-      (PopCount(~rob_valids) >= nInputs.U) && tsc >= 10.U && txs < totalTxs.U)
+    val rob_idx = WireInit(rob_alloc_ids(idx))
+    igen.io.rob_idx := rob_idx
+    igen.io.rob_ready := (rob_alloc_avail(idx) && rob_alloc_fires(idx) &&
+      tsc >= 10.U && txs < totalTxs.U)
     igen.io.tsc := tsc
     i.flit <> igen.io.out
     when (igen.io.fire) {
-      rob_allocs(rob_alloc_ids(idx)) := true.B
-      rob(rob_alloc_ids(idx)).payload := igen.io.out.bits.payload
-      rob(rob_alloc_ids(idx)).out_id := igen.io.out.bits.out_id
-      rob(rob_alloc_ids(idx)).n_flits := igen.io.n_flits
-      rob(rob_alloc_ids(idx)).flits_returned := 0.U
+      rob_payload.write(rob_idx, igen.io.out.bits.payload)
+      rob_out_id.write(rob_idx, igen.io.out.bits.out_id)
+      rob_n_flits.write(rob_idx, igen.io.n_flits)
+      rob_flits_returned.write(rob_idx, 0.U)
     }
+    tx_fire(idx) := igen.io.fire
+    rob_allocs = rob_allocs | (igen.io.fire << rob_idx)
   }
 
   io.from_noc.zipWithIndex map { case (o,i) =>
     o.flit.ready := LFSR(20) >= (outputStallProbability * (1 << 10)).toInt.U
+    val rob_idx = o.flit.bits.payload(15,8)
     when (o.flit.fire()) {
-      val rob_idx = o.flit.bits.payload(15,8)
 
       assert(rob_valids(rob_idx) &&
-        (rob(rob_idx).payload === o.flit.bits.payload) &&
+        (rob_payload(rob_idx) === o.flit.bits.payload) &&
         (o.flit.bits.out_id === i.U) &&
-        (rob(rob_idx).flits_returned < rob(rob_idx).n_flits))
+        (rob_flits_returned(rob_idx) < rob_n_flits(rob_idx)))
 
-      rob(rob_idx).flits_returned := rob(rob_idx).flits_returned + 1.U
-      rob(rob_idx).payload := rob(rob_idx).payload + 1.U
+      rob_flits_returned(rob_idx) := rob_flits_returned(rob_idx) + 1.U
+      rob_payload(rob_idx) := rob_payload(rob_idx) + 1.U
 
-      when (o.flit.bits.tail) {
-        rob_frees(rob_idx) := true.B
-      }
     }
+    rob_frees = rob_frees | ((o.flit.fire() && o.flit.bits.tail) << rob_idx)
   }
 
+  rob_valids := (rob_valids | rob_allocs) & ~rob_frees
+  idle := rob_allocs === 0.U && rob_frees === 0.U
   flits := flits + io.from_noc.map(_.flit.fire().asUInt).reduce(_+&_)
+  txs := txs + PopCount(tx_fire)
 }
+
+
 
 class TestHarness(implicit val p: Parameters) extends Module {
   val io = IO(new Bundle {
