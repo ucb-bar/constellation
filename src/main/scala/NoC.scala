@@ -8,8 +8,7 @@ import freechips.rocketchip.config.{Field, Parameters}
 
 class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   val channelParams: Seq[ChannelParams] = Seq.tabulate(nNodes, nNodes) { case (i,j) =>
-    val vChannels = topologyFunction(i, j)
-    if (vChannels.isEmpty) None else Some(ChannelParams(i, j, vChannels, depth=channelDepths(i, j)))
+    topologyFunction(i, j)
   }.flatten.flatten
   val inParams = (0 until nNodes).map { i => channelParams.filter(_.destId == i) }
   val outParams = (0 until nNodes).map { i => channelParams.filter(_.srcId == i) }

@@ -5,20 +5,22 @@ import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 
+import constellation.topology._
+
 case class NoCConfig(
   nNodes: Int = 3,
   flitPayloadBits: Int = 64,
   maxFlits: Int = 8,
-  nPrios: Int = 2,
+  nPrios: Int = 1,
 
   // srcNodeId, destNodeId => virtualChannelParams
-  topology: (Int, Int) => Seq[VirtualChannelParams] = (a: Int, b: Int) => Nil,
+  topology: (Int, Int) => Option[ChannelParams] = (a: Int, b: Int) => None,
   // srcNodeId, destNodeId => depth
   channelDepths: (Int, Int) => Int = (a: Int, b: Int) => 0,
   // nodeId => (srcNodeId, inVChannelId, destNodeId, outVChannelId) => prio => legalPath
-  virtualLegalPaths: Int => (Int, Int, Int, Int) => Int => Boolean = (a: Int) => (b: Int, c: Int, d: Int, e: Int) => (f: Int) => false,
-  // nodeId => lastId, destId, nextId => prio => usePath
-  routingFunctions: Int => (Int, Int, Int) => (Int) => Boolean = _ => (_, _, _) => _ => false,
+  virtualLegalPaths: Int => (Int, Int, Int, Int) => Int => Boolean = (a: Int) => (b: Int, c: Int, d: Int, e: Int) => (f: Int) => true,
+
+  routingFunctions: RoutingFunction = RoutingAlgorithms.crazy,
   // Seq[nodeId]
   inputNodes: Seq[Int] = Nil,
   // Seq[nodeId]

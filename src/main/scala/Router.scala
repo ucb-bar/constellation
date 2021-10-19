@@ -12,7 +12,7 @@ case class RouterParams(
   terminalInParams: Seq[ChannelParams],
   terminalOutParams: Seq[ChannelParams],
   vcAllocLegalPaths: (Int, Int, Int, Int) => Int => Boolean,
-  routingFunction: (Int, Int, Int) => Int => Boolean
+  routingFunction: (Int, Int, Int, Int) => Boolean
 )
 
 trait HasRouterOutputParams extends HasNoCParams {
@@ -62,10 +62,12 @@ trait HasRouterParams extends HasRouterOutputParams with HasRouterInputParams
     }.flatten.flatten.reduce(_||_)
 
     val legalPhysicalTransition = outputNodes.map(out => (0 until nPrios).map { prio =>
-      rParams.routingFunction(inParam.srcId, out, outParam.destId)(prio)
+      rParams.routingFunction(inParam.srcId, out, outParam.destId, prio)
     }).flatten.reduce(_||_)
 
-    require(!(!legalVirtualTransition && legalPhysicalTransition))
+    require(!(!legalVirtualTransition && legalPhysicalTransition),
+      s"Impossible transition from ${inParam.srcId} to ${outParam.destId} at ${inParam.destId}"
+    )
     legalVirtualTransition && legalPhysicalTransition
   }
 }

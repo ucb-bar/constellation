@@ -107,10 +107,10 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
     val flits_returned = UInt(flitIdBits.W)
   }
 
-  val rob_payload = Mem(robSz, UInt(flitPayloadBits.W))
-  val rob_out_id = Mem(robSz, UInt(log2Ceil(nOutputs).W))
-  val rob_n_flits = Mem(robSz, UInt(flitIdBits.W))
-  val rob_flits_returned = Mem(robSz, UInt(flitIdBits.W))
+  val rob_payload = Reg(Vec(robSz, UInt(flitPayloadBits.W)))
+  val rob_out_id = Reg(Vec(robSz, UInt(log2Ceil(nOutputs).W)))
+  val rob_n_flits = Reg(Vec(robSz, UInt(flitIdBits.W)))
+  val rob_flits_returned = Reg(Vec(robSz, UInt(flitIdBits.W)))
   val rob_valids = RegInit(0.U(robSz.W))
   var rob_allocs = 0.U(robSz.W)
   var rob_frees = 0.U(robSz.W)
@@ -134,10 +134,10 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
     igen.io.tsc := tsc
     i.flit <> igen.io.out
     when (igen.io.fire) {
-      rob_payload.write(rob_idx, igen.io.out.bits.payload)
-      rob_out_id.write(rob_idx, igen.io.out.bits.out_id)
-      rob_n_flits.write(rob_idx, igen.io.n_flits)
-      rob_flits_returned.write(rob_idx, 0.U)
+      rob_payload(rob_idx) := igen.io.out.bits.payload
+      rob_out_id(rob_idx) := igen.io.out.bits.out_id
+      rob_n_flits(rob_idx) := igen.io.n_flits
+      rob_flits_returned(rob_idx) := 0.U
     }
     tx_fire(idx) := igen.io.fire
     rob_allocs = rob_allocs | (igen.io.fire << rob_idx)

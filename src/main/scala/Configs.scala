@@ -2,32 +2,52 @@ package constellation
 
 import chisel3._
 import chisel3.util._
-
+import scala.math.pow
 import freechips.rocketchip.config.{Field, Parameters, Config}
+
+import constellation.topology._
+
+object TopologyConverter {
+  implicit def apply(topo: PhysicalTopology): ((Int, Int) => Option[ChannelParams]) = {
+    (src: Int, dst: Int) => if (topo(src, dst)) Some(ChannelParams(src, dst)) else None
+  }
+}
+
+// Why does this not make the implicit def work everywhere
+// Manually call TopologyConverter for now
+import TopologyConverter._
+
+class WithUniformChannelDepth(depth: Int) extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(topology = (src: Int, dst: Int) =>
+    up(NoCKey, site).topology(src, dst).map(_.copy(depth = depth))
+  )
+})
+
+class WithUniformVirtualChannelBufferSize(size: Int) extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(topology = (src: Int, dst: Int) =>
+    up(NoCKey, site).topology(src, dst).map(_.copy(
+      virtualChannelParams =
+        up(NoCKey, site).topology(src, dst).get.virtualChannelParams.map(_.copy(bufferSize = size))
+    ))
+  )
+})
+
+class WithUniformVirtualChannels(n: Int, v: VirtualChannelParams) extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(topology = (src: Int, dst: Int) =>
+    up(NoCKey, site).topology(src, dst).map(_.copy(
+      virtualChannelParams = Seq.fill(n) { v }
+    ))
+  )
+})
 
 class UnidirectionalLineConfig(
   nNodes: Int = 2,
   inputNodes: Seq[Int] = Seq(0),
-  outputNodes: Seq[Int] = Seq(1),
-  channelDepth: Int = 0,
-  bufferSize: Int = 3,
-  nVirtualChannels: Int = 3
+  outputNodes: Seq[Int] = Seq(1)
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
-    nPrios = 1,
-    topology = (a: Int, b: Int) => {
-      if ((b-a) == 1) Seq.fill(nVirtualChannels) { VirtualChannelParams(bufferSize=bufferSize) } else Nil
-    },
-    channelDepths = (a: Int, b: Int) => channelDepth,
-    virtualLegalPaths = {
-      (n: Int) => (src: Int, srcV: Int, dst: Int, dstV: Int) => (prio: Int) => {
-        true
-      }
-    },
-    routingFunctions = (n: Int) => (src: Int, dst: Int, nxt: Int) => (prio: Int) => {
-      true
-    },
+    topology = TopologyConverter(Topologies.unidirectionalLine),
     inputNodes = inputNodes,
     outputNodes = outputNodes
   )
@@ -37,42 +57,24 @@ class BidirectionalLineConfig(
   nNodes: Int = 2,
   inputNodes: Seq[Int] = Seq(0, 1),
   outputNodes: Seq[Int] = Seq(0, 1),
-  channelDepth: Int = 1
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
-    nPrios = 1,
-    topology = (a: Int, b: Int) => {
-      if ((b-a).abs == 1) Seq.fill(3) { VirtualChannelParams(bufferSize=3) } else Nil
-    },
-    channelDepths = (a: Int, b: Int) => channelDepth,
-    virtualLegalPaths = {
-      (n: Int) => (src: Int, srcV: Int, dst: Int, dstV: Int) => (prio: Int) => {
-        dst != src
-      }
-    },
-    routingFunctions = (n: Int) => (src: Int, dst: Int, nxt: Int) => (prio: Int) => {
-      if (n < nxt) dst >= nxt else dst <= nxt
-    },
+    topology = TopologyConverter(Topologies.bidirectionalLine),
+    routingFunctions = RoutingAlgorithms.bidirectionalLine,
     inputNodes = inputNodes,
     outputNodes = outputNodes
   )
 })
 
-class UnidirectionalRingConfig(
+class UnidirectionalTorus1DConfig(
   nNodes: Int = 2,
   inputNodes: Seq[Int] = Seq(0),
   outputNodes: Seq[Int] = Seq(1),
-  channelDepth: Int = 1,
-  nVirtualChannels: Int = 5
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
-    nPrios = 1,
-    topology = (a: Int, b: Int) => {
-      if ((b-a) == 1 || (b == 0 && a == (nNodes-1))) Seq.fill(nVirtualChannels) { VirtualChannelParams(bufferSize=5) } else Nil
-    },
-    channelDepths = (a: Int, b: Int) => channelDepth,
+    topology = TopologyConverter(Topologies.unidirectionalTorus1D(nNodes)),
     virtualLegalPaths = {
       (n: Int) => (src: Int, srcV: Int, dst: Int, dstV: Int) => (prio: Int) => {
         if (src == -1)  {
@@ -86,30 +88,20 @@ class UnidirectionalRingConfig(
         }
       }
     },
-    routingFunctions = (n: Int) => (src: Int, dst: Int, nxt: Int) => (prio: Int) => {
-      true
-    },
     inputNodes = inputNodes,
     outputNodes = outputNodes
   )
 })
 
-class BidirectionalRingConfig(
+class BidirectionalTorus1DConfig(
   nNodes: Int = 2,
   inputNodes: Seq[Int] = Seq(0),
   outputNodes: Seq[Int] = Seq(1),
-  channelDepth: Int = 1,
-  nVirtualChannels: Int = 5,
-  randomRouting: Boolean = false
+  randomRoute: Boolean = false
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
-    nPrios = 1,
-    topology = (a: Int, b: Int) => {
-      if ((b + nNodes - a) % nNodes == 1 || (a + nNodes - b) % nNodes == 1)
-        Seq.fill(nVirtualChannels) { VirtualChannelParams(bufferSize=5) } else Nil
-    },
-    channelDepths = (a: Int, b: Int) => channelDepth,
+    topology = TopologyConverter(Topologies.bidirectionalTorus1D(nNodes)),
     virtualLegalPaths = {
       (n: Int) => (src: Int, srcV: Int, dst: Int, dstV: Int) => (prio: Int) => {
         if (src == -1)  {
@@ -133,54 +125,90 @@ class BidirectionalRingConfig(
         }
       }
     },
-    routingFunctions = (n: Int) => (src: Int, dst: Int, nxt: Int) => (prio: Int) => {
-      if (randomRouting) {
-        if (src == -1) {
-          true
-        } else if ((n + nNodes - src) % nNodes == 1) {
-          (nxt + nNodes - n) % nNodes == 1
-        } else {
-          (n + nNodes - nxt) % nNodes == 1
-        }
-      } else {
-        val cwDist = (dst + nNodes - n) % nNodes
-        val ccwDist = (n + nNodes - dst) % nNodes
-        if (cwDist < ccwDist) {
-          (nxt + nNodes - n) % nNodes == 1
-        } else if (cwDist > ccwDist) {
-          (n + nNodes - nxt) % nNodes == 1
-        } else {
-          true
-        }
-      }
+    routingFunctions = if (randomRoute) {
+      RoutingAlgorithms.bidirectionalTorus1DRandom(nNodes)
+    } else {
+      RoutingAlgorithms.bidirectionalTorus1DShortest(nNodes)
     },
     inputNodes = inputNodes,
     outputNodes = outputNodes
   )
 })
 
-class TestConfig00 extends UnidirectionalLineConfig(2, Seq(0), Seq(1))
-class TestConfig01 extends UnidirectionalLineConfig(2, Seq(0), Seq(1, 1))
-class TestConfig02 extends UnidirectionalLineConfig(2, Seq(0, 0), Seq(1, 1))
-class TestConfig03 extends UnidirectionalLineConfig(2, Seq(0, 0), Seq(0, 1, 1))
-class TestConfig04 extends UnidirectionalLineConfig(3, Seq(0, 0), Seq(0, 1, 1, 2, 2))
-class TestConfig05 extends UnidirectionalLineConfig(3, Seq(0, 1, 1), Seq(1, 1, 2))
+// class ButterflyConfig(
+//   kAry: Int = 2,
+//   nFly: Int = 2
+// ) extends Config((site, here, up) => {
+//   case NoCKey => up(NoCKey, site).copy(
+//     nNodes = pow(kAry,nFly-1) * nFly,
+//     nPrios = 1,
 
-class TestConfig06 extends UnidirectionalLineConfig(2, Seq(0), Seq(1), 1, 5, 4)
+//       k
+//   )
+// })
 
-class TestConfig07 extends BidirectionalLineConfig(2, Seq(0, 1), Seq(0, 1))
-class TestConfig08 extends BidirectionalLineConfig(3, Seq(0, 1), Seq(0, 1, 2))
-class TestConfig09 extends BidirectionalLineConfig(4, Seq(1, 2), Seq(0, 1, 2, 3))
-class TestConfig10 extends BidirectionalLineConfig(4, Seq(1, 1, 2, 2), Seq(0, 0, 1, 1, 2, 2, 3, 3))
 
-class TestConfig11 extends UnidirectionalRingConfig(2, Seq(0), Seq(1))
-class TestConfig12 extends UnidirectionalRingConfig(4, Seq(0, 2), Seq(1, 3))
-class TestConfig13 extends UnidirectionalRingConfig(10, Seq(0, 2, 4, 6, 8), Seq(1, 3, 5, 7, 9))
-class TestConfig14 extends UnidirectionalRingConfig(10, 0 until 10, 0 until 10)
+class TestConfig00 extends Config(
+  new WithUniformVirtualChannels(3, VirtualChannelParams(3)) ++
+  new UnidirectionalLineConfig(2, Seq(0), Seq(1)))
+class TestConfig01 extends Config(
+  new WithUniformVirtualChannels(3, VirtualChannelParams(3)) ++
+  new UnidirectionalLineConfig(2, Seq(0), Seq(1, 1)))
+class TestConfig02 extends Config(
+  new WithUniformVirtualChannels(3, VirtualChannelParams(3)) ++
+  new UnidirectionalLineConfig(2, Seq(0, 0), Seq(1, 1)))
+class TestConfig03 extends Config(
+  new WithUniformVirtualChannels(3, VirtualChannelParams(3)) ++
+  new UnidirectionalLineConfig(2, Seq(0, 0), Seq(0, 1, 1)))
+class TestConfig04 extends Config(
+  new WithUniformVirtualChannels(3, VirtualChannelParams(3)) ++
+  new UnidirectionalLineConfig(3, Seq(0, 0), Seq(0, 1, 1, 2, 2)))
+class TestConfig05 extends Config(
+  new WithUniformVirtualChannels(3, VirtualChannelParams(3)) ++
+  new UnidirectionalLineConfig(3, Seq(0, 1, 1), Seq(1, 1, 2)))
+class TestConfig06 extends Config(
+  new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
+  new UnidirectionalLineConfig(2, Seq(0), Seq(1)))
 
-class TestConfig15 extends BidirectionalRingConfig(2, Seq(0, 1), Seq(0, 1))
-class TestConfig16 extends BidirectionalRingConfig(4, Seq(0, 2), Seq(1, 3))
-class TestConfig17 extends BidirectionalRingConfig(10, 0 until 10, 0 until 10)
+class TestConfig07 extends Config(
+  new WithUniformVirtualChannels(3, VirtualChannelParams(3)) ++
+  new BidirectionalLineConfig(2, Seq(0, 1), Seq(0, 1)))
+class TestConfig08 extends Config(
+  new WithUniformVirtualChannels(3, VirtualChannelParams(3)) ++
+  new BidirectionalLineConfig(3, Seq(0, 1), Seq(0, 1, 2)))
+class TestConfig09 extends Config(
+  new WithUniformVirtualChannels(3, VirtualChannelParams(3)) ++
+  new BidirectionalLineConfig(4, Seq(1, 2), Seq(0, 1, 2, 3)))
+class TestConfig10 extends Config(
+  new WithUniformVirtualChannels(3, VirtualChannelParams(3)) ++
+  new BidirectionalLineConfig(4, Seq(1, 1, 2, 2), Seq(0, 0, 1, 1, 2, 2, 3, 3)))
 
-class TestConfig18 extends BidirectionalRingConfig(10, 0 until 10, 0 until 10, randomRouting=true)
-class TestConfig19 extends BidirectionalRingConfig(10, (0 until 10) ++ (0 until 10), (0 until 10) ++ (0 until 10), randomRouting=true)
+class TestConfig11 extends Config(
+  new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
+  new UnidirectionalTorus1DConfig(2, Seq(0), Seq(1)))
+class TestConfig12 extends Config(
+  new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
+  new UnidirectionalTorus1DConfig(4, Seq(0, 2), Seq(1, 3)))
+class TestConfig13 extends Config(
+  new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
+  new UnidirectionalTorus1DConfig(10, Seq(0, 2, 4, 6, 8), Seq(1, 3, 5, 7, 9)))
+class TestConfig14 extends Config(
+  new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
+  new UnidirectionalTorus1DConfig(10, 0 until 10, 0 until 10))
+
+class TestConfig15 extends Config(
+  new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
+  new BidirectionalTorus1DConfig(2, Seq(0, 1), Seq(0, 1)))
+class TestConfig16 extends Config(
+  new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
+  new BidirectionalTorus1DConfig(4, Seq(0, 2), Seq(1, 3)))
+class TestConfig17 extends Config(
+  new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
+  new BidirectionalTorus1DConfig(10, 0 until 10, 0 until 10))
+
+class TestConfig18 extends Config(
+  new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
+  new BidirectionalTorus1DConfig(10, 0 until 10, 0 until 10, randomRoute=true))
+class TestConfig19 extends Config(
+  new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
+  new BidirectionalTorus1DConfig(10, (0 until 10) ++ (0 until 10), (0 until 10) ++ (0 until 10), randomRoute=true))

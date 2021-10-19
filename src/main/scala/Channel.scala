@@ -6,17 +6,17 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 
 case class VirtualChannelParams(
-  bufferSize: Int
+  bufferSize: Int = 1
 )
 
 case class ChannelParams(
   srcId: Int,
   destId: Int,
-  virtualChannelParams: Seq[VirtualChannelParams],
+  virtualChannelParams: Seq[VirtualChannelParams] = Seq(VirtualChannelParams()),
   terminalInputId: Int = -1,
   terminalOutputId: Int = -1,
   useSyncReadBuffer: Boolean = false,
-  depth: Int = 0
+  depth: Int = 1
 ) {
   val nVirtualChannels = virtualChannelParams.size
   val isTerminalInput = terminalInputId >= 0
