@@ -73,7 +73,7 @@ class InputGen(idx: Int, prio: Int, cParams: ChannelParams, inputStallProbabilit
 class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams])(implicit val p: Parameters) extends Module with HasNoCParams {
   require(flitPayloadBits >= 64)
   val robSz = 128
-  val totalTxs = 10000
+  val totalTxs = 50000
   val inputStallProbability = 0.0
   val outputStallProbability = 0.0
 

@@ -34,4 +34,10 @@ object Topologies {
       }
     }
   }
+
+  def mesh2D(nX: Int, nY: Int)(src: Int, dst: Int) = {
+    val (srcX, srcY) = (src % nX, src / nX)
+    val (dstX, dstY) = (dst % nX, dst / nX)
+    (srcX == dstX && (srcY - dstY).abs == 1) || (srcY == dstY && (srcX - dstX).abs == 1)
+  }
 }

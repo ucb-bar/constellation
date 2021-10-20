@@ -97,7 +97,7 @@ class BidirectionalTorus1DConfig(
   nNodes: Int = 2,
   inputNodes: Seq[Int] = Seq(0),
   outputNodes: Seq[Int] = Seq(1),
-  randomRoute: Boolean = false
+  routingAlgo: Int => RoutingFunction = RoutingAlgorithms.bidirectionalTorus1DShortest
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
@@ -125,11 +125,7 @@ class BidirectionalTorus1DConfig(
         }
       }
     },
-    routingFunctions = if (randomRoute) {
-      RoutingAlgorithms.bidirectionalTorus1DRandom(nNodes)
-    } else {
-      RoutingAlgorithms.bidirectionalTorus1DShortest(nNodes)
-    },
+    routingFunctions = routingAlgo(nNodes),
     inputNodes = inputNodes,
     outputNodes = outputNodes
   )
@@ -150,6 +146,22 @@ class ButterflyConfig(
     )
   }
 })
+
+class Mesh2DConfig(
+  nX: Int = 3,
+  nY: Int = 3,
+  routingAlgo: (Int, Int) => RoutingFunction = RoutingAlgorithms.mesh2DDimensionOrdered
+) extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(
+    nNodes = nX * nY,
+    topology = TopologyConverter(Topologies.mesh2D(nX, nY)),
+    routingFunctions = routingAlgo(nX, nY),
+    inputNodes = (0 until nX * nY),
+    outputNodes = (0 until nX * nY)
+  )
+})
+
+
 
 
 class TestConfig00 extends Config(
@@ -212,10 +224,10 @@ class TestConfig17 extends Config(
 
 class TestConfig18 extends Config(
   new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
-  new BidirectionalTorus1DConfig(10, 0 until 10, 0 until 10, randomRoute=true))
+  new BidirectionalTorus1DConfig(10, 0 until 10, 0 until 10, routingAlgo=RoutingAlgorithms.bidirectionalTorus1DRandom))
 class TestConfig19 extends Config(
   new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
-  new BidirectionalTorus1DConfig(10, (0 until 10) ++ (0 until 10), (0 until 10) ++ (0 until 10), randomRoute=true))
+  new BidirectionalTorus1DConfig(10, (0 until 10) ++ (0 until 10), (0 until 10) ++ (0 until 10), routingAlgo=RoutingAlgorithms.bidirectionalTorus1DRandom))
 
 class TestConfig20 extends Config(
   new WithUniformVirtualChannels(1, VirtualChannelParams(5)) ++
@@ -233,3 +245,18 @@ class TestConfig24 extends Config(
   new WithUniformVirtualChannels(1, VirtualChannelParams(5)) ++
   new ButterflyConfig(3, 3))
 
+
+class TestConfig25 extends Config(
+  new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
+  new Mesh2DConfig(3, 3))
+class TestConfig26 extends Config(
+  new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
+  new Mesh2DConfig(5, 5))
+class TestConfig27 extends Config(
+  new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
+  new Mesh2DConfig(10, 10))
+
+
+class TestConfig28 extends Config(
+  new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
+  new Mesh2DConfig(5, 5, RoutingAlgorithms.mesh2DMinimal))

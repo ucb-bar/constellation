@@ -59,4 +59,29 @@ object RoutingAlgorithms {
       }
     }
   }
+
+  def mesh2DDimensionOrdered(nX: Int, nY: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, prio: Int) = {
+    val (nextX, nextY) = (nextId / nX, nextId % nX)
+    val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
+    val (destX, destY) = (destId / nX, destId % nX)
+    val (lastX, lastY) = (lastId / nX, lastId % nX)
+
+    if (destX != nodeX) {
+      (if (nodeX < nextX) destX >= nextX else destX <= nextX) && nextY == nodeY
+    } else {
+      (if (nodeY < nextY) destY >= nextY else destY <= nextY) && nextX == nodeX
+    }
+  }
+
+  def mesh2DMinimal(nX: Int, nY: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, prio: Int) = {
+    val (nextX, nextY) = (nextId / nX, nextId % nX)
+    val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
+    val (destX, destY) = (destId / nX, destId % nX)
+    val (lastX, lastY) = (lastId / nX, lastId % nX)
+
+    val xR = (if (nodeX < nextX) destX >= nextX else if (nodeX > nextX) destX <= nextX else nodeX == nextX)
+    val yR = (if (nodeY < nextY) destY >= nextY else if (nodeY > nextY) destY <= nextY else nodeY == nextY)
+    xR && yR
+  }
+
 }
