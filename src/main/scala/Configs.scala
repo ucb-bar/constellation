@@ -127,6 +127,20 @@ class Mesh2DConfig(
   )
 })
 
+class UnidirectionalTorus2DConfig(
+  nX: Int = 3,
+  nY: Int = 3,
+) extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(
+    nNodes = nX * nY,
+    topology = TopologyConverter(Topologies.unidirectionalTorus2D(nX, nY)),
+    routingFunctions = RoutingAlgorithms.dimensionOrderedUnidirectionalTorus2D(nX, nY),
+    channelAllocPolicy = ChannelAllocPolicies.unidirectionalTorus2DDateline(nX, nY),
+    inputNodes = (0 until nX * nY),
+    outputNodes = (0 until nX * nY)
+  )
+})
+
 
 
 
@@ -232,3 +246,13 @@ class TestConfig29 extends Config(
 class TestConfig30 extends Config(
   new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
   new Mesh2DConfig(5, 5, RoutingAlgorithms.mesh2DNorthLast))
+
+class TestConfig31 extends Config(
+  new WithUniformVirtualChannels(2, VirtualChannelParams(1)) ++
+  new UnidirectionalTorus2DConfig(3, 3))
+class TestConfig32 extends Config(
+  new WithUniformVirtualChannels(3, VirtualChannelParams(3)) ++
+  new UnidirectionalTorus2DConfig(3, 3))
+class TestConfig32 extends Config(
+  new WithUniformVirtualChannels(4, VirtualChannelParams(4)) ++
+  new UnidirectionalTorus2DConfig(5, 5))

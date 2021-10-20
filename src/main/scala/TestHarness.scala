@@ -150,7 +150,7 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
 
       assert(rob_valids(rob_idx) &&
         (rob_payload(rob_idx) === o.flit.bits.payload) &&
-        (o.flit.bits.out_id === i.U) &&
+        (o.flit.bits.out_id === i.U && o.flit.bits.out_id === rob_out_id(rob_idx)) &&
         (rob_flits_returned(rob_idx) < rob_n_flits(rob_idx)))
 
       rob_flits_returned(rob_idx) := rob_flits_returned(rob_idx) + 1.U

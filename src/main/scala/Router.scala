@@ -91,16 +91,20 @@ class Router(val rParams: RouterParams)(implicit val p: Parameters) extends Modu
   require(nAllOutputs >= 1)
   require(nodeId < (1 << nodeIdBits))
 
-  val input_units = inParams.map { u =>
-    Module(new InputUnit(u, outParams, terminalOutParams)) }
-  val terminal_input_units = terminalInParams.map { u =>
-    Module(new TerminalInputUnit(u, outParams, terminalOutParams)) }
+  val input_units = inParams.zipWithIndex.map { case (u,i) =>
+    Module(new InputUnit(u, outParams, terminalOutParams))
+      .suggestName(s"input_unit_${i}_from_${u.srcId}") }
+  val terminal_input_units = terminalInParams.zipWithIndex.map { case (u,i) =>
+    Module(new TerminalInputUnit(u, outParams, terminalOutParams))
+      .suggestName(s"terminal_input_unit_${i+nInputs}_from_${u.terminalInputId}") }
   val all_input_units = input_units ++ terminal_input_units
 
-  val output_units = outParams.map { u =>
-    Module(new OutputUnit(inParams, terminalInParams, u)) }
-  val terminal_output_units = terminalOutParams.map { u =>
-    Module(new TerminalOutputUnit(inParams, terminalInParams, u)) }
+  val output_units = outParams.zipWithIndex.map { case (u,i) =>
+    Module(new OutputUnit(inParams, terminalInParams, u))
+      .suggestName(s"output_unit_${i}_to_${u.destId}")}
+  val terminal_output_units = terminalOutParams.zipWithIndex.map { case (u,i) =>
+    Module(new TerminalOutputUnit(inParams, terminalInParams, u))
+      .suggestName(s"terminal_output_unit_${i+nOutputs}_to_${u.terminalOutputId}")}
   val all_output_units = output_units ++ terminal_output_units
 
   val switch = Module(new Switch(rParams))
