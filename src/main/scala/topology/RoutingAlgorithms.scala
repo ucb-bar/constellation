@@ -73,6 +73,7 @@ object RoutingAlgorithms {
     }
   }
 
+  // Minimal routing. Causes deadlocks.
   def mesh2DMinimal(nX: Int, nY: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, prio: Int) = {
     val (nextX, nextY) = (nextId / nX, nextId % nX)
     val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
@@ -82,6 +83,34 @@ object RoutingAlgorithms {
     val xR = (if (nodeX < nextX) destX >= nextX else if (nodeX > nextX) destX <= nextX else nodeX == nextX)
     val yR = (if (nodeY < nextY) destY >= nextY else if (nodeY > nextY) destY <= nextY else nodeY == nextY)
     xR && yR
+  }
+
+  def mesh2DWestFirst(nX: Int, nY: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, prio: Int) = {
+    val (nextX, nextY) = (nextId / nX, nextId % nX)
+    val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
+    val (destX, destY) = (destId / nX, destId % nX)
+    val (lastX, lastY) = (lastId / nX, lastId % nX)
+
+    if (destX < nodeX) {
+      nextX == nodeX - 1
+    } else {
+      mesh2DMinimal(nX, nY)(nodeId)(lastId, destId, nextId, prio)
+    }
+  }
+
+  def mesh2DNorthLast(nX: Int, nY: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, prio: Int) = {
+    val (nextX, nextY) = (nextId / nX, nextId % nX)
+    val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
+    val (destX, destY) = (destId / nX, destId % nX)
+    val (lastX, lastY) = (lastId / nX, lastId % nX)
+
+    if (destY > nodeY && destX != nodeX) {
+      mesh2DMinimal(nX, nY)(nodeId)(lastId, destId, nextId, prio) && nextY != nodeY + 1
+    } else if (destY > nodeY) {
+      nextY == nodeY + 1
+    } else {
+      mesh2DMinimal(nX, nY)(nodeId)(lastId, destId, nextId, prio)
+    }
   }
 
 }

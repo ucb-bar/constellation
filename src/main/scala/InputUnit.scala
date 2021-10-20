@@ -114,12 +114,11 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
     (x: VCAllocReq) => true.B, rr = true))
   (vcalloc_arbiter.io.in zip states).zipWithIndex.map { case ((i,s),idx) =>
     i.valid := s.g === g_v
-    val bits = Wire(new VCAllocReq(cParam, nOutputs, nTerminalOutputs))
-    bits.in_virt_channel := idx.U
-    bits.out_channels := s.r
-    bits.in_prio := s.prio
-    bits.dummy := idx.U
-    i.bits <> bits
+
+    i.bits.in_virt_channel := idx.U
+    i.bits.out_channels := s.r
+    i.bits.in_prio := s.prio
+    i.bits.dest_id := s.dest_id
     when (i.fire()) { s.g := g_v_stall }
   }
   io.vcalloc_req <> vcalloc_arbiter.io.out

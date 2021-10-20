@@ -15,11 +15,7 @@ case class NoCConfig(
 
   // srcNodeId, destNodeId => virtualChannelParams
   topology: (Int, Int) => Option[ChannelParams] = (a: Int, b: Int) => None,
-  // srcNodeId, destNodeId => depth
-  channelDepths: (Int, Int) => Int = (a: Int, b: Int) => 0,
-  // nodeId => (srcNodeId, inVChannelId, destNodeId, outVChannelId) => prio => legalPath
-  virtualLegalPaths: Int => (Int, Int, Int, Int) => Int => Boolean = (a: Int) => (b: Int, c: Int, d: Int, e: Int) => (f: Int) => true,
-
+  channelAllocPolicy: ChannelAllocPolicy = ChannelAllocPolicies.allLegal,
   routingFunctions: RoutingFunction = RoutingAlgorithms.crazy,
   // Seq[nodeId]
   inputNodes: Seq[Int] = Nil,
@@ -45,8 +41,7 @@ trait HasNoCParams {
   //   case (i,j) => params.topology(i, j).size }.flatten.max)
 
   val topologyFunction = params.topology
-  val channelDepths = params.channelDepths
-  val virtualLegalPathsFunction = params.virtualLegalPaths
+  val channelAllocPolicy = params.channelAllocPolicy
   val routingFunctions = params.routingFunctions
 
   val inputNodes = params.inputNodes

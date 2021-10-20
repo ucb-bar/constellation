@@ -75,19 +75,7 @@ class UnidirectionalTorus1DConfig(
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
     topology = TopologyConverter(Topologies.unidirectionalTorus1D(nNodes)),
-    virtualLegalPaths = {
-      (n: Int) => (src: Int, srcV: Int, dst: Int, dstV: Int) => (prio: Int) => {
-        if (src == -1)  {
-          dstV != 0
-        } else if (srcV == 0) {
-          dstV == 0
-        } else if (n == nNodes - 1) {
-          dstV < srcV
-        } else {
-          dstV <= srcV && dstV != 0
-        }
-      }
-    },
+    channelAllocPolicy = ChannelAllocPolicies.unidirectionalTorus1DDateline(nNodes),
     inputNodes = inputNodes,
     outputNodes = outputNodes
   )
@@ -102,29 +90,7 @@ class BidirectionalTorus1DConfig(
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
     topology = TopologyConverter(Topologies.bidirectionalTorus1D(nNodes)),
-    virtualLegalPaths = {
-      (n: Int) => (src: Int, srcV: Int, dst: Int, dstV: Int) => (prio: Int) => {
-        if (src == -1)  {
-          dstV != 0
-        } else if (srcV == 0) {
-          dstV == 0
-        } else if ((dst + nNodes - n) % nNodes == 1) {
-          if (n == nNodes - 1) {
-            dstV < srcV
-          } else {
-            dstV <= srcV && dstV != 0
-          }
-        } else if ((n + nNodes - dst) % nNodes == 1) {
-          if (n == 0) {
-            dstV < srcV
-          } else {
-            dstV <= srcV && dstV != 0
-          }
-        } else {
-          false
-        }
-      }
-    },
+    channelAllocPolicy = ChannelAllocPolicies.bidirectionalTorus1DDateline(nNodes),
     routingFunctions = routingAlgo(nNodes),
     inputNodes = inputNodes,
     outputNodes = outputNodes
@@ -150,7 +116,7 @@ class ButterflyConfig(
 class Mesh2DConfig(
   nX: Int = 3,
   nY: Int = 3,
-  routingAlgo: (Int, Int) => RoutingFunction = RoutingAlgorithms.mesh2DDimensionOrdered
+  routingAlgo: (Int, Int) => RoutingFunction = RoutingAlgorithms.mesh2DDimensionOrdered,
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nX * nY,
@@ -259,4 +225,10 @@ class TestConfig27 extends Config(
 
 class TestConfig28 extends Config(
   new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
-  new Mesh2DConfig(5, 5, RoutingAlgorithms.mesh2DMinimal))
+  new Mesh2DConfig(5, 5))
+class TestConfig29 extends Config(
+  new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
+  new Mesh2DConfig(5, 5, RoutingAlgorithms.mesh2DWestFirst))
+class TestConfig30 extends Config(
+  new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
+  new Mesh2DConfig(5, 5, RoutingAlgorithms.mesh2DNorthLast))

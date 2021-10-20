@@ -52,7 +52,7 @@ class TerminalInputUnit(
   io.vcalloc_req.bits.in_virt_channel := 0.U
   io.vcalloc_req.bits.in_prio := route_buffer.io.deq.bits.prio
   io.vcalloc_req.bits.out_channels := route_q.io.deq.bits.out_channels
-  io.vcalloc_req.bits.dummy := 0.U
+  io.vcalloc_req.bits.dest_id := outIdToDestId(route_buffer.io.deq.bits.out_id)
 
   val head = route_buffer.io.deq.bits.head
   val tail = route_buffer.io.deq.bits.tail
