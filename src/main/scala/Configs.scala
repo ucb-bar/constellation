@@ -142,6 +142,21 @@ class UnidirectionalTorus2DConfig(
 })
 
 
+class BidirectionalTorus2DConfig(
+  nX: Int = 3,
+  nY: Int = 3,
+) extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(
+    nNodes = nX * nY,
+    topology = TopologyConverter(Topologies.bidirectionalTorus2D(nX, nY)),
+    routingFunctions = RoutingAlgorithms.dimensionOrderedBidirectionalTorus2D(nX, nY),
+    channelAllocPolicy = ChannelAllocPolicies.bidirectionalTorus2DDateline(nX, nY),
+    inputNodes = (0 until nX * nY),
+    outputNodes = (0 until nX * nY)
+  )
+})
+
+
 
 
 class TestConfig00 extends Config(
@@ -253,6 +268,10 @@ class TestConfig31 extends Config(
 class TestConfig32 extends Config(
   new WithUniformVirtualChannels(3, VirtualChannelParams(3)) ++
   new UnidirectionalTorus2DConfig(3, 3))
-class TestConfig32 extends Config(
+class TestConfig33 extends Config(
   new WithUniformVirtualChannels(4, VirtualChannelParams(4)) ++
   new UnidirectionalTorus2DConfig(5, 5))
+
+class TestConfig34 extends Config(
+  new WithUniformVirtualChannels(2, VirtualChannelParams(1)) ++
+  new BidirectionalTorus2DConfig(3, 3))

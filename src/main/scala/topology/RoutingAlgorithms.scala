@@ -126,4 +126,17 @@ object RoutingAlgorithms {
       nextX == nodeX
     }
   }
+
+  def dimensionOrderedBidirectionalTorus2D(nX: Int, nY: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, prio: Int) = {
+    val (nextX, nextY) = (nextId / nX, nextId % nX)
+    val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
+    val (destX, destY) = (destId / nX, destId % nX)
+    val (lastX, lastY) = (lastId / nX, lastId % nX)
+
+    if (destX != nodeX) {
+      bidirectionalTorus1DShortest(nX)(nodeX)(lastX, destX, nextX, prio)
+    } else {
+      bidirectionalTorus1DShortest(nY)(nodeY)(lastY, destY, nextY, prio)
+    }
+  }
 }

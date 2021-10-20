@@ -46,4 +46,10 @@ object Topologies {
     val (dstX, dstY) = (dst % nX, dst / nX)
     (srcY == dstY && unidirectionalTorus1D(nX)(srcX, dstX)) || (srcX == dstX && unidirectionalTorus1D(nY)(srcY, dstY))
   }
+
+  def bidirectionalTorus2D(nX: Int, nY: Int)(src: Int, dst: Int) = {
+    val (srcX, srcY) = (src % nX, src / nX)
+    val (dstX, dstY) = (dst % nX, dst / nX)
+    (srcY == dstY && bidirectionalTorus1D(nX)(srcX, dstX)) || (srcX == dstX && bidirectionalTorus1D(nY)(srcY, dstY))
+  }
 }
