@@ -135,17 +135,21 @@ class BidirectionalTorus1DConfig(
   )
 })
 
-// class ButterflyConfig(
-//   kAry: Int = 2,
-//   nFly: Int = 2
-// ) extends Config((site, here, up) => {
-//   case NoCKey => up(NoCKey, site).copy(
-//     nNodes = pow(kAry,nFly-1) * nFly,
-//     nPrios = 1,
-
-//       k
-//   )
-// })
+class ButterflyConfig(
+  kAry: Int = 2,
+  nFly: Int = 2
+) extends Config((site, here, up) => {
+  case NoCKey => {
+    val height = pow(kAry,nFly-1).toInt
+    up(NoCKey, site).copy(
+      nNodes = height * nFly,
+      topology = TopologyConverter(Topologies.butterfly(kAry, nFly)),
+      routingFunctions = RoutingAlgorithms.butterfly(kAry, nFly),
+      inputNodes = (0 until height) ++ (0 until height),
+      outputNodes = ((0 until height) ++ (0 until height)).map(_ + height*(nFly-1))
+    )
+  }
+})
 
 
 class TestConfig00 extends Config(
@@ -212,3 +216,20 @@ class TestConfig18 extends Config(
 class TestConfig19 extends Config(
   new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
   new BidirectionalTorus1DConfig(10, (0 until 10) ++ (0 until 10), (0 until 10) ++ (0 until 10), randomRoute=true))
+
+class TestConfig20 extends Config(
+  new WithUniformVirtualChannels(1, VirtualChannelParams(5)) ++
+  new ButterflyConfig(2, 2))
+class TestConfig21 extends Config(
+  new WithUniformVirtualChannels(1, VirtualChannelParams(5)) ++
+  new ButterflyConfig(2, 3))
+class TestConfig22 extends Config(
+  new WithUniformVirtualChannels(1, VirtualChannelParams(5)) ++
+  new ButterflyConfig(2, 4))
+class TestConfig23 extends Config(
+  new WithUniformVirtualChannels(1, VirtualChannelParams(5)) ++
+  new ButterflyConfig(3, 2))
+class TestConfig24 extends Config(
+  new WithUniformVirtualChannels(1, VirtualChannelParams(5)) ++
+  new ButterflyConfig(3, 3))
+

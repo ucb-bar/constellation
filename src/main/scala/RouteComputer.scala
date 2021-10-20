@@ -27,7 +27,7 @@ class RouteComputer(val rParams: RouterParams)(implicit val p: Parameters) exten
   val routingMatrix = outParams.map { outP => allInParams.map { inP =>
     val mat = Wire(Vec(nNodes, Vec(nPrios, Bool())))
     Seq.tabulate(nNodes, nPrios) { case (dst,prio) =>
-      mat(dst)(prio) := rParams.routingFunction(inP.srcId, dst, outP.destId, prio).B
+      mat(dst)(prio) := routingFunction(inP.srcId, dst, outP.destId, prio).B
     }
     mat
   }}

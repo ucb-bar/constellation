@@ -1,5 +1,7 @@
 package constellation.topology
 
+import scala.math.pow
+
 object RoutingAlgorithms {
   def crazy(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, prio: Int) = true
 
@@ -25,6 +27,36 @@ object RoutingAlgorithms {
       (nextId + nNodes - nodeId) % nNodes == 1
     } else {
       (nodeId + nNodes - nextId) % nNodes == 1
+    }
+  }
+
+  def butterfly(kAry: Int, nFly: Int) = {
+    require(kAry >= 2 && nFly >= 2)
+    val height = pow(kAry, nFly-1).toInt
+    def digitsToNum(dig: Seq[Int]) = dig.zipWithIndex.map { case (d,i) => d * pow(kAry,i).toInt }.sum
+    val table = (0 until pow(kAry, nFly).toInt).map { i =>
+      (0 until nFly).map { n => (i / pow(kAry, n).toInt) % kAry }
+    }
+    val channels = (1 until nFly).map { i =>
+      table.map { e => (digitsToNum(e.drop(1)), digitsToNum(e.updated(i, e(0)).drop(1))) }
+    }
+
+    (nodeId: Int) => (lastId: Int, destId: Int, nextId: Int, prio: Int) => {
+      val (nextX, nextY) = (nextId / height, nextId % height)
+      val (nodeX, nodeY) = (nodeId / height, nodeId % height)
+      val (destX, destY) = (destId / height, destId % height)
+      if (destX <= nodeX) {
+        false
+      } else if (nodeX == nFly-1) {
+        true
+      } else {
+        val dests = (nextX until nFly-1).foldRight((0 until height).map { i => Seq(i) }) {
+          case (i,l) => (0 until height).map { s => channels(i).filter(_._1 == s).map { case (_,d) =>
+            l(d)
+          }.flatten }
+        }
+        dests(nextY).contains(destId % height)
+      }
     }
   }
 }

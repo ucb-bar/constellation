@@ -1,5 +1,6 @@
 package constellation.topology
 
+import scala.math.pow
 
 object Topologies {
   def unidirectionalLine(src: Int, dest: Int) = dest - src == 1
@@ -10,5 +11,27 @@ object Topologies {
   }
   def bidirectionalTorus1D(nNodes: Int)(src: Int, dest: Int) = {
     (dest + nNodes - src) % nNodes == 1 || (src + nNodes - dest) % nNodes == 1
+  }
+
+  def butterfly(kAry: Int, nFly: Int) = {
+    require(kAry >= 2 && nFly >= 2)
+    val height = pow(kAry, nFly-1).toInt
+    def digitsToNum(dig: Seq[Int]) = dig.zipWithIndex.map { case (d,i) => d * pow(kAry,i).toInt }.sum
+    val table = (0 until pow(kAry, nFly).toInt).map { i =>
+      (0 until nFly).map { n => (i / pow(kAry, n).toInt) % kAry }
+    }
+    val channels = (1 until nFly).map { i =>
+      table.map { e => (digitsToNum(e.drop(1)), digitsToNum(e.updated(i, e(0)).drop(1))) }
+    }
+    (src: Int, dest: Int) => {
+      val (srcX, srcY) = (src / height, src % height)
+      val (destX, destY) = (dest / height, dest % height)
+      if (srcX < nFly - 1 && destX == srcX + 1) {
+        val connected = channels(srcX).contains((srcY, destY))
+        connected
+      } else {
+        false
+      }
+    }
   }
 }
