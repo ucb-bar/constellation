@@ -5,6 +5,7 @@ import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
+import freechips.rocketchip.rocket.{DecodeLogic}
 
 class VCAllocReq(val cParam: ChannelParams, val nOutputs: Int, val nTerminalOutputs: Int)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   val in_virt_channel = UInt(virtualChannelBits.W)
@@ -133,17 +134,15 @@ class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends
       for (inId <- 0 until nAllInputs) {
         val r = io.req(inId)
         val legalPath = if (outId < nOutputs) {
-          // This is horrible.
-          MuxCase(false.B, Seq.tabulate(allInParams(inId).nVirtualChannels, 1 << userBits, nNodes) {
-            case (inVirtId, user, destId) => {
-              val hit = (r.bits.in_virt_channel === inVirtId.U &&
-                r.bits.in_user === user.U &&
-                r.bits.dest_id === destId.U)
-              val canRoute = rParams.vcAllocLegalPaths(
-                allInParams(inId).srcId, inVirtId, outParams(outId).destId, outVirtId, destId, user)
-              hit -> canRoute.B
-            }
-          }.flatten.flatten)
+          val table = Seq.tabulate(allInParams(inId).nVirtualChannels, 1 << userBits, nNodes) {
+            case (inVirtId, user, destId) =>
+              ((((inVirtId << userBits) + user) << nodeIdBits) + destId,
+                rParams.vcAllocLegalPaths(allInParams(inId).srcId, inVirtId, outParams(outId).destId, outVirtId, destId, user))
+          }.flatten.flatten
+          DecodeLogic(Cat(r.bits.in_virt_channel, r.bits.in_user, r.bits.dest_id),
+            table.filter(_._2).map(_._1.U),
+            table.filter(!_._2).map(_._1.U)
+          )
         } else {
           true.B
         }

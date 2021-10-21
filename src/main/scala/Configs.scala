@@ -127,7 +127,7 @@ class ButterflyConfig(
 class Mesh2DConfig(
   nX: Int = 3,
   nY: Int = 3,
-  routingAlgo: (Int, Int) => RoutingFunction = RoutingAlgorithms.mesh2DDimensionOrdered,
+  routingAlgo: (Int, Int) => RoutingFunction = RoutingAlgorithms.mesh2DDimensionOrdered(),
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nX * nY,
@@ -257,10 +257,10 @@ class TestConfig25 extends Config(
   new Mesh2DConfig(3, 3))
 class TestConfig26 extends Config(
   new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
-  new Mesh2DConfig(5, 5))
+  new Mesh2DConfig(10, 10))
 class TestConfig27 extends Config(
   new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
-  new Mesh2DConfig(10, 10))
+  new Mesh2DConfig(5, 5))
 
 
 class TestConfig28 extends Config(
@@ -272,6 +272,7 @@ class TestConfig29 extends Config(
 class TestConfig30 extends Config(
   new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
   new Mesh2DConfig(5, 5, RoutingAlgorithms.mesh2DNorthLast))
+
 
 class TestConfig31 extends Config(
   new WithUniformVirtualChannels(2, VirtualChannelParams(1)) ++

@@ -4,6 +4,7 @@ import chisel3._
 import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
+import freechips.rocketchip.rocket.DecodeLogic
 
 
 class RouteComputerReq(val cParam: ChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
@@ -36,13 +37,14 @@ class RouteComputer(val rParams: RouterParams)(implicit val p: Parameters) exten
       val out = Wire(Vec(nOutputs, Bool()))
       // This is horrible
       (0 until nOutputs).map { o =>
-        out(o) := MuxCase(false.B, Seq.tabulate(
-          1 << userBits,
-          nNodes) { case (user, dest) =>
-            val hit = user.U === req.bits.src_user && dest.U === req.bits.dest_id
-            hit -> routingFunction(allInParams(i).srcId, dest,
-              allOutParams(o).destId, user).B
-        }.flatten)
+        val table = Seq.tabulate(1 << userBits, nNodes) { case (user, dest) =>
+          ((user << nodeIdBits) + dest,
+            routingFunction(allInParams(i).srcId, dest, allOutParams(o).destId, user))
+        }.flatten
+
+        out(o) := DecodeLogic(Cat(req.bits.src_user, req.bits.dest_id),
+          table.filter(_._2).map(_._1.U),
+          table.filter(!_._2).map(_._1.U))
       }
       resp.bits.out_channels := out.asUInt
     }
