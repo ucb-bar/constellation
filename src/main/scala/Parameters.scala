@@ -11,7 +11,7 @@ case class NoCConfig(
   nNodes: Int = 3,
   flitPayloadBits: Int = 64,
   maxFlits: Int = 8,
-  nPrios: Int = 1,
+  userBits: Int = 1,
 
   // srcNodeId, destNodeId => virtualChannelParams
   topology: (Int, Int) => Option[ChannelParams] = (a: Int, b: Int) => None,
@@ -34,11 +34,8 @@ trait HasNoCParams {
   val nodeIdBits = log2Ceil(params.nNodes)
   val maxFlits = params.maxFlits
   val flitIdBits = log2Up(params.maxFlits+1)
-  val nPrios = params.nPrios
-  require (nPrios >= 1)
-  val prioBits = log2Up(params.nPrios)
-  // val virtualChannelBits = log2Up(Seq.tabulate(nNodes, nNodes) {
-  //   case (i,j) => params.topology(i, j).size }.flatten.max)
+  val userBits = params.userBits
+  require(userBits >= 1)
 
   val topologyFunction = params.topology
   val channelAllocPolicy = params.channelAllocPolicy

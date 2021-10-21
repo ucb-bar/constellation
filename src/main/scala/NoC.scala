@@ -24,66 +24,6 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
     val out = MixedVec(outputParams.map { u => new IOChannel(u) })
   })
 
-
-
-  // srcId, destId, virtChannelId, prio
-  // type ResourceTuple = (Int, Int, Int, Int)
-  // val resourceTuples: Seq[ResourceTuple] = channelParams.map { c =>
-  //   Seq.tabulate(c.virtualChannelParams.size) { v =>
-  //     Seq.tabulate(nPrios) { p => (c.srcId, c.destId, v, p) }
-  //   }.flatten
-  // }.flatten
-  // val edgesList: Seq[(ResourceTuple, ResourceTuple)] =
-  //   (0 until nNodes).map { n =>
-  //     inParams(n).map { iP =>
-  //       (0 until iP.virtualChannelParams.size).map { iv =>
-  //         outParams(n).map { oP =>
-  //           (0 until oP.virtualChannelParams.size).map { ov =>
-  //             (0 until nPrios).map { inPrio =>
-  //               if (virtualLegalPathsFunction(n)(iP.srcId, iv, oP.destId, ov, inPrio)) {
-  //                 (0 until nPrios).map { outPrio =>
-  //                   ((iP.srcId, n, iv, inPrio), (n, oP.destId, ov, outPrio))
-  //                 }
-  //               } else {
-  //                 Nil
-  //               }
-  //             }.flatten
-  //           }.flatten
-  //         }.flatten
-  //       }.flatten
-  //     }.flatten
-  //   }.flatten
-  // resourceTuples.foreach(t => println(t))
-  // edgesList.foreach(t => println(t))
-
-  // def checkCyclic: Boolean = {
-  //   val visited = scala.collection.mutable.Map[ResourceTuple, Boolean]().withDefaultValue(false)
-  //   val recStack = scala.collection.mutable.Map[ResourceTuple, Boolean]().withDefaultValue(false)
-
-  //   def isCyclicUtil(node: ResourceTuple): Boolean = {
-  //     visited(node) = true
-  //     recStack(node) = true
-
-  //     for (next <- edges(node))
-  //       if (!visited(next)) {
-  //         if (isCyclicUtil(next)) return true
-  //       } else if (recStack(next)) {
-  //         return true
-  //       }
-
-  //     recStack(node) = false
-  //     false
-  //   }
-
-  //   for (node <- nodes)
-  //     if (!visited(node))
-  //       if (isCyclicUtil(node)) return true
-  //   false
-  // }
-
-
-
-
   val router_nodes = Seq.tabulate(nNodes) { i => Module(new Router(RouterParams(
     i,
     inParams(i),

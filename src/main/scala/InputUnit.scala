@@ -51,7 +51,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
     val o = UInt(log2Up(allOutParams.map(_.virtualChannelParams.size).max).W)
     val p = UInt(log2Up(maxBufferSize).W)
     val c = UInt(log2Up(1+maxBufferSize).W)
-    val prio = UInt(prioBits.W)
+    val user = UInt(userBits.W)
     val tail_seen = Bool()
     val dest_id = UInt(nodeIdBits.W)
   }
@@ -81,7 +81,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
     states(id).r := UIntToOH(outIdToDestChannelId(io.in.flit.bits.out_id)) << nOutputs
     states(id).p := buffer.io.head
     states(id).tail_seen := io.in.flit.bits.tail
-    states(id).prio := io.in.flit.bits.prio
+    states(id).user := io.in.flit.bits.user
 
   } .elsewhen (io.in.flit.fire()) {
     val id = io.in.flit.bits.virt_channel_id
@@ -97,7 +97,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
     i.valid := s.g === g_r
     i.bits.dest_id := s.dest_id
     i.bits.src_virt_id := idx.U
-    i.bits.src_prio := s.prio
+    i.bits.src_user := s.user
     when (i.fire()) { s.g := g_r_stall }
   }
   io.router_req <> route_arbiter.io.out
@@ -117,7 +117,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
 
     i.bits.in_virt_channel := idx.U
     i.bits.out_channels := s.r
-    i.bits.in_prio := s.prio
+    i.bits.in_user := s.user
     i.bits.dest_id := s.dest_id
     when (i.fire()) { s.g := g_v_stall }
   }

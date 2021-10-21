@@ -45,9 +45,9 @@ trait HasRouterParams extends HasRouterOutputParams with HasRouterInputParams
   val outParams = rParams.outParams
   val terminalInParams = rParams.terminalInParams
   val terminalOutParams = rParams.terminalOutParams
-  def routingFunction(lastId: Int, dstId: Int, nextId: Int, prio: Int) = {
+  def routingFunction(lastId: Int, dstId: Int, nextId: Int, user: Int) = {
     if (nextId != nodeId && outParams.map(_.destId).contains(nextId))
-      rParams.routingFunction(lastId, dstId, nextId, prio)
+      rParams.routingFunction(lastId, dstId, nextId, user)
     else
       false
   }
@@ -63,13 +63,13 @@ trait HasRouterParams extends HasRouterOutputParams with HasRouterInputParams
       inParam.nVirtualChannels,
       outParam.nVirtualChannels,
       nNodes,
-      nPrios) { case (inV, outV, destId, prio) =>
-        (rParams.vcAllocLegalPaths(inParam.srcId, inV, outParam.destId, outV, destId, prio) ||
+      1 << userBits) { case (inV, outV, destId, user) =>
+        (rParams.vcAllocLegalPaths(inParam.srcId, inV, outParam.destId, outV, destId, user) ||
           (inParam.isTerminalInput && outParam.isTerminalOutput))
     }.flatten.flatten.flatten.reduce(_||_)
 
-    val legalPhysicalTransition = outputNodes.map(out => (0 until nPrios).map { prio =>
-      routingFunction(inParam.srcId, out, outParam.destId, prio)
+    val legalPhysicalTransition = outputNodes.map(out => (0 until (1 << userBits)).map { user =>
+      routingFunction(inParam.srcId, out, outParam.destId, user)
     }).flatten.reduce(_||_)
 
     legalVirtualTransition && legalPhysicalTransition

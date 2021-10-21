@@ -3,13 +3,13 @@ package constellation.topology
 import scala.math.pow
 
 object RoutingAlgorithms {
-  def crazy(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, prio: Int) = true
+  def crazy(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, user: Int) = true
 
-  def bidirectionalLine(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, prio: Int) = {
+  def bidirectionalLine(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, user: Int) = {
     (if (nodeId < nextId) destId >= nextId else destId <= nextId) && nextId != lastId
   }
 
-  def bidirectionalTorus1DShortest(nNodes: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, prio: Int) = {
+  def bidirectionalTorus1DShortest(nNodes: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, user: Int) = {
     val cwDist = (destId + nNodes - nodeId) % nNodes
     val ccwDist = (nodeId + nNodes - destId) % nNodes
     if (cwDist < ccwDist) {
@@ -20,7 +20,7 @@ object RoutingAlgorithms {
       true
     }
   }
-  def bidirectionalTorus1DRandom(nNodes: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, prio: Int) = {
+  def bidirectionalTorus1DRandom(nNodes: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, user: Int) = {
     if (lastId == -1) {
       true
     } else if ((nodeId + nNodes - lastId) % nNodes == 1) {
@@ -41,7 +41,7 @@ object RoutingAlgorithms {
       table.map { e => (digitsToNum(e.drop(1)), digitsToNum(e.updated(i, e(0)).drop(1))) }
     }
 
-    (nodeId: Int) => (lastId: Int, destId: Int, nextId: Int, prio: Int) => {
+    (nodeId: Int) => (lastId: Int, destId: Int, nextId: Int, user: Int) => {
       val (nextX, nextY) = (nextId / height, nextId % height)
       val (nodeX, nodeY) = (nodeId / height, nodeId % height)
       val (destX, destY) = (destId / height, destId % height)
@@ -60,7 +60,7 @@ object RoutingAlgorithms {
     }
   }
 
-  def mesh2DDimensionOrdered(nX: Int, nY: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, prio: Int) = {
+  def mesh2DDimensionOrdered(nX: Int, nY: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, user: Int) = {
     val (nextX, nextY) = (nextId / nX, nextId % nX)
     val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
     val (destX, destY) = (destId / nX, destId % nX)
@@ -74,7 +74,7 @@ object RoutingAlgorithms {
   }
 
   // Minimal routing. Causes deadlocks.
-  def mesh2DMinimal(nX: Int, nY: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, prio: Int) = {
+  def mesh2DMinimal(nX: Int, nY: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, user: Int) = {
     val (nextX, nextY) = (nextId / nX, nextId % nX)
     val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
     val (destX, destY) = (destId / nX, destId % nX)
@@ -85,7 +85,7 @@ object RoutingAlgorithms {
     xR && yR
   }
 
-  def mesh2DWestFirst(nX: Int, nY: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, prio: Int) = {
+  def mesh2DWestFirst(nX: Int, nY: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, user: Int) = {
     val (nextX, nextY) = (nextId / nX, nextId % nX)
     val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
     val (destX, destY) = (destId / nX, destId % nX)
@@ -94,27 +94,27 @@ object RoutingAlgorithms {
     if (destX < nodeX) {
       nextX == nodeX - 1
     } else {
-      mesh2DMinimal(nX, nY)(nodeId)(lastId, destId, nextId, prio)
+      mesh2DMinimal(nX, nY)(nodeId)(lastId, destId, nextId, user)
     }
   }
 
-  def mesh2DNorthLast(nX: Int, nY: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, prio: Int) = {
+  def mesh2DNorthLast(nX: Int, nY: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, user: Int) = {
     val (nextX, nextY) = (nextId / nX, nextId % nX)
     val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
     val (destX, destY) = (destId / nX, destId % nX)
     val (lastX, lastY) = (lastId / nX, lastId % nX)
 
     if (destY > nodeY && destX != nodeX) {
-      mesh2DMinimal(nX, nY)(nodeId)(lastId, destId, nextId, prio) && nextY != nodeY + 1
+      mesh2DMinimal(nX, nY)(nodeId)(lastId, destId, nextId, user) && nextY != nodeY + 1
     } else if (destY > nodeY) {
       nextY == nodeY + 1
     } else {
-      mesh2DMinimal(nX, nY)(nodeId)(lastId, destId, nextId, prio)
+      mesh2DMinimal(nX, nY)(nodeId)(lastId, destId, nextId, user)
     }
   }
 
 
-  def dimensionOrderedUnidirectionalTorus2D(nX: Int, nY: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, prio: Int) = {
+  def dimensionOrderedUnidirectionalTorus2D(nX: Int, nY: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, user: Int) = {
     val (nextX, nextY) = (nextId / nX, nextId % nX)
     val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
     val (destX, destY) = (destId / nX, destId % nX)
@@ -127,16 +127,16 @@ object RoutingAlgorithms {
     }
   }
 
-  def dimensionOrderedBidirectionalTorus2D(nX: Int, nY: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, prio: Int) = {
+  def dimensionOrderedBidirectionalTorus2D(nX: Int, nY: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, user: Int) = {
     val (nextX, nextY) = (nextId / nX, nextId % nX)
     val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
     val (destX, destY) = (destId / nX, destId % nX)
     val (lastX, lastY) = (lastId / nX, lastId % nX)
 
     if (destX != nodeX) {
-      bidirectionalTorus1DShortest(nX)(nodeX)(lastX, destX, nextX, prio)
+      bidirectionalTorus1DShortest(nX)(nodeX)(lastX, destX, nextX, user)
     } else {
-      bidirectionalTorus1DShortest(nY)(nodeY)(lastY, destY, nextY, prio)
+      bidirectionalTorus1DShortest(nY)(nodeY)(lastY, destY, nextY, user)
     }
   }
 }

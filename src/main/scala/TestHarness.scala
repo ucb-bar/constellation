@@ -22,7 +22,7 @@ object SelectFirstNUInt
   }
 }
 
-class InputGen(idx: Int, prio: Int, cParams: ChannelParams, inputStallProbability: Double)(implicit val p: Parameters) extends Module with HasNoCParams {
+class InputGen(idx: Int, cParams: ChannelParams, inputStallProbability: Double)(implicit val p: Parameters) extends Module with HasNoCParams {
   val io = IO(new Bundle {
     val out = Decoupled(new Flit(cParams))
     val rob_ready = Input(Bool())
@@ -43,7 +43,7 @@ class InputGen(idx: Int, prio: Int, cParams: ChannelParams, inputStallProbabilit
   io.out.valid := !random_delay && flits_left === 0.U && io.rob_ready
   io.out.bits.head := true.B
   io.out.bits.tail := packet_remaining === 0.U
-  io.out.bits.prio := prio.U
+  io.out.bits.user := 0.U
   io.out.bits.out_id := LFSR(20) % outputNodes.size.U
   io.out.bits.virt_channel_id := idx.U
   io.out.bits.payload := (io.tsc << 16) | (io.rob_idx << 8)
@@ -126,7 +126,7 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
 
   val tx_fire = Wire(Vec(nInputs, Bool()))
   io.to_noc.zipWithIndex.map { case (i,idx) =>
-    val igen = Module(new InputGen(idx, 0, inputParams(idx), inputStallProbability))
+    val igen = Module(new InputGen(idx, inputParams(idx), inputStallProbability))
     val rob_idx = WireInit(rob_alloc_ids(idx))
     igen.io.rob_idx := rob_idx
     igen.io.rob_ready := (rob_alloc_avail(idx) && rob_alloc_fires(idx) &&
