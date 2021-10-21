@@ -3,6 +3,27 @@ package constellation.topology
 object ChannelAllocPolicies {
   def allLegal(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, destId: Int, prio: Int) = true
 
+  def virtualTLSubnetworks(f: ChannelAllocPolicy)
+    (nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, destId: Int, prio: Int) = {
+    if (srcV == -1) {
+      (nxtV % 5 == prio &&
+        virtualSubnetworks(f, 5)(nodeId)(
+          srcId, srcV, nxtId, nxtV, destId, prio))
+    } else {
+      virtualSubnetworks(f, 5)(nodeId)(
+        srcId, srcV, nxtId, nxtV, destId, prio)
+    }
+  }
+
+
+  def virtualSubnetworks(f: ChannelAllocPolicy, n: Int)
+    (nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, destId: Int, prio: Int) = {
+    val srcVNetId = srcV % n
+    val nxtVNetId = nxtV % n
+    ((srcV == -1 || srcVNetId == nxtVNetId)
+      && f(nodeId)(srcId, srcV / n, nxtId, nxtV / n, destId, prio))
+  }
+
   def unidirectionalTorus1DDateline(nNodes: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, prio: Int) = {
     if (srcId == -1)  {
       nxtV != 0
