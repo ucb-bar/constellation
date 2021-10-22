@@ -128,11 +128,13 @@ class Mesh2DConfig(
   nX: Int = 3,
   nY: Int = 3,
   routingAlgo: (Int, Int) => RoutingFunction = RoutingAlgorithms.mesh2DDimensionOrdered(),
+  channelAllocPolicy: (Int, Int) => ChannelAllocPolicy = (_, _) => ChannelAllocPolicies.allLegal
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nX * nY,
     topology = TopologyConverter(Topologies.mesh2D(nX, nY)),
     routingFunctions = routingAlgo(nX, nY),
+    channelAllocPolicy = channelAllocPolicy(nX, nY),
     inputNodes = (0 until nX * nY),
     outputNodes = (0 until nX * nY)
   )
@@ -261,29 +263,32 @@ class TestConfig26 extends Config(
 class TestConfig27 extends Config(
   new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
   new Mesh2DConfig(5, 5))
-
-
 class TestConfig28 extends Config(
-  new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
-  new Mesh2DConfig(5, 5))
+  new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
+  new Mesh2DConfig(5, 5, RoutingAlgorithms.mesh2DMinimal, ChannelAllocPolicies.mesh2DAlternatingDimensionOrdered))
+
+
 class TestConfig29 extends Config(
   new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
-  new Mesh2DConfig(5, 5, RoutingAlgorithms.mesh2DWestFirst))
+  new Mesh2DConfig(5, 5))
 class TestConfig30 extends Config(
+  new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
+  new Mesh2DConfig(5, 5, RoutingAlgorithms.mesh2DWestFirst))
+class TestConfig31 extends Config(
   new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
   new Mesh2DConfig(5, 5, RoutingAlgorithms.mesh2DNorthLast))
 
 
-class TestConfig31 extends Config(
+class TestConfig32 extends Config(
   new WithUniformVirtualChannels(2, VirtualChannelParams(1)) ++
   new UnidirectionalTorus2DConfig(3, 3))
-class TestConfig32 extends Config(
+class TestConfig33 extends Config(
   new WithUniformVirtualChannels(3, VirtualChannelParams(3)) ++
   new UnidirectionalTorus2DConfig(3, 3))
-class TestConfig33 extends Config(
+class TestConfig34 extends Config(
   new WithUniformVirtualChannels(4, VirtualChannelParams(4)) ++
   new UnidirectionalTorus2DConfig(5, 5))
 
-class TestConfig34 extends Config(
+class TestConfig35 extends Config(
   new WithUniformVirtualChannels(2, VirtualChannelParams(1)) ++
   new BidirectionalTorus2DConfig(3, 3))

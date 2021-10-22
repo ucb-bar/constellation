@@ -139,10 +139,9 @@ class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends
               ((((inVirtId << userBits) + user) << nodeIdBits) + destId,
                 rParams.vcAllocLegalPaths(allInParams(inId).srcId, inVirtId, outParams(outId).destId, outVirtId, destId, user))
           }.flatten.flatten
-          DecodeLogic(Cat(r.bits.in_virt_channel, r.bits.in_user, r.bits.dest_id),
-            table.filter(_._2).map(_._1.U),
-            table.filter(!_._2).map(_._1.U)
-          )
+
+          val addr = Cat(r.bits.in_virt_channel, r.bits.in_user, r.bits.dest_id)
+          table.filter(_._2).map(_._1.U === addr).orR
         } else {
           true.B
         }
