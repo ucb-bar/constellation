@@ -20,7 +20,10 @@ class VCAllocResp(val cParam: ChannelParams, val outParams: Seq[ChannelParams], 
   val out_channel = UInt(log2Up(nAllOutputs).W)
 }
 
-class Allocator(d0: Int, d1: Int, revD0: Boolean = false, revD1: Boolean = false)
+class Allocator(d0: Int, d1: Int,
+  revD0: Boolean = false, revD1: Boolean = false,
+  rrD0: Boolean = false, rrD1: Boolean = false
+)
     extends Module {
 
   class ValidReady extends Bundle {
@@ -40,8 +43,8 @@ class Allocator(d0: Int, d1: Int, revD0: Boolean = false, revD1: Boolean = false
     }
   }
 
-  val rank_1_arbs = Seq.fill(d0) { Module(new Arbiter(Bool(), d1)) }
-  val rank_2_arbs = Seq.fill(d1) { Module(new Arbiter(Bool(), d0)) }
+  val rank_1_arbs = Seq.fill(d0) { Module(new GrantHoldArbiter(Bool(), d1, (_: Bool) => true.B, rr = rrD0)) }
+  val rank_2_arbs = Seq.fill(d1) { Module(new GrantHoldArbiter(Bool(), d0, (_: Bool) => true.B, rr = rrD1)) }
 
   Seq.tabulate(d0, d1) { case (y, x) =>
     rank_1_arbs(y).io.in(x).valid := in(y)(x).valid
@@ -82,22 +85,8 @@ class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends
   (io.resp zip io.req).map { case (o,i) => o.bits.in_virt_channel := i.bits.in_virt_channel }
   io.req.foreach { r => when (r.valid) { assert(PopCount(r.bits.out_channels) >= 1.U) } }
 
-  val allocator = Module(new Allocator(nOutChannels, nAllInputs, revD0=true))
+  val allocator = Module(new Allocator(nOutChannels, nAllInputs))
   allocator.io.in.foreach(_.foreach(_.valid := false.B))
-
-  // if (nodeId == 0) {
-  //   for (k <- 0 until nAllInputs) {
-  //     for (m <- 0 until allInParams(k).nVirtualChannels) {
-  //       for (i <- 0 until nOutputs) {
-  //         for (j <- 0 until allOutParams(i).nVirtualChannels) {
-  //           println((allInParams(k).srcId, m, outParams(i).destId, j,
-  //             rParams.vcAllocLegalPaths(allInParams(k).srcId, m, outParams(i).destId, j)(0)))
-  //         }
-  //       }
-  //     }
-  //   }
-  // }
-
 
   def getIdx(outChannel: Int, outVirtChannel: Int): Int = {
     require(outChannel < nAllOutputs &&
@@ -143,7 +132,7 @@ class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends
           }.flatten.flatten
 
           val addr = Cat(r.bits.in_virt_channel, r.bits.in_user, r.bits.dest_id)
-          table.filter(_._2).map(_._1.U === addr).orR
+          table.filter(_._2).map(_._1.U === addr).orR && !(r.bits.dest_id === nodeId.U)
         } else {
           true.B
         }

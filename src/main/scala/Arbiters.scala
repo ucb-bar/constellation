@@ -15,10 +15,7 @@ class GrantHoldArbiter[T <: Data](
       rr: Boolean = false)
     extends Module {
 
-  val io = IO(new Bundle {
-    val in = Vec(arbN, Flipped(Decoupled(typ)))
-    val out = Decoupled(typ)
-  })
+  val io = IO(new ArbiterIO(typ, arbN))
 
   def rotateLeft[T <: Data](norm: Vec[T], rot: UInt): Seq[T] = {
     val n = norm.size
@@ -39,6 +36,7 @@ class GrantHoldArbiter[T <: Data](
   }
 
   val chosen = Mux(locked && io.in(lockIdx).valid, lockIdx, choice)
+  io.chosen := chosen
 
   for (i <- 0 until arbN) {
     io.in(i).ready := io.out.ready && chosen === i.U
