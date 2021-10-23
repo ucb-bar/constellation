@@ -137,7 +137,9 @@ class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends
           val table = Seq.tabulate(allInParams(inId).nVirtualChannels, 1 << userBits, nNodes) {
             case (inVirtId, user, destId) =>
               ((((inVirtId << userBits) + user) << nodeIdBits) + destId,
-                rParams.vcAllocLegalPaths(allInParams(inId).srcId, inVirtId, outParams(outId).destId, outVirtId, destId, user))
+                rParams.vcAllocLegalPaths(allInParams(inId).srcId, inVirtId,
+                  outParams(outId).destId, outVirtId, destId, user)
+              )
           }.flatten.flatten
 
           val addr = Cat(r.bits.in_virt_channel, r.bits.in_user, r.bits.dest_id)

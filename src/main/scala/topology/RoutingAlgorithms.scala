@@ -60,16 +60,24 @@ object RoutingAlgorithms {
     }
   }
 
-  def mesh2DDimensionOrdered(nX: Int, nY: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, user: Int) = {
+  def mesh2DDimensionOrdered(firstDim: Int = 0)(nX: Int, nY: Int)(nodeId: Int)(lastId: Int, destId: Int, nextId: Int, user: Int) = {
     val (nextX, nextY) = (nextId / nX, nextId % nX)
     val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
     val (destX, destY) = (destId / nX, destId % nX)
     val (lastX, lastY) = (lastId / nX, lastId % nX)
 
-    if (destX != nodeX) {
-      (if (nodeX < nextX) destX >= nextX else destX <= nextX) && nextY == nodeY
+    if (firstDim == 0) {
+      if (destX != nodeX) {
+        (if (nodeX < nextX) destX >= nextX else destX <= nextX) && nextY == nodeY
+      } else {
+        (if (nodeY < nextY) destY >= nextY else destY <= nextY) && nextX == nodeX
+      }
     } else {
-      (if (nodeY < nextY) destY >= nextY else destY <= nextY) && nextX == nodeX
+      if (destY != nodeY) {
+        (if (nodeY < nextY) destY >= nextY else destY <= nextY) && nextX == nodeX
+      } else {
+        (if (nodeX < nextX) destX >= nextX else destX <= nextX) && nextY == nodeY
+      }
     }
   }
 

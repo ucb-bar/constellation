@@ -58,6 +58,29 @@ object ChannelAllocPolicies {
     }
   }
 
+  def mesh2DAlternatingDimensionOrdered(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, user: Int) = {
+    val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
+    val (nxtX, nxtY) = (nxtId / nX, nxtId % nX)
+    val (srcX, srcY) = (srcId / nX, srcId % nX)
+    val (dstX, dstY) = (dstId / nX, dstId % nX)
+
+    val turn = nxtX != srcX && nxtY != srcY
+    val canRouteThis = RoutingAlgorithms.mesh2DDimensionOrdered(srcV % 2)(nX, nY)(nodeId)(
+      srcId, dstId, nxtId, user)
+    val canRouteNext = RoutingAlgorithms.mesh2DDimensionOrdered(nxtV % 2)(nX, nY)(nodeId)(
+      srcId, dstId, nxtId, user)
+
+    if (srcId == -1) {
+      nxtV != 0 && canRouteNext
+    } else if (canRouteThis) {
+      nxtV % 2 == srcV % 2 && nxtV <= srcV
+    } else if (canRouteNext) {
+      nxtV % 2 != srcV % 2 && nxtV <= srcV
+    } else {
+      false
+    }
+  }
+
   def unidirectionalTorus2DDateline(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, user: Int) = {
     val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
     val (nxtX, nxtY) = (nxtId / nX, nxtId % nX)
