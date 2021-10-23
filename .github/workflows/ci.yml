@@ -9,6 +9,9 @@ jobs:
   test:
     runs-on: ubuntu-20.04
 
+    env:
+      JAVA_TOOL_OPTIONS: -Xmx4G -Xss8M
+
     steps:
     - uses: actions/checkout@v2
 
