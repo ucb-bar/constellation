@@ -39,7 +39,7 @@ class NocTests extends AnyFlatSpec with ChiselScalatestTester with ParallelTestE
     new TestConfig25,
     new TestConfig26,
     new TestConfig27,
-    // new TestConfig28,
+    new TestConfig28,
     new TestConfig29,
     new TestConfig30,
     new TestConfig31,
@@ -52,7 +52,7 @@ class NocTests extends AnyFlatSpec with ChiselScalatestTester with ParallelTestE
   configs.foreach { conf =>
     it should s"execute the TestHarness with ${conf.getClass.getName}" in {
       implicit val p: Parameters = conf
-      test(new TestHarness).withAnnotations(annos).runUntilStop(timeout = 1000 * 1000)
+      test(new ChiselTester).withAnnotations(annos).runUntilStop(timeout = 1000 * 1000)
     }
   }
 }
