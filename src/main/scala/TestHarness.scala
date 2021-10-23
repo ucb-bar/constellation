@@ -169,13 +169,9 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
 
 
 class TestHarness(implicit val p: Parameters) extends Module {
-  val io = IO(new Bundle {
-    val success = Output(Bool())
-  })
-
   val noc = Module(new NoC)
   val noc_tester = Module(new NoCTester(noc.inputParams, noc.outputParams))
   noc.io.in <> noc_tester.io.to_noc
   noc_tester.io.from_noc <> noc.io.out
-  io.success := noc_tester.io.success
+  when(noc_tester.io.success) { stop() }
 }
