@@ -40,12 +40,12 @@ trait HasRouterInputParams extends HasNoCParams {
 
 trait HasRouterParams extends HasRouterOutputParams with HasRouterInputParams
 {
-  val rParams: RouterParams
-  val nodeId = rParams.nodeId
-  val inParams = rParams.inParams
-  val outParams = rParams.outParams
-  val terminalInParams = rParams.terminalInParams
-  val terminalOutParams = rParams.terminalOutParams
+  val rP: RouterParams
+  val nodeId = rP.nodeId
+  val inParams = rP.inParams
+  val outParams = rP.outParams
+  val terminalInParams = rP.terminalInParams
+  val terminalOutParams = rP.terminalOutParams
 
   def possibleTransition(inParam: ChannelParams, outParam: ChannelParams): Boolean = {
 
@@ -59,7 +59,7 @@ trait HasRouterParams extends HasRouterOutputParams with HasRouterInputParams
       outParam.nVirtualChannels,
       nNodes,
       nVirtualNetworks) { case (inV, outV, destId, vNetId) =>
-        (rParams.masterAllocTable(inParam.srcId, inV, outParam.destId, outV, destId, vNetId) ||
+        (rP.masterAllocTable(inParam.srcId, inV, outParam.destId, outV, destId, vNetId) ||
           (inParam.isTerminalInput && outParam.isTerminalOutput))
     }.flatten.flatten.flatten.reduce(_||_)
 
@@ -67,7 +67,7 @@ trait HasRouterParams extends HasRouterOutputParams with HasRouterInputParams
   }
 }
 
-class Router(val rParams: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
+class Router(val rP: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
   allOutParams.foreach(u => require(u.srcId == nodeId))
   allInParams.foreach(u => require(u.destId == nodeId))
 
@@ -98,10 +98,10 @@ class Router(val rParams: RouterParams)(implicit val p: Parameters) extends Modu
       .suggestName(s"terminal_output_unit_${i+nOutputs}_to_${u.terminalOutputId}")}
   val all_output_units = output_units ++ terminal_output_units
 
-  val switch = Module(new Switch(rParams))
-  val switch_allocator = Module(new SwitchAllocator(rParams))
-  val vc_allocator = Module(new VCAllocator(rParams))
-  val route_computer = Module(new RouteComputer(rParams))
+  val switch = Module(new Switch(rP))
+  val switch_allocator = Module(new SwitchAllocator(rP))
+  val vc_allocator = Module(new VCAllocator(rP))
+  val route_computer = Module(new RouteComputer(rP))
 
   (io.in zip input_units).foreach {
     case (i,u) => u.io.in <> i }

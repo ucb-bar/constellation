@@ -14,7 +14,7 @@ class SwitchBundle(val outParams: Seq[ChannelParams], val terminalOutParams: Seq
   val out_virt_channel = UInt(log2Up(allOutParams.map(_.nVirtualChannels).max).W)
 }
 
-class Switch(val rParams: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
+class Switch(val rP: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
 
   val io = IO(new Bundle {
     val in = Vec(nAllInputs, Input(Valid(new SwitchBundle(outParams, terminalOutParams))))
