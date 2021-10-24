@@ -4,11 +4,11 @@ on:
   push:
   pull_request:
 
-
 jobs:
   test:
     runs-on: ubuntu-20.04
     strategy:
+      fail-fast: false
       matrix:
         config: [
             "00", "01", "02", "03", "04", "05", "06", "07", "08", "09",
@@ -36,4 +36,4 @@ jobs:
       run: sbt compile
 
     - name: Unit Tests
-      run: sbt testOnly constellation.NocTest${{ matrix.config }}
+      run: sbt "testOnly constellation.NocTest${{ matrix.config }}"
