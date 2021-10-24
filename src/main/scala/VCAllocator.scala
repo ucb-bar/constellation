@@ -7,17 +7,14 @@ import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 import freechips.rocketchip.rocket.{DecodeLogic}
 
-class VCAllocReq(val cParam: ChannelParams, val nOutputs: Int, val nTerminalOutputs: Int)(implicit val p: Parameters) extends Bundle with HasChannelParams {
+class VCAllocReq(val cParam: ChannelParams, val outParams: Seq[ChannelParams], val terminalOutParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle with HasChannelParams with HasRouterOutputParams{
   val in_virt_channel = UInt(virtualChannelBits.W)
-  val in_user = UInt(userBits.W)
-  val dest_id = UInt(nodeIdBits.W)
-  val out_channels = UInt((nOutputs+nTerminalOutputs).W)
+  val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
 }
 
 class VCAllocResp(val cParam: ChannelParams, val outParams: Seq[ChannelParams], val terminalOutParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle with HasChannelParams with HasRouterOutputParams {
   val in_virt_channel = UInt(virtualChannelBits.W)
-  val out_virt_channel = UInt(log2Up((Seq(1) ++ allOutParams.map(_.virtualChannelParams.size)).max).W)
-  val out_channel = UInt(log2Up(nAllOutputs).W)
+  val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
 }
 
 class Allocator(d0: Int, d1: Int,
@@ -70,7 +67,7 @@ class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends
     with HasRouterParams {
   val io = IO(new Bundle {
     val req = MixedVec(allInParams.map { u =>
-      Flipped(Decoupled(new VCAllocReq(u, nOutputs, nTerminalOutputs))) })
+      Flipped(Decoupled(new VCAllocReq(u, outParams, terminalOutParams))) })
     val resp = MixedVec(allInParams.map { u =>
       Valid(new VCAllocResp(u, outParams, terminalOutParams)) })
 
@@ -83,7 +80,7 @@ class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends
 
   io.resp.foreach(_.bits := DontCare)
   (io.resp zip io.req).map { case (o,i) => o.bits.in_virt_channel := i.bits.in_virt_channel }
-  io.req.foreach { r => when (r.valid) { assert(PopCount(r.bits.out_channels) >= 1.U) } }
+  io.req.foreach { r => when (r.valid) { assert(r.bits.vc_sel.asUInt =/= 0.U) } }
 
   val allocator = Module(new Allocator(nOutChannels, nAllInputs))
   allocator.io.in.foreach(_.foreach(_.valid := false.B))
@@ -122,24 +119,10 @@ class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends
       val idx = getIdx(outId, outVirtId)
       for (inId <- 0 until nAllInputs) {
         val r = io.req(inId)
-        val legalPath = if (outId < nOutputs) {
-          val table = Seq.tabulate(allInParams(inId).nVirtualChannels, 1 << userBits, nNodes) {
-            case (inVirtId, user, destId) =>
-              ((((inVirtId << userBits) + user) << nodeIdBits) + destId,
-                rParams.vcAllocLegalPaths(allInParams(inId).srcId, inVirtId,
-                  outParams(outId).destId, outVirtId, destId, user)
-              )
-          }.flatten.flatten
 
-          val addr = Cat(r.bits.in_virt_channel, r.bits.in_user, r.bits.dest_id)
-          table.filter(_._2).map(_._1.U === addr).orR && !(r.bits.dest_id === nodeId.U)
-        } else {
-          true.B
-        }
         allocator.io.in(idx)(inId).valid := (r.valid &&
-          r.bits.out_channels(outId) &&
-          io.channel_available(outId)(outVirtId) &&
-          legalPath
+          r.bits.vc_sel(outId)(outVirtId) &&
+          io.channel_available(outId)(outVirtId)
         )
       }
       io.out_allocs(outId)(outVirtId) := allocator.io.in(idx).map(_.fire()).reduce(_||_)
@@ -154,7 +137,11 @@ class VCAllocator(val rParams: RouterParams)(implicit val p: Parameters) extends
     req.ready := fires.reduce(_||_)
     resp.valid := fires.reduce(_||_)
     resp.bits.in_virt_channel := req.bits.in_virt_channel
-    resp.bits.out_channel := out_id
-    resp.bits.out_virt_channel := out_virt_id
+    resp.bits.vc_sel.foreach(_.foreach(_ := false.B))
+    for (o <- 0 until nAllOutputs) {
+      when (out_id === o.U) {
+        resp.bits.vc_sel(o)(out_virt_id) := true.B
+      }
+    }
   }
 }

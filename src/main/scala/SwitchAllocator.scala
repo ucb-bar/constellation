@@ -7,8 +7,7 @@ import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
 class SwitchAllocReq(val outParams: Seq[ChannelParams], val terminalOutParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle with HasRouterOutputParams {
-  val out_channel = UInt(log2Up(nAllOutputs).W)
-  val out_virt_channel = UInt(log2Up(allOutParams.map(_.virtualChannelParams.size).max).W)
+  val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
   val tail = Bool()
 }
 
@@ -42,7 +41,7 @@ class SwitchAllocator(val rParams: RouterParams)(implicit val p: Parameters) ext
     val fires = Wire(Vec(arbs.size, Bool()))
     arbs.zipWithIndex.foreach { case (a,i) =>
       if (possibleTransition(allInParams(j), allOutParams(i))) {
-        a.io.in(j).valid := o.io.out.valid && o.io.out.bits.out_channel === i.U
+        a.io.in(j).valid := o.io.out.valid && o.io.out.bits.vc_sel(i).reduce(_||_)
         a.io.in(j).bits := o.io.out.bits
         fires(i) := a.io.in(j).fire()
       } else {
@@ -56,6 +55,7 @@ class SwitchAllocator(val rParams: RouterParams)(implicit val p: Parameters) ext
 
   (arbs.take(nOutputs) zip io.credit_alloc).map { case (a,i) =>
     i.valid := a.io.out.fire()
-    i.bits := a.io.out.bits.out_virt_channel
+    val sel = a.io.out.bits.vc_sel.map(_.reduce(_||_))
+    i.bits := Mux1H(sel, a.io.out.bits.vc_sel.map(v => OHToUInt(v)))
   }
 }

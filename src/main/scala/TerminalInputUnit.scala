@@ -20,7 +20,7 @@ class TerminalInputUnit(
   })
 
   val route_buffer = Module(new Queue(new Flit(cParam), 2))
-  val route_q = Module(new Queue(new RouteComputerResp(cParam, nAllOutputs), 2))
+  val route_q = Module(new Queue(new RouteComputerResp(cParam, outParams, terminalOutParams), 2))
 
   route_buffer.io.enq.bits := io.in.bits
   io.router_req.bits.src_virt_id := 0.U
@@ -39,7 +39,13 @@ class TerminalInputUnit(
   when (io.in.fire() && io.in.bits.head && out_is_in) {
     route_q.io.enq.valid := true.B
     route_q.io.enq.bits.src_virt_id := 0.U
-    route_q.io.enq.bits.out_channels := UIntToOH(outIdToDestChannelId(io.in.bits.out_id)) << nOutputs
+    route_q.io.enq.bits.vc_sel.foreach(_.foreach(_ := false.B))
+    val term_id = outIdToDestChannelId(io.in.bits.out_id)
+    for (o <- 0 until nTerminalOutputs) {
+      when (term_id === o.U) {
+        route_q.io.enq.bits.vc_sel(o+nOutputs)(0) := true.B
+      }
+    }
   }
   assert(!(route_q.io.enq.valid && !route_q.io.enq.ready))
 
@@ -50,9 +56,7 @@ class TerminalInputUnit(
   vcalloc_buffer.io.enq.bits := route_buffer.io.deq.bits
 
   io.vcalloc_req.bits.in_virt_channel := 0.U
-  io.vcalloc_req.bits.in_user := route_buffer.io.deq.bits.user
-  io.vcalloc_req.bits.out_channels := route_q.io.deq.bits.out_channels
-  io.vcalloc_req.bits.dest_id := outIdToDestId(route_buffer.io.deq.bits.out_id)
+  io.vcalloc_req.bits.vc_sel := route_q.io.deq.bits.vc_sel
 
   val head = route_buffer.io.deq.bits.head
   val tail = route_buffer.io.deq.bits.tail
@@ -73,13 +77,10 @@ class TerminalInputUnit(
   vcalloc_q.io.enq.bits := io.vcalloc_resp.bits
   assert(!(vcalloc_q.io.enq.valid && !vcalloc_q.io.enq.ready))
 
-  io.salloc_req(0).bits.out_channel := vcalloc_q.io.deq.bits.out_channel
-  io.salloc_req(0).bits.out_virt_channel := vcalloc_q.io.deq.bits.out_virt_channel
+  io.salloc_req(0).bits.vc_sel := vcalloc_q.io.deq.bits.vc_sel
   io.salloc_req(0).bits.tail := vcalloc_buffer.io.deq.bits.tail
 
-  val c = (UIntToOH(vcalloc_q.io.deq.bits.out_virt_channel) &
-    VecInit(io.out_credit_available.map(_.asUInt))(vcalloc_q.io.deq.bits.out_channel)
-  ) =/= 0.U
+  val c = (vcalloc_q.io.deq.bits.vc_sel.asUInt & io.out_credit_available.asUInt) =/= 0.U
   val vcalloc_tail = vcalloc_buffer.io.deq.bits.tail
   io.salloc_req(0).valid := vcalloc_buffer.io.deq.valid && vcalloc_q.io.deq.valid && c
   vcalloc_buffer.io.deq.ready := io.salloc_req(0).ready && vcalloc_q.io.deq.valid && c
@@ -87,7 +88,8 @@ class TerminalInputUnit(
 
   io.out.valid := RegNext(vcalloc_buffer.io.deq.fire())
   io.out.bits.flit := RegNext(vcalloc_buffer.io.deq.bits)
-  io.out.bits.out_virt_channel := RegNext(vcalloc_q.io.deq.bits.out_virt_channel)
-  io.out.bits.out_channel := RegNext(vcalloc_q.io.deq.bits.out_channel)
+  val out_channel_oh = vcalloc_q.io.deq.bits.vc_sel.map(_.reduce(_||_))
+  io.out.bits.out_virt_channel := RegNext(Mux1H(out_channel_oh, vcalloc_q.io.deq.bits.vc_sel.map(v => OHToUInt(v))))
+  io.out.bits.out_channel := RegNext(OHToUInt(out_channel_oh))
 
 }

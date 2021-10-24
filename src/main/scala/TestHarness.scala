@@ -148,10 +148,10 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
     val rob_idx = o.flit.bits.payload(15,8)
     when (o.flit.fire()) {
 
-      assert(rob_valids(rob_idx) &&
-        (rob_payload(rob_idx) === o.flit.bits.payload) &&
-        (o.flit.bits.out_id === i.U && o.flit.bits.out_id === rob_out_id(rob_idx)) &&
-        (rob_flits_returned(rob_idx) < rob_n_flits(rob_idx)))
+      assert(rob_valids(rob_idx), s"out[$i] unexpected response")
+      assert(rob_payload(rob_idx) === o.flit.bits.payload, s"out[$i] incorrect payload");
+      assert(o.flit.bits.out_id === i.U && o.flit.bits.out_id === rob_out_id(rob_idx), s"out[$i] incorrect destination")
+      assert(rob_flits_returned(rob_idx) < rob_n_flits(rob_idx), s"out[$i] too many flits returned")
 
       rob_flits_returned(rob_idx) := rob_flits_returned(rob_idx) + 1.U
       rob_payload(rob_idx) := rob_payload(rob_idx) + 1.U
