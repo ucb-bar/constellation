@@ -210,12 +210,11 @@ object MasterAllocTables {
     val (srcX, srcY) = (srcId / nX, srcId % nX)
     val (dstX, dstY) = (dstId / nX, dstId % nX)
 
-    val turn = nxtX != srcX && nxtY != srcY
-    if (srcId == -1 || turn) {
+    if (srcId == -1) {
       nxtV != 0
-    } else if (srcX == nxtX) {
+    } else if (nodeX == nxtX) {
       bidirectionalTorus1DDateline(nY)(nodeY)(srcY, srcV, nxtY, nxtV, dstY, user)
-    } else if (srcY == nxtY) {
+    } else if (nodeY == nxtY) {
       bidirectionalTorus1DDateline(nX)(nodeX)(srcX, srcV, nxtX, nxtV, dstX, user)
     } else {
       false
@@ -248,12 +247,12 @@ object MasterAllocTables {
     val (dstX, dstY) = (dstId / nX, dstId % nX)
     val (srcX, srcY) = (srcId / nX, srcId % nX)
 
-    val sel = if (dstX != nodeX) {
-      bidirectionalTorus1DShortest(nX)(nodeX)(srcX, srcV, nxtX, nxtV, dstX, user)
-    } else {
-      bidirectionalTorus1DShortest(nY)(nodeY)(srcY, srcV, nxtY, nxtV, dstY, user)
-    }
-    sel && bidirectionalTorus2DDateline(nX, nY)(nodeId)(srcId, srcV, nxtId, nxtV, dstId, user)
+    val xdir = bidirectionalTorus1DShortest(nX)(nodeX)(if (srcId == -1) -1 else srcX, srcV, nxtX, nxtV, dstX, user)
+    val ydir = bidirectionalTorus1DShortest(nY)(nodeY)(if (srcId == -1) -1 else srcY, srcV, nxtY, nxtV, dstY, user)
+    val base = bidirectionalTorus2DDateline(nX, nY)(nodeId)(srcId, srcV, nxtId, nxtV, dstId, user)
+    val sel = if (dstX != nodeX) xdir else ydir
+
+    sel && base
   }
 
 
