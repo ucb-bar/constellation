@@ -16,7 +16,7 @@ case class ChannelParams(
   terminalInputId: Int = -1,
   terminalOutputId: Int = -1,
   useSyncReadBuffer: Boolean = false,
-  depth: Int = 1
+  depth: Int = 0
 ) {
   val nVirtualChannels = virtualChannelParams.size
   val isTerminalInput = terminalInputId >= 0

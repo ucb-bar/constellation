@@ -65,7 +65,7 @@ class OutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[ChannelPara
   }
 
   (io.credit_available zip states).zipWithIndex.map { case ((c,s),i) =>
-    c := s.c =/= 0.U || (io.out.credit_return.valid && io.out.credit_return.bits === i.U)
+    c := s.c =/= 0.U //|| (io.out.credit_return.valid && io.out.credit_return.bits === i.U)
   }
 
   states.zipWithIndex.map { case (s,i) =>
