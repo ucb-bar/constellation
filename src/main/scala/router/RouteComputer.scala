@@ -1,4 +1,4 @@
-package constellation
+package constellation.router
 
 import chisel3._
 import chisel3.util._
@@ -6,6 +6,7 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
+import constellation._
 
 class RouteComputerReq(val cParam: ChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   val src_virt_id = UInt(virtualChannelBits.W)

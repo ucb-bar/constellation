@@ -1,10 +1,11 @@
-package constellation
+package constellation.router
 
 import chisel3._
 import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 
+import constellation._
 
 class InputBuffer(val cParam: ChannelParams)(implicit val p: Parameters) extends Module with HasChannelParams {
   val io = IO(new Bundle {

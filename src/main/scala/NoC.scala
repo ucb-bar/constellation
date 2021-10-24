@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
-
+import constellation.router.{Router, RouterParams}
 
 class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   val channelParams: Seq[ChannelParams] = Seq.tabulate(nNodes, nNodes) { case (i,j) =>

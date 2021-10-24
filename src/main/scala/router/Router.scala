@@ -1,9 +1,11 @@
-package constellation
+package constellation.router
 
 import chisel3._
 import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
+
+import constellation._
 
 case class RouterParams(
   nodeId: Int,

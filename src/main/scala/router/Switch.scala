@@ -1,10 +1,12 @@
-package constellation
+package constellation.router
 
 import chisel3._
 import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
+
+import constellation._
 
 class SwitchBundle(val outParams: Seq[ChannelParams], val terminalOutParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle with HasRouterOutputParams{
   val flit = new Flit(allOutParams(0))

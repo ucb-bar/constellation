@@ -1,4 +1,4 @@
-package constellation
+package constellation.router
 
 import chisel3._
 import chisel3.util._
@@ -6,6 +6,8 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 import freechips.rocketchip.rocket.{DecodeLogic}
+
+import constellation._
 
 class VCAllocReq(val cParam: ChannelParams, val outParams: Seq[ChannelParams], val terminalOutParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle with HasChannelParams with HasRouterOutputParams{
   val in_virt_channel = UInt(virtualChannelBits.W)
