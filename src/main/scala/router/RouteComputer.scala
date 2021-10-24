@@ -44,12 +44,11 @@ class RouteComputer(val rParams: RouterParams)(implicit val p: Parameters) exten
           (0 until outParams(o).nVirtualChannels).map { outVId =>
             val table = Seq.tabulate(allInParams(i).nVirtualChannels, 1 << userBits, nNodes) {
               case (inVId, user, dest) => {
-                val r = routingFunction(allInParams(i).srcId, dest, allOutParams(o).destId, user)
-                val v = rParams.vcAllocLegalPaths(
+                val v = rParams.masterAllocTable(
                   allInParams(i).srcId, inVId,
                   outParams(o).destId, outVId,
                   dest, user)
-                ((((inVId << userBits) + user) << nodeIdBits) + dest, r && v)
+                ((((inVId << userBits) + user) << nodeIdBits) + dest, v)
               }
             }.flatten.flatten
 

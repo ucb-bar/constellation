@@ -15,8 +15,8 @@ case class NoCConfig(
 
   // srcNodeId, destNodeId => virtualChannelParams
   topology: (Int, Int) => Option[ChannelParams] = (a: Int, b: Int) => None,
-  channelAllocPolicy: ChannelAllocPolicy = ChannelAllocPolicies.allLegal,
-  routingFunctions: RoutingFunction = RoutingAlgorithms.crazy,
+  masterAllocTable: MasterAllocTable = MasterAllocTables.allLegal,
+
   // Seq[nodeId]
   inputNodes: Seq[Int] = Nil,
   // Seq[nodeId]
@@ -38,8 +38,7 @@ trait HasNoCParams {
   require(userBits >= 1)
 
   val topologyFunction = params.topology
-  val channelAllocPolicy = params.channelAllocPolicy
-  val routingFunctions = params.routingFunctions
+  val masterAllocTable = params.masterAllocTable
 
   val inputNodes = params.inputNodes
   val outputNodes = params.outputNodes

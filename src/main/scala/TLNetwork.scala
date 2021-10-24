@@ -8,7 +8,7 @@ import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.subsystem._
 import freechips.rocketchip.util._
-import constellation.topology.ChannelAllocPolicies
+import constellation.topology.MasterAllocTables
 
 
 class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Parameters) extends TLXbar {
@@ -219,7 +219,7 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
             Seq.tabulate(out.size) { i => Seq.fill(2) { outNodeMapping(i) } }).flatten,
           outputNodes = (Seq.tabulate (in.size) { i => Seq.fill(2) { inNodeMapping(i) } } ++
             Seq.tabulate(out.size) { i => Seq.fill(3) { outNodeMapping(i) } }).flatten,
-          channelAllocPolicy = ChannelAllocPolicies.virtualTLSubnetworks(p(NoCKey).channelAllocPolicy),
+          masterAllocTable = MasterAllocTables.virtualTLSubnetworks(p(NoCKey).masterAllocTable),
           topology = (src: Int, dst: Int) => p(NoCKey).topology(src, dst).map(_.copy(
             virtualChannelParams = p(NoCKey).topology(src, dst)
               .get.virtualChannelParams.map(c => Seq.fill(5) { c })

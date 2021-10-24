@@ -30,8 +30,7 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
     outParams(i),
     inputParams.filter(_.destId == i),
     outputParams.filter(_.srcId == i),
-    channelAllocPolicy(i),
-    routingFunctions(i)
+    masterAllocTable(i)
   ))) }
 
   router_nodes.zipWithIndex.map { case (dst,dstId) =>

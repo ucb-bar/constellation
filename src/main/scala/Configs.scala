@@ -34,7 +34,7 @@ class WithUniformVirtualChannelBufferSize(size: Int) extends Config((site, here,
 
 class WithNVirtualSubNetworks(n: Int) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
-    channelAllocPolicy = ChannelAllocPolicies.virtualSubnetworks(up(NoCKey, site).channelAllocPolicy, n),
+    masterAllocTable = MasterAllocTables.virtualSubnetworks(up(NoCKey, site).masterAllocTable, n),
     topology = (src: Int, dst: Int) => up(NoCKey, site).topology(src, dst).map(_.copy(
       virtualChannelParams = up(NoCKey, site).topology(src, dst)
         .get.virtualChannelParams.map(c => Seq.fill(n) { c })
@@ -72,7 +72,7 @@ class BidirectionalLineConfig(
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
     topology = TopologyConverter(Topologies.bidirectionalLine),
-    routingFunctions = RoutingAlgorithms.bidirectionalLine,
+    masterAllocTable = MasterAllocTables.bidirectionalLine,
     inputNodes = inputNodes,
     outputNodes = outputNodes
   )
@@ -86,7 +86,7 @@ class UnidirectionalTorus1DConfig(
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
     topology = TopologyConverter(Topologies.unidirectionalTorus1D(nNodes)),
-    channelAllocPolicy = ChannelAllocPolicies.unidirectionalTorus1DDateline(nNodes),
+    masterAllocTable = MasterAllocTables.unidirectionalTorus1DDateline(nNodes),
     inputNodes = inputNodes,
     outputNodes = outputNodes
   )
@@ -96,13 +96,16 @@ class BidirectionalTorus1DConfig(
   nNodes: Int = 2,
   inputNodes: Seq[Int] = Seq(0),
   outputNodes: Seq[Int] = Seq(1),
-  routingAlgo: Int => RoutingFunction = RoutingAlgorithms.bidirectionalTorus1DShortest
+  randomRoute: Boolean = false
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
     topology = TopologyConverter(Topologies.bidirectionalTorus1D(nNodes)),
-    channelAllocPolicy = ChannelAllocPolicies.bidirectionalTorus1DDateline(nNodes),
-    routingFunctions = routingAlgo(nNodes),
+    masterAllocTable = if (randomRoute) {
+      MasterAllocTables.bidirectionalTorus1DRandom(nNodes)
+    } else {
+      MasterAllocTables.bidirectionalTorus1DShortest(nNodes)
+    },
     inputNodes = inputNodes,
     outputNodes = outputNodes
   )
@@ -117,7 +120,7 @@ class ButterflyConfig(
     up(NoCKey, site).copy(
       nNodes = height * nFly,
       topology = TopologyConverter(Topologies.butterfly(kAry, nFly)),
-      routingFunctions = RoutingAlgorithms.butterfly(kAry, nFly),
+      masterAllocTable = MasterAllocTables.butterfly(kAry, nFly),
       inputNodes = (0 until height) ++ (0 until height),
       outputNodes = ((0 until height) ++ (0 until height)).map(_ + height*(nFly-1))
     )
@@ -127,14 +130,12 @@ class ButterflyConfig(
 class Mesh2DConfig(
   nX: Int = 3,
   nY: Int = 3,
-  routingAlgo: (Int, Int) => RoutingFunction = RoutingAlgorithms.mesh2DDimensionOrdered(),
-  channelAllocPolicy: (Int, Int) => ChannelAllocPolicy = (_, _) => ChannelAllocPolicies.allLegal
+  masterAllocTable: (Int, Int) => MasterAllocTable = MasterAllocTables.mesh2DDimensionOrdered()
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nX * nY,
     topology = TopologyConverter(Topologies.mesh2D(nX, nY)),
-    routingFunctions = routingAlgo(nX, nY),
-    channelAllocPolicy = channelAllocPolicy(nX, nY),
+    masterAllocTable = masterAllocTable(nX, nY),
     inputNodes = (0 until nX * nY),
     outputNodes = (0 until nX * nY)
   )
@@ -147,8 +148,7 @@ class UnidirectionalTorus2DConfig(
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nX * nY,
     topology = TopologyConverter(Topologies.unidirectionalTorus2D(nX, nY)),
-    routingFunctions = RoutingAlgorithms.dimensionOrderedUnidirectionalTorus2D(nX, nY),
-    channelAllocPolicy = ChannelAllocPolicies.unidirectionalTorus2DDateline(nX, nY),
+    masterAllocTable = MasterAllocTables.dimensionOrderedUnidirectionalTorus2DDateline(nX, nY),
     inputNodes = (0 until nX * nY),
     outputNodes = (0 until nX * nY)
   )
@@ -162,8 +162,7 @@ class BidirectionalTorus2DConfig(
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nX * nY,
     topology = TopologyConverter(Topologies.bidirectionalTorus2D(nX, nY)),
-    routingFunctions = RoutingAlgorithms.dimensionOrderedBidirectionalTorus2D(nX, nY),
-    channelAllocPolicy = ChannelAllocPolicies.bidirectionalTorus2DDateline(nX, nY),
+    masterAllocTable = MasterAllocTables.dimensionOrderedBidirectionalTorus2DDateline(nX, nY),
     inputNodes = (0 until nX * nY),
     outputNodes = (0 until nX * nY)
   )
@@ -232,10 +231,10 @@ class TestConfig17 extends Config(
 
 class TestConfig18 extends Config(
   new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
-  new BidirectionalTorus1DConfig(10, 0 until 10, 0 until 10, routingAlgo=RoutingAlgorithms.bidirectionalTorus1DRandom))
+  new BidirectionalTorus1DConfig(10, 0 until 10, 0 until 10, randomRoute = true))
 class TestConfig19 extends Config(
   new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
-  new BidirectionalTorus1DConfig(10, (0 until 10) ++ (0 until 10), (0 until 10) ++ (0 until 10), routingAlgo=RoutingAlgorithms.bidirectionalTorus1DRandom))
+  new BidirectionalTorus1DConfig(10, Seq.tabulate(20)(_ % 2), Seq.tabulate(2)(_ % 2), randomRoute = true))
 
 class TestConfig20 extends Config(
   new WithUniformVirtualChannels(1, VirtualChannelParams(5)) ++
@@ -265,7 +264,7 @@ class TestConfig27 extends Config(
   new Mesh2DConfig(5, 5))
 class TestConfig28 extends Config(
   new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
-  new Mesh2DConfig(5, 5, RoutingAlgorithms.mesh2DMinimal, ChannelAllocPolicies.mesh2DAlternatingDimensionOrdered))
+  new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DAlternatingDimensionOrdered))
 
 
 class TestConfig29 extends Config(
@@ -273,10 +272,10 @@ class TestConfig29 extends Config(
   new Mesh2DConfig(5, 5))
 class TestConfig30 extends Config(
   new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
-  new Mesh2DConfig(5, 5, RoutingAlgorithms.mesh2DWestFirst))
+  new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DWestFirst))
 class TestConfig31 extends Config(
   new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
-  new Mesh2DConfig(5, 5, RoutingAlgorithms.mesh2DNorthLast))
+  new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DNorthLast))
 
 
 class TestConfig32 extends Config(
