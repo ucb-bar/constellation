@@ -100,11 +100,12 @@ object MasterAllocTables {
     }
   }
 
+
   def mesh2DDimensionOrdered(firstDim: Int = 0)(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) = {
-    val (nxtX, nxtY) = (nxtId / nX, nxtId % nX)
-    val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
-    val (dstX, dstY) = (dstId / nX, dstId % nX)
-    val (srcX, srcY) = (srcId / nX, srcId % nX)
+    val (nxtX, nxtY)   = (nxtId % nX , nxtId / nX)
+    val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
+    val (dstX, dstY)   = (dstId % nX , dstId / nX)
+    val (srcX, srcY)   = (srcId % nX , srcId / nX)
 
     if (firstDim == 0) {
       if (dstX != nodeX) {
@@ -122,10 +123,10 @@ object MasterAllocTables {
   }
 
   private def mesh2DMinimal(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, nxtId: Int, dstId: Int, vNetId: Int) = {
-    val (nxtX, nxtY) = (nxtId / nX, nxtId % nX)
-    val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
-    val (dstX, dstY) = (dstId / nX, dstId % nX)
-    val (srcX, srcY) = (srcId / nX, srcId % nX)
+    val (nxtX, nxtY)   = (nxtId % nX , nxtId / nX)
+    val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
+    val (dstX, dstY)   = (dstId % nX , dstId / nX)
+    val (srcX, srcY)   = (srcId % nX , srcId / nX)
 
     val xR = (if (nodeX < nxtX) dstX >= nxtX else if (nodeX > nxtX) dstX <= nxtX else nodeX == nxtX)
     val yR = (if (nodeY < nxtY) dstY >= nxtY else if (nodeY > nxtY) dstY <= nxtY else nodeY == nxtY)
@@ -133,10 +134,10 @@ object MasterAllocTables {
   }
 
   def mesh2DWestFirst(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) = {
-    val (nxtX, nxtY) = (nxtId / nX, nxtId % nX)
-    val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
-    val (dstX, dstY) = (dstId / nX, dstId % nX)
-    val (srcX, srcY) = (srcId / nX, srcId % nX)
+    val (nxtX, nxtY)   = (nxtId % nX , nxtId / nX)
+    val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
+    val (dstX, dstY)   = (dstId % nX , dstId / nX)
+    val (srcX, srcY)   = (srcId % nX , srcId / nX)
 
     if (dstX < nodeX) {
       nxtX == nodeX - 1
@@ -146,10 +147,10 @@ object MasterAllocTables {
   }
 
   def mesh2DNorthLast(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) = {
-    val (nxtX, nxtY) = (nxtId / nX, nxtId % nX)
-    val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
-    val (dstX, dstY) = (dstId / nX, dstId % nX)
-    val (srcX, srcY) = (srcId / nX, srcId % nX)
+    val (nxtX, nxtY)   = (nxtId % nX , nxtId / nX)
+    val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
+    val (dstX, dstY)   = (dstId % nX , dstId / nX)
+    val (srcX, srcY)   = (srcId % nX , srcId / nX)
 
     if (dstY > nodeY && dstX != nodeX) {
       mesh2DMinimal(nX, nY)(nodeId)(srcId, nxtId, dstId, vNetId) && nxtY != nodeY + 1
@@ -163,10 +164,10 @@ object MasterAllocTables {
 
 
   def mesh2DAlternatingDimensionOrdered(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) = {
-    val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
-    val (nxtX, nxtY) = (nxtId / nX, nxtId % nX)
-    val (srcX, srcY) = (srcId / nX, srcId % nX)
-    val (dstX, dstY) = (dstId / nX, dstId % nX)
+    val (nxtX, nxtY)   = (nxtId % nX , nxtId / nX)
+    val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
+    val (dstX, dstY)   = (dstId % nX , dstId / nX)
+    val (srcX, srcY)   = (srcId % nX , srcId / nX)
 
     val turn = nxtX != srcX && nxtY != srcY
     val canRouteThis = mesh2DDimensionOrdered(srcV % 2)(nX, nY)(nodeId)(
@@ -187,10 +188,10 @@ object MasterAllocTables {
   }
 
   private def unidirectionalTorus2DDateline(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) = {
-    val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
-    val (nxtX, nxtY) = (nxtId / nX, nxtId % nX)
-    val (srcX, srcY) = (srcId / nX, srcId % nX)
-    val (dstX, dstY) = (dstId / nX, dstId % nX)
+    val (nxtX, nxtY)   = (nxtId % nX , nxtId / nX)
+    val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
+    val (dstX, dstY)   = (dstId % nX , dstId / nX)
+    val (srcX, srcY)   = (srcId % nX , srcId / nX)
 
     val turn = nxtX != srcX && nxtY != srcY
     if (srcId == -1 || turn) {
@@ -205,10 +206,10 @@ object MasterAllocTables {
   }
 
   private def bidirectionalTorus2DDateline(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) = {
-    val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
-    val (nxtX, nxtY) = (nxtId / nX, nxtId % nX)
-    val (srcX, srcY) = (srcId / nX, srcId % nX)
-    val (dstX, dstY) = (dstId / nX, dstId % nX)
+    val (nxtX, nxtY)   = (nxtId % nX , nxtId / nX)
+    val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
+    val (dstX, dstY)   = (dstId % nX , dstId / nX)
+    val (srcX, srcY)   = (srcId % nX , srcId / nX)
 
     if (srcId == -1) {
       nxtV != 0
@@ -226,10 +227,10 @@ object MasterAllocTables {
   def dimensionOrderedUnidirectionalTorus2DDateline(nX: Int, nY: Int)(nodeId: Int)(
     srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) = {
 
-    val (nxtX, nxtY) = (nxtId / nX, nxtId % nX)
-    val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
-    val (dstX, dstY) = (dstId / nX, dstId % nX)
-    val (srcX, srcY) = (srcId / nX, srcId % nX)
+    val (nxtX, nxtY)   = (nxtId % nX , nxtId / nX)
+    val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
+    val (dstX, dstY)   = (dstId % nX , dstId / nX)
+    val (srcX, srcY)   = (srcId % nX , srcId / nX)
 
     def sel = if (dstX != nodeX) {
       nxtY == nodeY
@@ -242,10 +243,10 @@ object MasterAllocTables {
   def dimensionOrderedBidirectionalTorus2DDateline(nX: Int, nY: Int)(nodeId: Int)(
     srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) = {
 
-    val (nxtX, nxtY) = (nxtId / nX, nxtId % nX)
-    val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
-    val (dstX, dstY) = (dstId / nX, dstId % nX)
-    val (srcX, srcY) = (srcId / nX, srcId % nX)
+    val (nxtX, nxtY)   = (nxtId % nX , nxtId / nX)
+    val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
+    val (dstX, dstY)   = (dstId % nX , dstId / nX)
+    val (srcX, srcY)   = (srcId % nX , srcId / nX)
 
     val xdir = bidirectionalTorus1DShortest(nX)(nodeX)(if (srcId == -1) -1 else srcX, srcV, nxtX, nxtV, dstX, vNetId)
     val ydir = bidirectionalTorus1DShortest(nY)(nodeY)(if (srcId == -1) -1 else srcY, srcV, nxtY, nxtV, dstY, vNetId)
