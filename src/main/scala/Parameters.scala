@@ -11,7 +11,7 @@ case class NoCConfig(
   nNodes: Int = 3,
   flitPayloadBits: Int = 64,
   maxFlits: Int = 8,
-  userBits: Int = 1,
+  nVirtualNetworks: Int = 1,
 
   // srcNodeId, destNodeId => virtualChannelParams
   topology: (Int, Int) => Option[ChannelParams] = (a: Int, b: Int) => None,
@@ -34,8 +34,8 @@ trait HasNoCParams {
   val nodeIdBits = log2Ceil(params.nNodes)
   val maxFlits = params.maxFlits
   val flitIdBits = log2Up(params.maxFlits+1)
-  val userBits = params.userBits
-  require(userBits >= 1)
+  val nVirtualNetworks = params.nVirtualNetworks
+  val vNetBits = log2Up(params.nVirtualNetworks)
 
   val topologyFunction = params.topology
   val masterAllocTable = params.masterAllocTable

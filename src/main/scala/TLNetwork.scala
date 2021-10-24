@@ -219,13 +219,13 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
             Seq.tabulate(out.size) { i => Seq.fill(2) { outNodeMapping(i) } }).flatten,
           outputNodes = (Seq.tabulate (in.size) { i => Seq.fill(2) { inNodeMapping(i) } } ++
             Seq.tabulate(out.size) { i => Seq.fill(3) { outNodeMapping(i) } }).flatten,
-          masterAllocTable = MasterAllocTables.virtualTLSubnetworks(p(NoCKey).masterAllocTable),
+          masterAllocTable = MasterAllocTables.virtualSubnetworks(p(NoCKey).masterAllocTable, 5),
           topology = (src: Int, dst: Int) => p(NoCKey).topology(src, dst).map(_.copy(
             virtualChannelParams = p(NoCKey).topology(src, dst)
               .get.virtualChannelParams.map(c => Seq.fill(5) { c })
               .flatten
           )),
-          userBits = 3
+          nVirtualNetworks = 5
         )
     })))
 
@@ -240,7 +240,7 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       in(i).a.ready := inA.flit.ready
       inA.flit.bits.head := firstAI(i)
       inA.flit.bits.tail := lastAI(i)
-      inA.flit.bits.user := 4.U
+      inA.flit.bits.vnet_id := 4.U
       inA.flit.bits.out_id := (in.size*2+0).U +& (requestAIIds(i) * 3.U)
       inA.flit.bits.virt_channel_id := 0.U
       inA.flit.bits.payload := in(i).a.bits.asUInt
@@ -253,7 +253,7 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       in(i).c.ready := inC.flit.ready
       inC.flit.bits.head := firstCI(i)
       inC.flit.bits.tail := lastCI(i)
-      inC.flit.bits.user := 2.U
+      inC.flit.bits.vnet_id := 2.U
       inC.flit.bits.out_id := (in.size*2+1).U +& (requestCIIds(i) * 3.U)
       inC.flit.bits.virt_channel_id := 2.U
       inC.flit.bits.payload := in(i).c.bits.asUInt
@@ -266,7 +266,7 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       in(i).e.ready := inE.flit.ready
       inE.flit.bits.head := firstEI(i)
       inE.flit.bits.tail := lastEI(i)
-      inE.flit.bits.user := 0.U
+      inE.flit.bits.vnet_id := 0.U
       inE.flit.bits.out_id := (in.size*2+2).U +& (requestEIIds(i) * 3.U)
       inE.flit.bits.virt_channel_id := 0.U
       inE.flit.bits.payload := in(i).e.bits.asUInt
@@ -287,7 +287,7 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       out(i).b.ready := inB.flit.ready
       inB.flit.bits.head := firstBO(i)
       inB.flit.bits.tail := lastBO(i)
-      inB.flit.bits.user := 3.U
+      inB.flit.bits.vnet_id := 3.U
       inB.flit.bits.out_id := 0.U +& (requestBOIds(i) * 2.U)
       inB.flit.bits.virt_channel_id := 0.U
       inB.flit.bits.payload := out(i).b.bits.asUInt
@@ -300,7 +300,7 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       out(i).d.ready := inD.flit.ready
       inD.flit.bits.head := firstDO(i)
       inD.flit.bits.tail := lastDO(i)
-      inD.flit.bits.user := 1.U
+      inD.flit.bits.vnet_id := 1.U
       inD.flit.bits.out_id := 1.U +& (requestDOIds(i) * 2.U)
       inD.flit.bits.virt_channel_id := 0.U
       inD.flit.bits.payload := out(i).d.bits.asUInt

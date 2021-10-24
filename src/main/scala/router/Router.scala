@@ -58,8 +58,8 @@ trait HasRouterParams extends HasRouterOutputParams with HasRouterInputParams
       inParam.nVirtualChannels,
       outParam.nVirtualChannels,
       nNodes,
-      1 << userBits) { case (inV, outV, destId, user) =>
-        (rParams.masterAllocTable(inParam.srcId, inV, outParam.destId, outV, destId, user) ||
+      nVirtualNetworks) { case (inV, outV, destId, vNetId) =>
+        (rParams.masterAllocTable(inParam.srcId, inV, outParam.destId, outV, destId, vNetId) ||
           (inParam.isTerminalInput && outParam.isTerminalOutput))
     }.flatten.flatten.flatten.reduce(_||_)
 

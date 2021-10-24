@@ -10,7 +10,7 @@ import constellation._
 
 class RouteComputerReq(val cParam: ChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   val src_virt_id = UInt(virtualChannelBits.W)
-  val src_user = UInt(userBits.W)
+  val src_vnet_id = UInt(vNetBits.W)
   val dest_id = UInt(nodeIdBits.W)
 }
 
@@ -42,17 +42,17 @@ class RouteComputer(val rParams: RouterParams)(implicit val p: Parameters) exten
       (0 until nAllOutputs).map { o =>
         if (o < nOutputs) {
           (0 until outParams(o).nVirtualChannels).map { outVId =>
-            val table = Seq.tabulate(allInParams(i).nVirtualChannels, 1 << userBits, nNodes) {
-              case (inVId, user, dest) => {
+            val table = Seq.tabulate(allInParams(i).nVirtualChannels, nVirtualNetworks, nNodes) {
+              case (inVId, vNetId, dest) => {
                 val v = rParams.masterAllocTable(
                   allInParams(i).srcId, inVId,
                   outParams(o).destId, outVId,
-                  dest, user)
-                ((((inVId << userBits) + user) << nodeIdBits) + dest, v)
+                  dest, vNetId)
+                ((((inVId << vNetBits) + vNetId) << nodeIdBits) + dest, v)
               }
             }.flatten.flatten
 
-            val addr = Cat(req.bits.src_virt_id, req.bits.src_user, req.bits.dest_id)
+            val addr = Cat(req.bits.src_virt_id, req.bits.src_vnet_id, req.bits.dest_id)
             resp.bits.vc_sel(o)(outVId) := table.filter(_._2).map(_._1.U === addr).orR
           }
         } else {

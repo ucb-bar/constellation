@@ -52,7 +52,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
     val ro = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
     val p = UInt(log2Up(maxBufferSize).W)
     val c = UInt(log2Up(1+maxBufferSize).W)
-    val user = UInt(userBits.W)
+    val vnet_id = UInt(vNetBits.W)
     val tail_seen = Bool()
     val dest_id = UInt(nodeIdBits.W)
   }
@@ -88,7 +88,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
     }
     states(id).p := buffer.io.head
     states(id).tail_seen := io.in.flit.bits.tail
-    states(id).user := io.in.flit.bits.user
+    states(id).vnet_id := io.in.flit.bits.vnet_id
 
   } .elsewhen (io.in.flit.fire()) {
     val id = io.in.flit.bits.virt_channel_id
@@ -104,7 +104,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
     i.valid := s.g === g_r
     i.bits.dest_id := s.dest_id
     i.bits.src_virt_id := idx.U
-    i.bits.src_user := s.user
+    i.bits.src_vnet_id := s.vnet_id
     when (i.fire()) { s.g := g_r_stall }
   }
   io.router_req <> route_arbiter.io.out

@@ -3,13 +3,13 @@ package constellation.topology
 import scala.math.pow
 
 object MasterAllocTables {
-  def allLegal(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, destId: Int, user: Int) = true
+  def allLegal(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, destId: Int, vNetId: Int) = true
 
-  def bidirectionalLine(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, user: Int) = {
+  def bidirectionalLine(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) = {
     (if (nodeId < nxtId) dstId >= nxtId else dstId <= nxtId) && nxtId != srcId
   }
 
-  def unidirectionalTorus1DDateline(nNodes: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, user: Int) = {
+  def unidirectionalTorus1DDateline(nNodes: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) = {
     if (srcId == -1)  {
       nxtV != 0
     } else if (srcV == 0) {
@@ -23,7 +23,7 @@ object MasterAllocTables {
 
 
 
-  private def bidirectionalTorus1DDateline(nNodes: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, user: Int) = {
+  private def bidirectionalTorus1DDateline(nNodes: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) = {
     if (srcId == -1)  {
       nxtV != 0
     } else if (srcV == 0) {
@@ -45,7 +45,7 @@ object MasterAllocTables {
     }
   }
 
-  def bidirectionalTorus1DShortest(nNodes: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, user: Int) = {
+  def bidirectionalTorus1DShortest(nNodes: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) = {
 
     val cwDist = (dstId + nNodes - nodeId) % nNodes
     val ccwDist = (nodeId + nNodes - dstId) % nNodes
@@ -56,10 +56,10 @@ object MasterAllocTables {
     } else {
       true
     }
-    distSel && bidirectionalTorus1DDateline(nNodes)(nodeId)(srcId, srcV, nxtId, nxtV, dstId, user)
+    distSel && bidirectionalTorus1DDateline(nNodes)(nodeId)(srcId, srcV, nxtId, nxtV, dstId, vNetId)
   }
 
-  def bidirectionalTorus1DRandom(nNodes: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, user: Int) = {
+  def bidirectionalTorus1DRandom(nNodes: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) = {
     val sel = if (srcId == -1) {
       true
     } else if ((nodeId + nNodes - srcId) % nNodes == 1) {
@@ -67,7 +67,7 @@ object MasterAllocTables {
     } else {
       (nodeId + nNodes - nxtId) % nNodes == 1
     }
-    sel && bidirectionalTorus1DDateline(nNodes)(nodeId)(srcId, srcV, nxtId, nxtV, dstId, user)
+    sel && bidirectionalTorus1DDateline(nNodes)(nodeId)(srcId, srcV, nxtId, nxtV, dstId, vNetId)
   }
 
   def butterfly(kAry: Int, nFly: Int) = {
@@ -81,7 +81,7 @@ object MasterAllocTables {
       table.map { e => (digitsToNum(e.drop(1)), digitsToNum(e.updated(i, e(0)).drop(1))) }
     }
 
-    (nodeId: Int) => (srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, user: Int) => {
+    (nodeId: Int) => (srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) => {
       val (nxtX, nxtY) = (nxtId / height, nxtId % height)
       val (nodeX, nodeY) = (nodeId / height, nodeId % height)
       val (dstX, dstY) = (dstId / height, dstId % height)
@@ -100,7 +100,7 @@ object MasterAllocTables {
     }
   }
 
-  def mesh2DDimensionOrdered(firstDim: Int = 0)(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, user: Int) = {
+  def mesh2DDimensionOrdered(firstDim: Int = 0)(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) = {
     val (nxtX, nxtY) = (nxtId / nX, nxtId % nX)
     val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
     val (dstX, dstY) = (dstId / nX, dstId % nX)
@@ -121,7 +121,7 @@ object MasterAllocTables {
     }
   }
 
-  private def mesh2DMinimal(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, nxtId: Int, dstId: Int, user: Int) = {
+  private def mesh2DMinimal(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, nxtId: Int, dstId: Int, vNetId: Int) = {
     val (nxtX, nxtY) = (nxtId / nX, nxtId % nX)
     val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
     val (dstX, dstY) = (dstId / nX, dstId % nX)
@@ -132,7 +132,7 @@ object MasterAllocTables {
     xR && yR
   }
 
-  def mesh2DWestFirst(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, user: Int) = {
+  def mesh2DWestFirst(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) = {
     val (nxtX, nxtY) = (nxtId / nX, nxtId % nX)
     val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
     val (dstX, dstY) = (dstId / nX, dstId % nX)
@@ -141,28 +141,28 @@ object MasterAllocTables {
     if (dstX < nodeX) {
       nxtX == nodeX - 1
     } else {
-      mesh2DMinimal(nX, nY)(nodeId)(srcId, nxtId, dstId, user)
+      mesh2DMinimal(nX, nY)(nodeId)(srcId, nxtId, dstId, vNetId)
     }
   }
 
-  def mesh2DNorthLast(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, user: Int) = {
+  def mesh2DNorthLast(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) = {
     val (nxtX, nxtY) = (nxtId / nX, nxtId % nX)
     val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
     val (dstX, dstY) = (dstId / nX, dstId % nX)
     val (srcX, srcY) = (srcId / nX, srcId % nX)
 
     if (dstY > nodeY && dstX != nodeX) {
-      mesh2DMinimal(nX, nY)(nodeId)(srcId, nxtId, dstId, user) && nxtY != nodeY + 1
+      mesh2DMinimal(nX, nY)(nodeId)(srcId, nxtId, dstId, vNetId) && nxtY != nodeY + 1
     } else if (dstY > nodeY) {
       nxtY == nodeY + 1
     } else {
-      mesh2DMinimal(nX, nY)(nodeId)(srcId, nxtId, dstId, user)
+      mesh2DMinimal(nX, nY)(nodeId)(srcId, nxtId, dstId, vNetId)
     }
   }
 
 
 
-  def mesh2DAlternatingDimensionOrdered(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, user: Int) = {
+  def mesh2DAlternatingDimensionOrdered(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) = {
     val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
     val (nxtX, nxtY) = (nxtId / nX, nxtId % nX)
     val (srcX, srcY) = (srcId / nX, srcId % nX)
@@ -170,9 +170,9 @@ object MasterAllocTables {
 
     val turn = nxtX != srcX && nxtY != srcY
     val canRouteThis = mesh2DDimensionOrdered(srcV % 2)(nX, nY)(nodeId)(
-      srcId, srcV, nxtId, nxtV, dstId, user)
+      srcId, srcV, nxtId, nxtV, dstId, vNetId)
     val canRouteNext = mesh2DDimensionOrdered(nxtV % 2)(nX, nY)(nodeId)(
-      srcId, dstId, nxtId, nxtV, dstId, user)
+      srcId, dstId, nxtId, nxtV, dstId, vNetId)
 
     val sel = if (srcId == -1) {
       nxtV != 0 && canRouteNext
@@ -183,10 +183,10 @@ object MasterAllocTables {
     } else {
       false
     }
-    sel && mesh2DMinimal(nX, nY)(nodeId)(srcId, nxtId, dstId, user)
+    sel && mesh2DMinimal(nX, nY)(nodeId)(srcId, nxtId, dstId, vNetId)
   }
 
-  private def unidirectionalTorus2DDateline(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, user: Int) = {
+  private def unidirectionalTorus2DDateline(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) = {
     val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
     val (nxtX, nxtY) = (nxtId / nX, nxtId % nX)
     val (srcX, srcY) = (srcId / nX, srcId % nX)
@@ -196,15 +196,15 @@ object MasterAllocTables {
     if (srcId == -1 || turn) {
       nxtV != 0
     } else if (srcX == nxtX) {
-      unidirectionalTorus1DDateline(nY)(nodeY)(srcY, srcV, nxtY, nxtV, dstY, user)
+      unidirectionalTorus1DDateline(nY)(nodeY)(srcY, srcV, nxtY, nxtV, dstY, vNetId)
     } else if (srcY == nxtY) {
-      unidirectionalTorus1DDateline(nX)(nodeX)(srcX, srcV, nxtX, nxtV, dstX, user)
+      unidirectionalTorus1DDateline(nX)(nodeX)(srcX, srcV, nxtX, nxtV, dstX, vNetId)
     } else {
       false
     }
   }
 
-  private def bidirectionalTorus2DDateline(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, user: Int) = {
+  private def bidirectionalTorus2DDateline(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) = {
     val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
     val (nxtX, nxtY) = (nxtId / nX, nxtId % nX)
     val (srcX, srcY) = (srcId / nX, srcId % nX)
@@ -213,9 +213,9 @@ object MasterAllocTables {
     if (srcId == -1) {
       nxtV != 0
     } else if (nodeX == nxtX) {
-      bidirectionalTorus1DDateline(nY)(nodeY)(srcY, srcV, nxtY, nxtV, dstY, user)
+      bidirectionalTorus1DDateline(nY)(nodeY)(srcY, srcV, nxtY, nxtV, dstY, vNetId)
     } else if (nodeY == nxtY) {
-      bidirectionalTorus1DDateline(nX)(nodeX)(srcX, srcV, nxtX, nxtV, dstX, user)
+      bidirectionalTorus1DDateline(nX)(nodeX)(srcX, srcV, nxtX, nxtV, dstX, vNetId)
     } else {
       false
     }
@@ -224,7 +224,7 @@ object MasterAllocTables {
 
 
   def dimensionOrderedUnidirectionalTorus2DDateline(nX: Int, nY: Int)(nodeId: Int)(
-    srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, user: Int) = {
+    srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) = {
 
     val (nxtX, nxtY) = (nxtId / nX, nxtId % nX)
     val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
@@ -236,47 +236,29 @@ object MasterAllocTables {
     } else {
       nxtX == nodeX
     }
-    sel && unidirectionalTorus2DDateline(nX, nY)(nodeId)(srcId, srcV, nxtId, nxtV, dstId, user)
+    sel && unidirectionalTorus2DDateline(nX, nY)(nodeId)(srcId, srcV, nxtId, nxtV, dstId, vNetId)
   }
 
   def dimensionOrderedBidirectionalTorus2DDateline(nX: Int, nY: Int)(nodeId: Int)(
-    srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, user: Int) = {
+    srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) = {
 
     val (nxtX, nxtY) = (nxtId / nX, nxtId % nX)
     val (nodeX, nodeY) = (nodeId / nX, nodeId % nX)
     val (dstX, dstY) = (dstId / nX, dstId % nX)
     val (srcX, srcY) = (srcId / nX, srcId % nX)
 
-    val xdir = bidirectionalTorus1DShortest(nX)(nodeX)(if (srcId == -1) -1 else srcX, srcV, nxtX, nxtV, dstX, user)
-    val ydir = bidirectionalTorus1DShortest(nY)(nodeY)(if (srcId == -1) -1 else srcY, srcV, nxtY, nxtV, dstY, user)
-    val base = bidirectionalTorus2DDateline(nX, nY)(nodeId)(srcId, srcV, nxtId, nxtV, dstId, user)
+    val xdir = bidirectionalTorus1DShortest(nX)(nodeX)(if (srcId == -1) -1 else srcX, srcV, nxtX, nxtV, dstX, vNetId)
+    val ydir = bidirectionalTorus1DShortest(nY)(nodeY)(if (srcId == -1) -1 else srcY, srcV, nxtY, nxtV, dstY, vNetId)
+    val base = bidirectionalTorus2DDateline(nX, nY)(nodeId)(srcId, srcV, nxtId, nxtV, dstId, vNetId)
     val sel = if (dstX != nodeX) xdir else ydir
 
     sel && base
   }
 
 
-
-  def virtualTLSubnetworks(f: MasterAllocTable)
-    (nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, destId: Int, user: Int) = {
-    if (srcV == -1) {
-      (nxtV % 5 == user &&
-        virtualSubnetworks(f, 5)(nodeId)(
-          srcId, srcV, nxtId, nxtV, destId, user))
-    } else {
-      virtualSubnetworks(f, 5)(nodeId)(
-        srcId, srcV, nxtId, nxtV, destId, user)
-    }
-  }
-
-
-
   def virtualSubnetworks(f: MasterAllocTable, n: Int)
-    (nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, destId: Int, user: Int) = {
-    val srcVNetId = srcV % n
-    val nxtVNetId = nxtV % n
-    ((srcV == -1 || srcVNetId == nxtVNetId)
-      && f(nodeId)(srcId, srcV / n, nxtId, nxtV / n, destId, user))
+    (nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, destId: Int, vNetId: Int) = {
+    (vNetId % n == nxtV) && f(nodeId)(srcId, srcV / n, nxtId, nxtV / n, destId, vNetId)
   }
 
 }

@@ -43,7 +43,7 @@ class InputGen(idx: Int, cParams: ChannelParams, inputStallProbability: Double)(
   io.out.valid := !random_delay && flits_left === 0.U && io.rob_ready
   io.out.bits.head := true.B
   io.out.bits.tail := packet_remaining === 0.U
-  io.out.bits.user := 0.U
+  io.out.bits.vnet_id := 0.U
   io.out.bits.out_id := LFSR(20) % outputNodes.size.U
   io.out.bits.virt_channel_id := idx.U
   io.out.bits.payload := (io.tsc << 16) | (io.rob_idx << 8)

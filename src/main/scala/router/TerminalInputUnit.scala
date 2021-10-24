@@ -26,7 +26,7 @@ class TerminalInputUnit(
 
   route_buffer.io.enq.bits := io.in.bits
   io.router_req.bits.src_virt_id := 0.U
-  io.router_req.bits.src_user := io.in.bits.user
+  io.router_req.bits.src_vnet_id := io.in.bits.vnet_id
   io.router_req.bits.dest_id := outIdToDestId(io.in.bits.out_id)
 
   val out_is_in = outIdToDestId(io.in.bits.out_id) === nodeId.U
