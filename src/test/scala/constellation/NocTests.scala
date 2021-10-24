@@ -6,7 +6,7 @@ import chiseltest.internal.CachingAnnotation
 import org.scalatest.ParallelTestExecution
 import org.scalatest.flatspec.AnyFlatSpec
 
-class NocTests extends AnyFlatSpec with ChiselScalatestTester with ParallelTestExecution {
+class NocTests extends AnyFlatSpec with ChiselScalatestTester { // with ParallelTestExecution {
 
   val annos = Seq(VerilatorBackendAnnotation, CachingAnnotation)
 
