@@ -218,14 +218,7 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
           inputNodes = (Seq.tabulate (in.size) { i => Seq.fill(3) { inNodeMapping(i) } } ++
             Seq.tabulate(out.size) { i => Seq.fill(2) { outNodeMapping(i) } }).flatten,
           outputNodes = (Seq.tabulate (in.size) { i => Seq.fill(2) { inNodeMapping(i) } } ++
-            Seq.tabulate(out.size) { i => Seq.fill(3) { outNodeMapping(i) } }).flatten,
-          masterAllocTable = MasterAllocTables.virtualSubnetworks(p(NoCKey).masterAllocTable, 5),
-          topology = (src: Int, dst: Int) => p(NoCKey).topology(src, dst).map(_.copy(
-            virtualChannelParams = p(NoCKey).topology(src, dst)
-              .get.virtualChannelParams.map(c => Seq.fill(5) { c })
-              .flatten
-          )),
-          nVirtualNetworks = 5
+            Seq.tabulate(out.size) { i => Seq.fill(3) { outNodeMapping(i) } }).flatten
         )
     })))
 
@@ -339,17 +332,20 @@ class ConstellationSystemBus(params: SystemBusParams, inNodeMapping: Seq[Int], o
 }
 
 class WithConstellationNoCSystemBus(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])
-    extends Config((site, here, up) => {
-  case TLNetworkTopologyLocated(InSubsystem) =>
-    up(TLNetworkTopologyLocated(InSubsystem), site).map(topo =>
-      topo match {
-        case j: JustOneBusTopologyParams =>
-          new TLBusWrapperTopology(j.instantiations.map(inst => inst match {
-            case (SBUS, sbus_params: SystemBusParams) =>
-              (SBUS, ConstellationSystemBusParams(sbus_params, inNodeMapping, outNodeMapping))
-            case a => a
-          }), j.connections)
-        case x => x
-      }
-    )
-})
+    extends Config(
+  new WithNVirtualSubNetworksWithDedicatedVirtualChannels(5) ++
+  new Config((site, here, up) => {
+    case TLNetworkTopologyLocated(InSubsystem) =>
+      up(TLNetworkTopologyLocated(InSubsystem), site).map(topo =>
+        topo match {
+          case j: JustOneBusTopologyParams =>
+            new TLBusWrapperTopology(j.instantiations.map(inst => inst match {
+              case (SBUS, sbus_params: SystemBusParams) =>
+                (SBUS, ConstellationSystemBusParams(sbus_params, inNodeMapping, outNodeMapping))
+              case a => a
+            }), j.connections)
+          case x => x
+        }
+      )
+  })
+)

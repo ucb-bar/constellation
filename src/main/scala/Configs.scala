@@ -32,14 +32,15 @@ class WithUniformVirtualChannelBufferSize(size: Int) extends Config((site, here,
   )
 })
 
-class WithNVirtualSubNetworks(n: Int) extends Config((site, here, up) => {
+class WithNVirtualSubNetworksWithDedicatedVirtualChannels(n: Int) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     masterAllocTable = MasterAllocTables.virtualSubnetworks(up(NoCKey, site).masterAllocTable, n),
     topology = (src: Int, dst: Int) => up(NoCKey, site).topology(src, dst).map(_.copy(
       virtualChannelParams = up(NoCKey, site).topology(src, dst)
         .get.virtualChannelParams.map(c => Seq.fill(n) { c })
         .flatten
-    ))
+    )),
+    nVirtualNetworks = n
   )
 })
 
