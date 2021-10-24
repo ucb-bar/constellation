@@ -1,2 +1,2 @@
-Constellation: A Chisel NoC Generator
+Constellation: A NoC Generator
 =======================================================
