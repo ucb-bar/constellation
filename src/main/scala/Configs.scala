@@ -235,7 +235,7 @@ class TestConfig18 extends Config(
   new BidirectionalTorus1DConfig(10, 0 until 10, 0 until 10, randomRoute = true))
 class TestConfig19 extends Config(
   new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
-  new BidirectionalTorus1DConfig(10, Seq.tabulate(20)(_ % 2), Seq.tabulate(2)(_ % 2), randomRoute = true))
+  new BidirectionalTorus1DConfig(10, Seq.tabulate(20)(_ % 10), Seq.tabulate(20)(_ % 10), randomRoute = true))
 
 class TestConfig20 extends Config(
   new WithUniformVirtualChannels(1, VirtualChannelParams(5)) ++

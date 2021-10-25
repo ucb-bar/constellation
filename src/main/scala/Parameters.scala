@@ -45,6 +45,12 @@ trait HasNoCParams {
   val outputIdBits = log2Up(outputNodes.size)
   val outChannelIdBits = log2Up((0 until nNodes).map { i => outputNodes.count(_ == i) }.max)
 
+
+  def inIdToInChannelId(inId: Int): Int = {
+    val t: Seq[Int] = inputNodes.zipWithIndex.map { case (e,i) => inputNodes.take(i).count(_ == e) }
+    t(inId)
+  }
+
   def outIdToDestId(outId: UInt): UInt = VecInit(outputNodes.map(_.U))(outId)
   def outIdToDestChannelId(outId: UInt): UInt = {
     VecInit(outputNodes.zipWithIndex.map { case (e,i) => outputNodes.take(i).count(_ == e).U })(outId)
