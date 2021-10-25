@@ -59,7 +59,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
   val states = Reg(Vec(nVirtualChannels, new InputState))
   val buffer = Module(new InputBuffer(cParam))
   buffer.io.in := io.in.flit
-  (0 until nVirtualChannels).map { i =>
+  (0 until nVirtualChannels).map { i => if (virtualChannelParams(i).traversable) {
     when (!io.salloc_req(i).fire() &&
       (io.in.flit.fire() && io.in.flit.bits.virt_channel_id === i.U)) {
 
@@ -69,7 +69,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
 
       states(i).c := states(i).c - 1.U
     }
-  }
+  } }
 
   when (io.in.flit.fire() && io.in.flit.bits.head) {
     val id = io.in.flit.bits.virt_channel_id
@@ -101,11 +101,16 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
     new RouteComputerReq(cParam), nVirtualChannels,
     (t: RouteComputerReq) => true.B, rr = true))
   (route_arbiter.io.in zip states).zipWithIndex.map { case ((i,s),idx) =>
-    i.valid := s.g === g_r
-    i.bits.dest_id := s.dest_id
-    i.bits.src_virt_id := idx.U
-    i.bits.src_vnet_id := s.vnet_id
-    when (i.fire()) { s.g := g_r_stall }
+    if (virtualChannelParams(idx).traversable) {
+      i.valid := s.g === g_r
+      i.bits.dest_id := s.dest_id
+      i.bits.src_virt_id := idx.U
+      i.bits.src_vnet_id := s.vnet_id
+      when (i.fire()) { s.g := g_r_stall }
+    } else {
+      i.valid := false.B
+      i.bits := DontCare
+    }
   }
   io.router_req <> route_arbiter.io.out
 
@@ -120,11 +125,16 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
     new VCAllocReq(cParam, outParams, terminalOutParams), nVirtualChannels,
     (x: VCAllocReq) => true.B, rr = true))
   (vcalloc_arbiter.io.in zip states).zipWithIndex.map { case ((i,s),idx) =>
-    i.valid := s.g === g_v
+    if (virtualChannelParams(idx).traversable) {
+      i.valid := s.g === g_v
 
-    i.bits.in_virt_channel := idx.U
-    i.bits.vc_sel := s.ro
-    when (i.fire()) { s.g := g_v_stall }
+      i.bits.in_virt_channel := idx.U
+      i.bits.vc_sel := s.ro
+      when (i.fire()) { s.g := g_v_stall }
+    } else {
+      i.valid := false.B
+      i.bits := DontCare
+    }
   }
   io.vcalloc_req <> vcalloc_arbiter.io.out
 
@@ -138,18 +148,24 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
   }
 
   (states zip io.salloc_req).zipWithIndex.map { case ((s,r),i) =>
-    val credit_available = (s.ro.asUInt & io.out_credit_available.asUInt) =/= 0.U
+    if (virtualChannelParams(i).traversable) {
+      val credit_available = (s.ro.asUInt & io.out_credit_available.asUInt) =/= 0.U
 
-    r.valid := s.g === g_a && credit_available && (s.c =/= 0.U ||
-      (io.in.flit.valid && io.in.flit.bits.virt_channel_id === i.U))
-    r.bits.vc_sel := s.ro
-    buffer.io.tail_read_req(i) := s.p
-    r.bits.tail := buffer.io.tail_read_resp(i)
-    when (r.fire()) {
-      s.p := WrapInc(s.p, virtualChannelParams(i).bufferSize)
-    }
-    when (r.fire() && buffer.io.tail_read_resp(i)) {
-      s.g := g_i
+      r.valid := s.g === g_a && credit_available && (s.c =/= 0.U ||
+        (io.in.flit.valid && io.in.flit.bits.virt_channel_id === i.U))
+      r.bits.vc_sel := s.ro
+      buffer.io.tail_read_req(i) := s.p
+      r.bits.tail := buffer.io.tail_read_resp(i)
+      when (r.fire()) {
+        s.p := WrapInc(s.p, virtualChannelParams(i).bufferSize)
+      }
+      when (r.fire() && buffer.io.tail_read_resp(i)) {
+        s.g := g_i
+      }
+    } else {
+      r.valid := false.B
+      r.bits := DontCare
+      buffer.io.tail_read_req(i) := 0.U
     }
   }
   val salloc_fires = io.salloc_req.map(_.fire())

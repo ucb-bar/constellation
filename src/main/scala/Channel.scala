@@ -6,7 +6,8 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 
 case class VirtualChannelParams(
-  bufferSize: Int = 1
+  bufferSize: Int = 1,
+  traversable: Boolean = false
 )
 
 case class ChannelParams(
@@ -21,6 +22,7 @@ case class ChannelParams(
   val nVirtualChannels = virtualChannelParams.size
   val isTerminalInput = terminalInputId >= 0
   val isTerminalOutput = terminalOutputId >= 0
+  def traversable = virtualChannelParams.map(_.traversable).reduce(_||_)
   require(!(srcId == -1 ^ isTerminalInput))
   require(!(destId == -1 ^ isTerminalOutput))
   require(!(isTerminalInput && isTerminalOutput))
@@ -67,9 +69,17 @@ class ChannelBuffer(val cParam: ChannelParams)(implicit val p: Parameters) exten
     val in = Flipped(new Channel(cParam))
     val out = new Channel(cParam)
   })
-
-  io.out.flit := Pipe(io.in.flit, cParam.depth)
-  io.in.credit_return := Pipe(io.out.credit_return, cParam.depth)
-  io.in.vc_free := Pipe(io.out.vc_free, cParam.depth)
+  if (cParam.traversable) {
+    io.out.flit := Pipe(io.in.flit, cParam.depth)
+    io.in.credit_return := Pipe(io.out.credit_return, cParam.depth)
+    io.in.vc_free := Pipe(io.out.vc_free, cParam.depth)
+  } else {
+    io.out.flit.valid := false.B
+    io.out.flit.bits := DontCare
+    io.in.credit_return.valid := false.B
+    io.in.credit_return.bits := DontCare
+    io.in.vc_free.valid := false.B
+    io.in.vc_free.bits := DontCare
+  }
 
 }

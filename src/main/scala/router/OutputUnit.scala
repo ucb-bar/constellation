@@ -51,18 +51,18 @@ class OutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[ChannelPara
   io.out.flit := io.in
 
   when (io.out.vc_free.fire()) {
-    states.zipWithIndex.map { case (s,i) =>
+    states.zipWithIndex.map { case (s,i) => if (virtualChannelParams(i).traversable) {
       when (io.out.vc_free.bits === i.U) {
         assert(s.g =/= g_i)
         s.g := g_i
         io.channel_available(i) := true.B
       }
-    }
+    } }
   }
 
-  (states zip io.allocs).map { case (s,a) =>
+  (states zip io.allocs).zipWithIndex.map { case ((s,a),i) => if (virtualChannelParams(i).traversable) {
     when (a) { s.g := g_a }
-  }
+  } }
 
   (io.credit_available zip states).zipWithIndex.map { case ((c,s),i) =>
     c := s.c =/= 0.U //|| (io.out.credit_return.valid && io.out.credit_return.bits === i.U)
@@ -71,7 +71,9 @@ class OutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[ChannelPara
   states.zipWithIndex.map { case (s,i) =>
     val free = (io.out.credit_return.valid && io.out.credit_return.bits === i.U)
     val alloc = (io.credit_alloc.valid && io.credit_alloc.bits === i.U)
-    s.c := s.c +& free - alloc
+    if (virtualChannelParams(i).traversable) {
+      s.c := s.c +& free - alloc
+    }
   }
 
 
