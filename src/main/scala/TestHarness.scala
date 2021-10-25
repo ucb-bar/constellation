@@ -146,16 +146,21 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
   io.from_noc.zipWithIndex map { case (o,i) =>
     o.flit.ready := LFSR(20) >= (outputStallProbability * (1 << 10)).toInt.U
     val rob_idx = o.flit.bits.payload(15,8)
+    val packet_valid = RegInit(false.B)
+    val packet_rob_idx = Reg(UInt(log2Ceil(robSz).W))
+
     when (o.flit.fire()) {
 
       assert(rob_valids(rob_idx), s"out[$i] unexpected response")
       assert(rob_payload(rob_idx) === o.flit.bits.payload, s"out[$i] incorrect payload");
       assert(o.flit.bits.out_id === i.U && o.flit.bits.out_id === rob_out_id(rob_idx), s"out[$i] incorrect destination")
       assert(rob_flits_returned(rob_idx) < rob_n_flits(rob_idx), s"out[$i] too many flits returned")
+      assert((!packet_valid && o.flit.bits.head) || rob_idx === packet_rob_idx)
 
       rob_flits_returned(rob_idx) := rob_flits_returned(rob_idx) + 1.U
       rob_payload(rob_idx) := rob_payload(rob_idx) + 1.U
-
+      when (o.flit.bits.head) { packet_valid := true.B; packet_rob_idx := rob_idx }
+      when (o.flit.bits.tail) { packet_valid := false.B }
     }
     rob_frees = rob_frees | ((o.flit.fire() && o.flit.bits.tail) << rob_idx)
   }
