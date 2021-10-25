@@ -257,9 +257,21 @@ object MasterAllocTables {
   }
 
 
-  def virtualSubnetworks(f: MasterAllocTable, n: Int)
+  // The below tables implement support for virtual subnetworks in a variety of ways
+  // NOTE: The topology must have sufficient virtual channels for these to work correctly
+  // TODO: Write assertions to check this
+
+  // Independent virtual subnets with no resource sharing
+  def nonblockingVirtualSubnetworks(f: MasterAllocTable, n: Int)
     (nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, destId: Int, vNetId: Int) = {
-    (vNetId % n == nxtV) && f(nodeId)(srcId, srcV / n, nxtId, nxtV / n, destId, vNetId)
+    (vNetId % n == nxtV) && f(nodeId)(srcId, srcV / n, nxtId, nxtV / n, destId, 0)
   }
 
+  // Virtual subnets with 1 dedicated virtual channel each, and some number of shared channels
+  def sharedNonblockingVirtualSubnetworks(f: MasterAllocTable, n: Int, nSharedChannels: Int)
+    (nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, destId: Int, vNetId: Int) = {
+    def trueVIdToVirtualVId(vId: Int) = if (vId < n) 0 else vId - n
+    f(nodeId)(srcId, trueVIdToVirtualVId(srcV), nxtId, trueVIdToVirtualVId(nxtV), destId, 0)
+
+  }
 }

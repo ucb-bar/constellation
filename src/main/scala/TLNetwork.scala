@@ -333,7 +333,7 @@ class ConstellationSystemBus(params: SystemBusParams, inNodeMapping: Seq[Int], o
 
 class WithConstellationNoCSystemBus(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])
     extends Config(
-  new WithNVirtualSubNetworksWithDedicatedVirtualChannels(5) ++
+  new WithNNonblockingVirtualNetworksWithSharing(5, 2) ++
   new Config((site, here, up) => {
     case TLNetworkTopologyLocated(InSubsystem) =>
       up(TLNetworkTopologyLocated(InSubsystem), site).map(topo =>

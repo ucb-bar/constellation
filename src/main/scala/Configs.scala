@@ -25,24 +25,32 @@ class WithUniformChannelDepth(depth: Int) extends Config((site, here, up) => {
 
 class WithUniformVirtualChannelBufferSize(size: Int) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(topology = (src: Int, dst: Int) =>
-    up(NoCKey, site).topology(src, dst).map(_.copy(
-      virtualChannelParams =
-        up(NoCKey, site).topology(src, dst).get.virtualChannelParams.map(_.copy(bufferSize = size))
+    up(NoCKey, site).topology(src, dst).map(u => u.copy(
+      virtualChannelParams = u.virtualChannelParams.map(_.copy(bufferSize = size))
     ))
   )
 })
 
-class WithNVirtualSubNetworksWithDedicatedVirtualChannels(n: Int) extends Config((site, here, up) => {
+class WithNNonblockingVirtualNetworks(n: Int) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
-    masterAllocTable = MasterAllocTables.virtualSubnetworks(up(NoCKey, site).masterAllocTable, n),
-    topology = (src: Int, dst: Int) => up(NoCKey, site).topology(src, dst).map(_.copy(
-      virtualChannelParams = up(NoCKey, site).topology(src, dst)
-        .get.virtualChannelParams.map(c => Seq.fill(n) { c })
-        .flatten
+    masterAllocTable = MasterAllocTables.nonblockingVirtualSubnetworks(up(NoCKey, site).masterAllocTable, n),
+    topology = (src: Int, dst: Int) => up(NoCKey, site).topology(src, dst).map(u => u.copy(
+      virtualChannelParams = u.virtualChannelParams.map(c => Seq.fill(n) { c }).flatten
     )),
     nVirtualNetworks = n
   )
 })
+
+class WithNNonblockingVirtualNetworksWithSharing(n: Int, nSharedChannels: Int = 1) extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(
+    masterAllocTable = MasterAllocTables.sharedNonblockingVirtualSubnetworks(up(NoCKey, site).masterAllocTable, n, nSharedChannels),
+    topology = (src: Int, dst: Int) => up(NoCKey, site).topology(src, dst).map(u => u.copy(
+      virtualChannelParams = Seq.fill(n) { u.virtualChannelParams(0) } ++ u.virtualChannelParams,
+    )),
+    nVirtualNetworks = n
+  )
+})
+
 
 class WithUniformVirtualChannels(n: Int, v: VirtualChannelParams) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(topology = (src: Int, dst: Int) =>
@@ -266,29 +274,32 @@ class TestConfig27 extends Config(
 class TestConfig28 extends Config(
   new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
   new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DAlternatingDimensionOrdered))
-
-
 class TestConfig29 extends Config(
-  new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
-  new Mesh2DConfig(5, 5))
+  new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
+  new Mesh2DConfig(3, 4, MasterAllocTables.mesh2DAlternatingDimensionOrdered))
+
+
 class TestConfig30 extends Config(
   new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
-  new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DWestFirst))
+  new Mesh2DConfig(5, 5))
 class TestConfig31 extends Config(
+  new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
+  new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DWestFirst))
+class TestConfig32 extends Config(
   new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
   new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DNorthLast))
 
 
-class TestConfig32 extends Config(
+class TestConfig33 extends Config(
   new WithUniformVirtualChannels(2, VirtualChannelParams(1)) ++
   new UnidirectionalTorus2DConfig(3, 3))
-class TestConfig33 extends Config(
+class TestConfig34 extends Config(
   new WithUniformVirtualChannels(3, VirtualChannelParams(3)) ++
   new UnidirectionalTorus2DConfig(3, 3))
-class TestConfig34 extends Config(
+class TestConfig35 extends Config(
   new WithUniformVirtualChannels(4, VirtualChannelParams(4)) ++
   new UnidirectionalTorus2DConfig(5, 5))
 
-class TestConfig35 extends Config(
+class TestConfig36 extends Config(
   new WithUniformVirtualChannels(2, VirtualChannelParams(1)) ++
   new BidirectionalTorus2DConfig(3, 3))

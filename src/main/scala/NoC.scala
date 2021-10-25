@@ -26,16 +26,14 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
         var positions: Seq[(Int, Int, Int)] = Seq((-1, 0, iId))
         while (positions.size != 0) {
           positions = positions.filter(_._3 != oId).map { case (srcId, srcV, nodeId) =>
-            var canRoute = false
             val nexts = outParams(nodeId).map { nxtC =>
               (0 until nxtC.nVirtualChannels).map { nxtV =>
                 val can_transition = masterAllocTable(
                   nodeId)(srcId, srcV, nxtC.destId, nxtV, oId, vNetId)
-                if (can_transition) canRoute = true
                 if (can_transition) Some((nodeId, nxtV, nxtC.destId)) else None
               }.flatten
             }.flatten
-            require(canRoute,
+            require(nexts.size > 0,
               s"Failed to route from $iId to $oId at $srcId, $srcV, $nodeId")
             nexts
           }.flatten.distinct
