@@ -64,4 +64,6 @@ class NocTest32 extends NocTest(Seq(new TestConfig32))
 class NocTest33 extends NocTest(Seq(new TestConfig33))
 class NocTest34 extends NocTest(Seq(new TestConfig34))
 class NocTest35 extends NocTest(Seq(new TestConfig35))
+class NocTest36 extends NocTest(Seq(new TestConfig36))
+class NocTest37 extends NocTest(Seq(new TestConfig37))
 

@@ -187,6 +187,22 @@ object MasterAllocTables {
     sel && mesh2DMinimal(nX, nY)(nodeId)(srcId, nxtId, dstId, vNetId)
   }
 
+  def mesh2DDimensionOrderedHighest(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) = {
+    val (nxtX, nxtY)   = (nxtId % nX , nxtId / nX)
+    val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
+    val (dstX, dstY)   = (dstId % nX , dstId / nX)
+    val (srcX, srcY)   = (srcId % nX , srcId / nX)
+
+    if (nxtV == 0) {
+      mesh2DDimensionOrdered()(nX, nY)(nodeId)(
+        srcId, srcV, nxtId, nxtV, dstId, vNetId)
+    } else if (srcId == -1) {
+      nxtV != 0 && mesh2DMinimal(nX, nY)(nodeId)(srcId, nxtId, dstId, vNetId)
+    } else {
+      nxtV <= srcV && mesh2DMinimal(nX, nY)(nodeId)(srcId, nxtId, dstId, vNetId)
+    }
+  }
+
   private def unidirectionalTorus2DDateline(nX: Int, nY: Int)(nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) = {
     val (nxtX, nxtY)   = (nxtId % nX , nxtId / nX)
     val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)

@@ -276,30 +276,33 @@ class TestConfig28 extends Config(
   new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DAlternatingDimensionOrdered))
 class TestConfig29 extends Config(
   new WithUniformVirtualChannels(4, VirtualChannelParams(5)) ++
-  new Mesh2DConfig(3, 4, MasterAllocTables.mesh2DAlternatingDimensionOrdered))
-
-
+  new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DDimensionOrderedHighest))
 class TestConfig30 extends Config(
-  new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
-  new Mesh2DConfig(5, 5))
+  new WithUniformVirtualChannels(2, VirtualChannelParams(2)) ++
+  new Mesh2DConfig(3, 3, MasterAllocTables.mesh2DDimensionOrderedHighest))
+
+
 class TestConfig31 extends Config(
   new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
-  new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DWestFirst))
+  new Mesh2DConfig(5, 5))
 class TestConfig32 extends Config(
+  new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
+  new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DWestFirst))
+class TestConfig33 extends Config(
   new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
   new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DNorthLast))
 
 
-class TestConfig33 extends Config(
+class TestConfig34 extends Config(
   new WithUniformVirtualChannels(2, VirtualChannelParams(1)) ++
   new UnidirectionalTorus2DConfig(3, 3))
-class TestConfig34 extends Config(
+class TestConfig35 extends Config(
   new WithUniformVirtualChannels(3, VirtualChannelParams(3)) ++
   new UnidirectionalTorus2DConfig(3, 3))
-class TestConfig35 extends Config(
+class TestConfig36 extends Config(
   new WithUniformVirtualChannels(4, VirtualChannelParams(4)) ++
   new UnidirectionalTorus2DConfig(5, 5))
 
-class TestConfig36 extends Config(
+class TestConfig37 extends Config(
   new WithUniformVirtualChannels(2, VirtualChannelParams(1)) ++
   new BidirectionalTorus2DConfig(3, 3))
