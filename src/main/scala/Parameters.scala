@@ -15,6 +15,8 @@ case class NoCConfig(
 
   // srcNodeId, destNodeId => virtualChannelParams
   topology: (Int, Int) => Option[ChannelParams] = (a: Int, b: Int) => None,
+  // src, dst
+  inputOutputConnectivity: (Int, Int) => Boolean = (_: Int, _: Int) => true,
   masterAllocTable: MasterAllocTable = MasterAllocTables.allLegal,
 
   // Seq[nodeId]
@@ -29,21 +31,23 @@ trait HasNoCParams {
   implicit val p: Parameters
   val params = p(NoCKey)
 
+  val inputNodes = params.inputNodes
+  val outputNodes = params.outputNodes
+
   val nNodes = params.nNodes
+  val maxFlits = params.maxFlits
+  val nVirtualNetworks = params.nVirtualNetworks
+
   val flitPayloadBits = params.flitPayloadBits
   val nodeIdBits = log2Ceil(params.nNodes)
-  val maxFlits = params.maxFlits
   val flitIdBits = log2Up(params.maxFlits+1)
-  val nVirtualNetworks = params.nVirtualNetworks
   val vNetBits = log2Up(params.nVirtualNetworks)
+  val outputIdBits = log2Up(outputNodes.size)
+  val outChannelIdBits = log2Up((0 until nNodes).map { i => outputNodes.count(_ == i) }.max)
 
   val topologyFunction = params.topology
   val masterAllocTable = params.masterAllocTable
-
-  val inputNodes = params.inputNodes
-  val outputNodes = params.outputNodes
-  val outputIdBits = log2Up(outputNodes.size)
-  val outChannelIdBits = log2Up((0 until nNodes).map { i => outputNodes.count(_ == i) }.max)
+  val inputOutputConnectivity = params.inputOutputConnectivity
 
 
   def inIdToInChannelId(inId: Int): Int = {

@@ -210,6 +210,39 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
     require(out.size == outNodeMapping.size,
       s"TL Outwards count must match mapping size ${out.size} != ${outNodeMapping.size}")
 
+
+    def isAIn (i: Int) = i <  in.size * 3 && i % 3 == 0
+    def isAOut(o: Int) = o >= in.size * 2 && (o - in.size*2) % 3 == 0
+
+    def isBIn (i: Int) = i >= in.size * 3 && (i - in.size*3) % 2 == 0
+    def isBOut(o: Int) = o <  in.size * 2 && o % 2 == 0
+
+    def isCIn (i: Int) = i <  in.size * 3 && i % 3 == 1
+    def isCOut(o: Int) = o >= in.size * 2 && (o - in.size*2) % 3 == 1
+
+    def isDIn (i: Int) = i >= in.size * 3 && (i - in.size*3) % 2 == 1
+    def isDOut(o: Int) = o <  in.size * 2 && o % 2 == 1
+
+    def isEIn (i: Int) = i <  in.size * 3 && i % 3 == 2
+    def isEOut(o: Int) = o >= in.size * 2 && (o - in.size*2) % 3 == 2
+
+
+    def connectivity(src: Int, dst: Int) = {
+      if (isAIn(src) && isAOut(dst)) {
+        connectAIO(src/3)((dst-in.size*2)/3)
+      } else if (isBIn(src) && isBOut(dst)) {
+        connectBOI((src-in.size*3)/2)(dst/2)
+      } else if (isCIn(src) && isCOut(dst)) {
+        connectCIO(src/3)((dst-in.size*2)/3)
+      } else if (isDIn(src) && isDOut(dst)) {
+        connectDOI((src-in.size*3)/2)(dst/2)
+      } else if (isEIn(src) && isEOut(dst)) {
+        connectEIO(src/3)((dst-in.size*2)/3)
+      } else {
+        false
+      }
+    }
+
     val noc = Module(new NoC()(p.alterPartial({
       case NoCKey =>
         val b = new TLBundle(wide_bundle)
@@ -218,9 +251,11 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
           inputNodes = (Seq.tabulate (in.size) { i => Seq.fill(3) { inNodeMapping(i) } } ++
             Seq.tabulate(out.size) { i => Seq.fill(2) { outNodeMapping(i) } }).flatten,
           outputNodes = (Seq.tabulate (in.size) { i => Seq.fill(2) { inNodeMapping(i) } } ++
-            Seq.tabulate(out.size) { i => Seq.fill(3) { outNodeMapping(i) } }).flatten
+            Seq.tabulate(out.size) { i => Seq.fill(3) { outNodeMapping(i) } }).flatten,
+          inputOutputConnectivity = connectivity
         )
     })))
+
 
     for (i <- 0 until in.size) {
       val inA  = noc.io.in (i*3)

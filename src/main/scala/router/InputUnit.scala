@@ -189,6 +189,10 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
   io.out.bits.out_virt_channel := RegNext(virt_channel)
   io.out.bits.out_channel := RegNext(OHToUInt(channel_oh))
 
+  (0 until nVirtualChannels).map { i =>
+    if (!virtualChannelParams(i).traversable) states(i) := DontCare
+  }
+
   when (reset.asBool) {
     states.foreach(_.g := g_i)
     states.foreach(_.c := 0.U)
