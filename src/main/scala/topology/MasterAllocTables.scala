@@ -176,7 +176,7 @@ object MasterAllocTables {
       srcId, dstId, nxtId, nxtV, dstId, vNetId)
 
     val sel = if (srcId == -1) {
-      nxtV != 0 && canRouteNext
+      canRouteNext
     } else if (canRouteThis) {
       nxtV % 2 == srcV % 2 && nxtV <= srcV
     } else if (canRouteNext) {

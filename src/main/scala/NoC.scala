@@ -57,14 +57,14 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
         if (traversableVirtualChannels.contains((cP.srcId, vId, cP.destId))) {
           true
         } else {
-          println(s"Untraversable ${cP.srcId}, $vId, ${cP.destId}")
+          println(s"WARNING, virtual channel $vId from ${cP.srcId} to ${cP.destId} appears to be untraversable")
           false
         }
       )
     }
   )}
   channelParams.map(cP => if (!cP.traversable)
-    println(s"WARNING, channel from $cP.srcId to $cP.destId appears to be untraversable"))
+    println(s"WARNING, physical channel from ${cP.srcId} to ${cP.destId} appears to be untraversable"))
   val inParams = (0 until nNodes).map { i => channelParams.filter(_.destId == i) }
   val outParams = (0 until nNodes).map { i => channelParams.filter(_.srcId == i) }
 
