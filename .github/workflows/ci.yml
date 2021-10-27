@@ -28,13 +28,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 22 and 26 are skipped because they ran out of memory
+        # 22 and 26, 27 and 28 are skipped because they ran out of memory
         config: [
             "00", "01", "02", "03", "04", "05", "06", "07", "08", "09",
             "10", "11", "12", "13", "14", "15", "16", "17", "18", "19",
             "20", "21",
             "23", "24", "25",
-            "27",
             "29",
             "30", "31", "32", "33", "34", "35"
         ]
