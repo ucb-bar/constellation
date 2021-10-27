@@ -1,0 +1,41 @@
+name: constellation
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # 22 and 26 are skipped because they ran out of memory
+        config: [
+            "00", "01", "02", "03", "04", "05", "06", "07", "08", "09",
+            "10", "11", "12", "13", "14", "15", "16", "17", "18", "19",
+            "20", "21",
+            "23", "24", "25",
+            "27", "28", "29",
+            "30", "31", "32", "33", "34", "35"
+        ]
+    env:
+      JAVA_TOOL_OPTIONS: -Xmx4G -Xss8M
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install Verilator
+      run: |
+        sudo apt-get install -y verilator
+        verilator --version
+    - name: Set up JDK 11
+      uses: actions/setup-java@v1
+      with:
+        java-version: 11
+
+    - name: Compile
+      run: sbt compile
+
+    - name: Unit Tests
+      run: sbt "testOnly constellation.NocTest${{ matrix.config }}"
