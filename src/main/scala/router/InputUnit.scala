@@ -176,16 +176,16 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
   val salloc_fire_id = OHToUInt(salloc_fires)
   val salloc_fire = salloc_fires.reduce(_||_)
   assert(PopCount(salloc_fires) <= 1.U)
-  buffer.io.read_req.valid := salloc_fire
-  buffer.io.read_req.bits.addr := Mux1H(salloc_fires, states.map(_.p))
-  buffer.io.read_req.bits.channel := salloc_fire_id
+  buffer.io.read_req.valid := RegNext(salloc_fire)
+  buffer.io.read_req.bits.addr := RegNext(Mux1H(salloc_fires, states.map(_.p)))
+  buffer.io.read_req.bits.channel := RegNext(salloc_fire_id)
 
   io.in.credit_return.valid := salloc_fire
   io.in.credit_return.bits := salloc_fire_id
   io.in.vc_free.valid := salloc_fire && buffer.io.tail_read_resp(salloc_fire_id)
   io.in.vc_free.bits := salloc_fire_id
 
-  io.out.valid := RegNext(buffer.io.read_req.valid)
+  io.out.valid := buffer.io.read_req.valid
   io.out.bits.flit := buffer.io.read_resp
   val ro = Mux1H(salloc_fires, states.map(_.ro))
   val channel_oh = ro.map(_.reduce(_||_))
