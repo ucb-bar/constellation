@@ -16,8 +16,6 @@ case class ChannelParams(
   virtualChannelParams: Seq[VirtualChannelParams] = Seq(VirtualChannelParams()),
   terminalInputId: Int = -1,
   terminalOutputId: Int = -1,
-  useSyncReadBuffer: Boolean = false,
-  bypassRCVA: Boolean = false,
   depth: Int = 0
 ) {
   val nVirtualChannels = virtualChannelParams.size

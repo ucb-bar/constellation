@@ -73,13 +73,13 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
     val out = MixedVec(outputParams.map { u => new IOChannel(u) })
   })
 
-  val router_nodes = Seq.tabulate(nNodes) { i => Module(new Router(RouterParams(
-    i,
-    inParams(i),
-    outParams(i),
-    inputParams.filter(_.destId == i),
-    outputParams.filter(_.srcId == i),
-    masterAllocTable(i)
+  val router_nodes = Seq.tabulate(nNodes) { i => Module(new Router(routerParams(i).copy(
+    nodeId = i,
+    inParams = inParams(i),
+    outParams = outParams(i),
+    terminalInParams = inputParams.filter(_.destId == i),
+    terminalOutParams = outputParams.filter(_.srcId == i),
+    masterAllocTable = masterAllocTable(i),
   ))) }
 
   router_nodes.zipWithIndex.map { case (dst,dstId) =>

@@ -38,7 +38,9 @@ abstract class AbstractInputUnit(
   def io: AbstractInputUnitIO
 }
 
-class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOutParams: Seq[ChannelParams])
+class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
+  terminalOutParams: Seq[ChannelParams],
+  combineRCVA: Boolean, combineSAST: Boolean)
   (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, terminalOutParams)(p) {
   require(!isTerminalInputChannel)
 
@@ -130,7 +132,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
       i.bits.in_virt_channel := idx.U
       i.bits.vc_sel := s.ro
 
-      if (cParam.bypassRCVA) {
+      if (combineRCVA) {
         when (io.router_resp.fire() && io.router_resp.bits.src_virt_id === idx.U) {
           i.valid := true.B
           i.bits.vc_sel := io.router_resp.bits.vc_sel
@@ -154,9 +156,12 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
   (states zip io.salloc_req).zipWithIndex.map { case ((s,r),i) =>
     if (virtualChannelParams(i).traversable) {
       val credit_available = (s.ro.asUInt & io.out_credit_available.asUInt) =/= 0.U
-
-      r.valid := s.g === g_a && credit_available && (s.c =/= 0.U ||
-        (io.in.flit.valid && io.in.flit.bits.virt_channel_id === i.U))
+      val bypass_input = if (combineSAST) {
+        false.B
+      } else {
+        io.in.flit.valid && io.in.flit.bits.virt_channel_id === i.U
+      }
+      r.valid := s.g === g_a && credit_available && (s.c =/= 0.U || bypass_input)
       r.bits.vc_sel := s.ro
       buffer.io.tail_read_req(i) := s.p
       r.bits.tail := buffer.io.tail_read_resp(i)
@@ -176,22 +181,43 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
   val salloc_fire_id = OHToUInt(salloc_fires)
   val salloc_fire = salloc_fires.reduce(_||_)
   assert(PopCount(salloc_fires) <= 1.U)
-  buffer.io.read_req.valid := RegNext(salloc_fire)
-  buffer.io.read_req.bits.addr := RegNext(Mux1H(salloc_fires, states.map(_.p)))
-  buffer.io.read_req.bits.channel := RegNext(salloc_fire_id)
 
   io.in.credit_return.valid := salloc_fire
   io.in.credit_return.bits := salloc_fire_id
   io.in.vc_free.valid := salloc_fire && buffer.io.tail_read_resp(salloc_fire_id)
   io.in.vc_free.bits := salloc_fire_id
 
-  io.out.valid := buffer.io.read_req.valid
-  io.out.bits.flit := buffer.io.read_resp
+
+  class OutBundle extends Bundle {
+    val valid = Bool()
+    val p = UInt(log2Up(maxBufferSize).W)
+    val vid = UInt(virtualChannelBits.W)
+    val out_vid = UInt(log2Up(allOutParams.map(_.nVirtualChannels).max).W)
+    val out_id = UInt(log2Up(nAllOutputs).W)
+  }
+
+  val salloc_out = if (combineSAST) {
+    Wire(new OutBundle)
+  } else {
+    Reg(new OutBundle)
+  }
+  salloc_out.valid := salloc_fire
+  salloc_out.p := Mux1H(salloc_fires, states.map(_.p))
+  salloc_out.vid := salloc_fire_id
   val ro = Mux1H(salloc_fires, states.map(_.ro))
   val channel_oh = ro.map(_.reduce(_||_))
   val virt_channel = Mux1H(channel_oh, ro.map(v => OHToUInt(v)))
-  io.out.bits.out_virt_channel := RegNext(virt_channel)
-  io.out.bits.out_channel := RegNext(OHToUInt(channel_oh))
+  salloc_out.out_vid := virt_channel
+  salloc_out.out_id := OHToUInt(channel_oh)
+
+  buffer.io.read_req.valid := salloc_out.valid
+  buffer.io.read_req.bits.addr := salloc_out.p
+  buffer.io.read_req.bits.channel := salloc_out.vid
+
+  io.out.valid := buffer.io.read_req.valid
+  io.out.bits.flit := buffer.io.read_resp
+  io.out.bits.out_virt_channel := salloc_out.out_vid
+  io.out.bits.out_channel := salloc_out.out_id
 
   (0 until nVirtualChannels).map { i =>
     if (!virtualChannelParams(i).traversable) states(i) := DontCare

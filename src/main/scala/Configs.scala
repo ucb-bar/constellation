@@ -17,9 +17,15 @@ object TopologyConverter {
 // Manually call TopologyConverter for now
 import TopologyConverter._
 
-class WithBypassRCVA extends Config((site, here, up) => {
-  case NoCKey => up(NoCKey, site).copy(topology = (src: Int, dst: Int) =>
-    up(NoCKey, site).topology(src, dst).map(_.copy(bypassRCVA = true))
+class WithCombineRCVA extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(routerParams = (i: Int) =>
+    up(NoCKey, site).routerParams(i).copy(combineRCVA = true)
+  )
+})
+
+class WithCombineSAST extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(routerParams = (i: Int) =>
+    up(NoCKey, site).routerParams(i).copy(combineSAST = true)
   )
 })
 
@@ -291,32 +297,41 @@ class TestConfig30 extends Config(
   new WithUniformVirtualChannels(2, VirtualChannelParams(2)) ++
   new Mesh2DConfig(3, 3, MasterAllocTables.mesh2DDimensionOrderedHighest))
 class TestConfig31 extends Config(
-  new WithBypassRCVA ++
+  new WithCombineRCVA ++
+  new WithUniformVirtualChannels(2, VirtualChannelParams(2)) ++
+  new Mesh2DConfig(3, 3, MasterAllocTables.mesh2DDimensionOrderedHighest))
+class TestConfig32 extends Config(
+  new WithCombineSAST ++
+  new WithUniformVirtualChannels(2, VirtualChannelParams(2)) ++
+  new Mesh2DConfig(3, 3, MasterAllocTables.mesh2DDimensionOrderedHighest))
+class TestConfig33 extends Config(
+  new WithCombineSAST ++
+  new WithCombineRCVA ++
   new WithUniformVirtualChannels(2, VirtualChannelParams(2)) ++
   new Mesh2DConfig(3, 3, MasterAllocTables.mesh2DDimensionOrderedHighest))
 
 
-class TestConfig32 extends Config(
+class TestConfig34 extends Config(
   new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
   new Mesh2DConfig(5, 5))
-class TestConfig33 extends Config(
+class TestConfig35 extends Config(
   new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
   new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DWestFirst))
-class TestConfig34 extends Config(
+class TestConfig36 extends Config(
   new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
   new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DNorthLast))
 
 // 2D Torus
-class TestConfig35 extends Config(
+class TestConfig37 extends Config(
   new WithUniformVirtualChannels(2, VirtualChannelParams(1)) ++
   new UnidirectionalTorus2DConfig(3, 3))
-class TestConfig36 extends Config(
+class TestConfig38 extends Config(
   new WithUniformVirtualChannels(3, VirtualChannelParams(3)) ++
   new UnidirectionalTorus2DConfig(3, 3))
-class TestConfig37 extends Config(
+class TestConfig39 extends Config(
   new WithUniformVirtualChannels(4, VirtualChannelParams(4)) ++
   new UnidirectionalTorus2DConfig(5, 5))
 
-class TestConfig38 extends Config(
+class TestConfig40 extends Config(
   new WithUniformVirtualChannels(2, VirtualChannelParams(1)) ++
   new BidirectionalTorus2DConfig(3, 3))

@@ -6,6 +6,7 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 
 import constellation.topology._
+import constellation.router._
 
 case class NoCConfig(
   nNodes: Int = 3,
@@ -18,6 +19,7 @@ case class NoCConfig(
   // src, dst
   inputOutputConnectivity: (Int, Int) => Boolean = (_: Int, _: Int) => true,
   masterAllocTable: MasterAllocTable = MasterAllocTables.allLegal,
+  routerParams: Int => RouterParams = (i: Int) => RouterParams(i, Nil, Nil, Nil, Nil, (_,_,_,_,_,_) => false, false, false),
 
   // Seq[nodeId]
   inputNodes: Seq[Int] = Nil,
@@ -48,6 +50,7 @@ trait HasNoCParams {
   val topologyFunction = params.topology
   val masterAllocTable = params.masterAllocTable
   val inputOutputConnectivity = params.inputOutputConnectivity
+  val routerParams = params.routerParams
 
 
   def inIdToInChannelId(inId: Int): Int = {

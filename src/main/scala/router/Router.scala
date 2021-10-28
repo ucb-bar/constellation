@@ -13,7 +13,9 @@ case class RouterParams(
   outParams: Seq[ChannelParams],
   terminalInParams: Seq[ChannelParams],
   terminalOutParams: Seq[ChannelParams],
-  masterAllocTable: (Int, Int, Int, Int, Int, Int) => Boolean
+  masterAllocTable: (Int, Int, Int, Int, Int, Int) => Boolean,
+  combineSAST: Boolean = false,
+  combineRCVA: Boolean = false,
 )
 
 trait HasRouterOutputParams extends HasNoCParams {
@@ -83,10 +85,10 @@ class Router(val rP: RouterParams)(implicit val p: Parameters) extends Module wi
   require(nodeId < (1 << nodeIdBits))
 
   val input_units = inParams.zipWithIndex.map { case (u,i) =>
-    Module(new InputUnit(u, outParams, terminalOutParams))
+    Module(new InputUnit(u, outParams, terminalOutParams, rP.combineRCVA, rP.combineSAST))
       .suggestName(s"input_unit_${i}_from_${u.srcId}") }
   val terminal_input_units = terminalInParams.zipWithIndex.map { case (u,i) =>
-    Module(new TerminalInputUnit(u, outParams, terminalOutParams))
+    Module(new TerminalInputUnit(u, outParams, terminalOutParams, rP.combineRCVA, rP.combineSAST))
       .suggestName(s"terminal_input_unit_${i+nInputs}_from_${u.terminalInputId}") }
   val all_input_units = input_units ++ terminal_input_units
 

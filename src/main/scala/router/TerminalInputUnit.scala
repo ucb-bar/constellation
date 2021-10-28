@@ -11,7 +11,9 @@ import constellation._
 class TerminalInputUnit(
   cParam: ChannelParams,
   outParams: Seq[ChannelParams],
-  terminalOutParams: Seq[ChannelParams])
+  terminalOutParams: Seq[ChannelParams],
+  combineRCVA: Boolean,
+  combineSAST: Boolean)
   (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, terminalOutParams)(p) {
 
   require(isTerminalInputChannel && !isTerminalOutputChannel)
@@ -23,7 +25,7 @@ class TerminalInputUnit(
 
   val route_buffer = Module(new Queue(new Flit(cParam), 2))
   val route_q = Module(new Queue(new RouteComputerResp(cParam, outParams, terminalOutParams), 2,
-    flow=cParam.bypassRCVA))
+    flow=combineRCVA))
 
   route_buffer.io.enq.bits := io.in.bits
   io.router_req.bits.src_virt_id := 0.U
@@ -89,10 +91,16 @@ class TerminalInputUnit(
   vcalloc_buffer.io.deq.ready := io.salloc_req(0).ready && vcalloc_q.io.deq.valid && c
   vcalloc_q.io.deq.ready := vcalloc_tail && vcalloc_buffer.io.deq.fire()
 
-  io.out.valid := RegNext(vcalloc_buffer.io.deq.fire())
-  io.out.bits.flit := RegNext(vcalloc_buffer.io.deq.bits)
-  val out_channel_oh = vcalloc_q.io.deq.bits.vc_sel.map(_.reduce(_||_))
-  io.out.bits.out_virt_channel := RegNext(Mux1H(out_channel_oh, vcalloc_q.io.deq.bits.vc_sel.map(v => OHToUInt(v))))
-  io.out.bits.out_channel := RegNext(OHToUInt(out_channel_oh))
+  val out_bundle = if (combineSAST) {
+    Wire(Valid(new SwitchBundle(outParams, terminalOutParams)))
+  } else {
+    Reg(Valid(new SwitchBundle(outParams, terminalOutParams)))
+  }
+  io.out := out_bundle
 
+  out_bundle.valid := vcalloc_buffer.io.deq.fire()
+  out_bundle.bits.flit := vcalloc_buffer.io.deq.bits
+  val out_channel_oh = vcalloc_q.io.deq.bits.vc_sel.map(_.reduce(_||_))
+  out_bundle.bits.out_virt_channel := Mux1H(out_channel_oh, vcalloc_q.io.deq.bits.vc_sel.map(v => OHToUInt(v)))
+  out_bundle.bits.out_channel := OHToUInt(out_channel_oh)
 }
