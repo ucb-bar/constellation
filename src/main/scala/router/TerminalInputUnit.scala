@@ -22,7 +22,8 @@ class TerminalInputUnit(
   })
 
   val route_buffer = Module(new Queue(new Flit(cParam), 2))
-  val route_q = Module(new Queue(new RouteComputerResp(cParam, outParams, terminalOutParams), 2))
+  val route_q = Module(new Queue(new RouteComputerResp(cParam, outParams, terminalOutParams), 2,
+    flow=cParam.bypassRCVA))
 
   route_buffer.io.enq.bits := io.in.bits
   io.router_req.bits.src_virt_id := 0.U

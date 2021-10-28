@@ -127,9 +127,16 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
   (vcalloc_arbiter.io.in zip states).zipWithIndex.map { case ((i,s),idx) =>
     if (virtualChannelParams(idx).traversable) {
       i.valid := s.g === g_v
-
       i.bits.in_virt_channel := idx.U
       i.bits.vc_sel := s.ro
+
+      if (cParam.bypassRCVA) {
+        when (io.router_resp.fire() && io.router_resp.bits.src_virt_id === idx.U) {
+          i.valid := true.B
+          i.bits.vc_sel := io.router_resp.bits.vc_sel
+        }
+      }
+
       when (i.fire()) { s.g := g_v_stall }
     } else {
       i.valid := false.B
@@ -140,9 +147,6 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams], terminalOu
 
   when (io.vcalloc_resp.fire()) {
     val id = io.vcalloc_resp.bits.in_virt_channel
-    assert(states(id).g.isOneOf(g_v, g_v_stall))
-
-
     states(id).ro := io.vcalloc_resp.bits.vc_sel
     states(id).g := g_a
   }
