@@ -194,7 +194,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     val p = UInt(log2Up(maxBufferSize).W)
     val vid = UInt(virtualChannelBits.W)
     val out_vid = UInt(log2Up(allOutParams.map(_.nVirtualChannels).max).W)
-    val out_id = UInt(nAllOutputs.W)
+    val out_id = Vec(nAllOutputs, Bool())
   }
 
   val salloc_out = if (combineSAST) {
@@ -209,7 +209,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   val channel_oh = ro.map(_.reduce(_||_))
   val virt_channel = Mux1H(channel_oh, ro.map(v => OHToUInt(v)))
   salloc_out.out_vid := virt_channel
-  salloc_out.out_id := channel_oh.asUInt
+  salloc_out.out_id := VecInit(channel_oh)
 
   buffer.io.read_req.valid := salloc_out.valid
   buffer.io.read_req.bits.addr := salloc_out.p
