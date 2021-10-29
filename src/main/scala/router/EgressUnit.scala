@@ -8,12 +8,12 @@ import freechips.rocketchip.util._
 
 import constellation._
 
-class TerminalOutputUnit(inParams: Seq[ChannelParams], terminalInParams: Seq[ChannelParams], cParam: ChannelParams)
-  (implicit p: Parameters) extends AbstractOutputUnit(inParams, terminalInParams, cParam)(p) {
+class EgressUnit(inParams: Seq[ChannelParams], ingressParams: Seq[ChannelParams], cParam: ChannelParams)
+  (implicit p: Parameters) extends AbstractOutputUnit(inParams, ingressParams, cParam)(p) {
 
   require(nVirtualChannels == 1)
 
-  val io = IO(new AbstractOutputUnitIO(inParams, terminalInParams, cParam) {
+  val io = IO(new AbstractOutputUnitIO(inParams, ingressParams, cParam) {
     val out = Decoupled(new Flit(cParam))
   })
 

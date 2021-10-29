@@ -17,14 +17,15 @@ case class NoCConfig(
   // srcNodeId, destNodeId => virtualChannelParams
   topology: (Int, Int) => Option[ChannelParams] = (a: Int, b: Int) => None,
   // src, dst
-  inputOutputConnectivity: (Int, Int) => Boolean = (_: Int, _: Int) => true,
+  terminalConnectivity: (Int, Int) => Boolean = (_: Int, _: Int) => true,
   masterAllocTable: MasterAllocTable = MasterAllocTables.allLegal,
-  routerParams: Int => RouterParams = (i: Int) => RouterParams(i, Nil, Nil, Nil, Nil, (_,_,_,_,_,_) => false, false, false),
+  routerParams: Int => RouterParams =
+    (i: Int) => RouterParams(i, Nil, Nil, Nil, Nil, (_,_,_,_,_,_) => false, false, false),
 
   // Seq[nodeId]
-  inputNodes: Seq[Int] = Nil,
+  ingressNodes: Seq[Int] = Nil,
   // Seq[nodeId]
-  outputNodes: Seq[Int] = Nil
+  egressNodes: Seq[Int] = Nil
 )
 
 case object NoCKey extends Field[NoCConfig](NoCConfig())
@@ -33,8 +34,8 @@ trait HasNoCParams {
   implicit val p: Parameters
   val params = p(NoCKey)
 
-  val inputNodes = params.inputNodes
-  val outputNodes = params.outputNodes
+  val ingressNodes = params.ingressNodes
+  val egressNodes = params.egressNodes
 
   val nNodes = params.nNodes
   val maxFlits = params.maxFlits
@@ -44,23 +45,24 @@ trait HasNoCParams {
   val nodeIdBits = log2Ceil(params.nNodes)
   val flitIdBits = log2Up(params.maxFlits+1)
   val vNetBits = log2Up(params.nVirtualNetworks)
-  val outputIdBits = log2Up(outputNodes.size)
-  val outChannelIdBits = log2Up((0 until nNodes).map { i => outputNodes.count(_ == i) }.max)
+  val egressIdBits = log2Up(egressNodes.size)
 
   val topologyFunction = params.topology
   val masterAllocTable = params.masterAllocTable
-  val inputOutputConnectivity = params.inputOutputConnectivity
+  val terminalConnectivity = params.terminalConnectivity
   val routerParams = params.routerParams
 
 
-  def inIdToInChannelId(inId: Int): Int = {
-    val t: Seq[Int] = inputNodes.zipWithIndex.map { case (e,i) => inputNodes.take(i).count(_ == e) }
-    t(inId)
+  def ingressIdToIngressChannelId(ingressId: Int): Int = {
+    val t: Seq[Int] = ingressNodes.zipWithIndex.map { case (e,i) =>
+      ingressNodes.take(i).count(_ == e) }
+    t(ingressId)
   }
 
-  def outIdToDestId(outId: UInt): UInt = VecInit(outputNodes.map(_.U))(outId)
-  def outIdToDestChannelId(outId: UInt): UInt = {
-    VecInit(outputNodes.zipWithIndex.map { case (e,i) => outputNodes.take(i).count(_ == e).U })(outId)
+  def egressIdToDestId(egressId: UInt): UInt = VecInit(egressNodes.map(_.U))(egressId)
+  def egressIdToEgressChannelId(egressId: UInt): UInt = {
+    VecInit(egressNodes.zipWithIndex.map { case (e,i) =>
+      egressNodes.take(i).count(_ == e).U })(egressId)
   }
 
 }

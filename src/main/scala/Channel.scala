@@ -14,17 +14,17 @@ case class ChannelParams(
   srcId: Int,
   destId: Int,
   virtualChannelParams: Seq[VirtualChannelParams] = Seq(VirtualChannelParams()),
-  terminalInputId: Int = -1,
-  terminalOutputId: Int = -1,
+  ingressId: Int = -1,
+  egressId: Int = -1,
   depth: Int = 0
 ) {
   val nVirtualChannels = virtualChannelParams.size
-  val isTerminalInput = terminalInputId >= 0
-  val isTerminalOutput = terminalOutputId >= 0
+  val isIngress = ingressId >= 0
+  val isEgress = egressId >= 0
   def traversable = virtualChannelParams.map(_.traversable).reduce(_||_)
-  require(!(srcId == -1 ^ isTerminalInput))
-  require(!(destId == -1 ^ isTerminalOutput))
-  require(!(isTerminalInput && isTerminalOutput))
+  require(!(srcId == -1 ^ isIngress))
+  require(!(destId == -1 ^ isEgress))
+  require(!(isIngress && isEgress))
 }
 
 trait HasChannelParams extends HasNoCParams {
@@ -36,9 +36,9 @@ trait HasChannelParams extends HasNoCParams {
 
   val maxBufferSize = virtualChannelParams.map(_.bufferSize).max
 
-  val isTerminalInputChannel = cParam.isTerminalInput
-  val isTerminalOutputChannel = cParam.isTerminalOutput
-  val isTerminalChannel = isTerminalInputChannel || isTerminalOutputChannel
+  val isIngressChannel = cParam.isIngress
+  val isEgressChannel = cParam.isEgress
+  val isTerminalChannel = isIngressChannel || isEgressChannel
 }
 
 class Channel(val cParam: ChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
@@ -49,7 +49,7 @@ class Channel(val cParam: ChannelParams)(implicit val p: Parameters) extends Bun
   val vc_free = Input(Valid(UInt(virtualChannelBits.W)))
 }
 
-class IOChannel(val cParam: ChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
+class TerminalChannel(val cParam: ChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   require(isTerminalChannel)
 
   val flit = Decoupled(new Flit(cParam))

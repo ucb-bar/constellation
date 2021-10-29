@@ -11,27 +11,28 @@ import constellation._
 class AbstractInputUnitIO(
   val cParam: ChannelParams,
   val outParams: Seq[ChannelParams],
-  val terminalOutParams: Seq[ChannelParams]
-)(implicit val p: Parameters) extends Bundle with HasRouterOutputParams with HasChannelParams {
+  val egressParams: Seq[ChannelParams]
+)(implicit val p: Parameters) extends Bundle
+    with HasRouterOutputParams with HasChannelParams {
   val nodeId = cParam.destId
 
   val router_req = Decoupled(new RouteComputerReq(cParam))
-  val router_resp = Flipped(Valid(new RouteComputerResp(cParam, outParams, terminalOutParams)))
+  val router_resp = Flipped(Valid(new RouteComputerResp(cParam, outParams, egressParams)))
 
-  val vcalloc_req = Decoupled(new VCAllocReq(cParam, outParams, terminalOutParams))
-  val vcalloc_resp = Flipped(Valid(new VCAllocResp(cParam, outParams, terminalOutParams)))
+  val vcalloc_req = Decoupled(new VCAllocReq(cParam, outParams, egressParams))
+  val vcalloc_resp = Flipped(Valid(new VCAllocResp(cParam, outParams, egressParams)))
 
   val out_credit_available = Input(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) }))
 
-  val salloc_req = Vec(nVirtualChannels, Decoupled(new SwitchAllocReq(outParams, terminalOutParams)))
+  val salloc_req = Vec(nVirtualChannels, Decoupled(new SwitchAllocReq(outParams, egressParams)))
 
-  val out = Valid(new SwitchBundle(outParams, terminalOutParams))
+  val out = Valid(new SwitchBundle(outParams, egressParams))
 }
 
 abstract class AbstractInputUnit(
   val cParam: ChannelParams,
   val outParams: Seq[ChannelParams],
-  val terminalOutParams: Seq[ChannelParams]
+  val egressParams: Seq[ChannelParams]
 )(implicit val p: Parameters) extends Module with HasRouterOutputParams with HasChannelParams {
   val nodeId = cParam.destId
 
@@ -39,12 +40,12 @@ abstract class AbstractInputUnit(
 }
 
 class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
-  terminalOutParams: Seq[ChannelParams],
+  egressParams: Seq[ChannelParams],
   combineRCVA: Boolean, combineSAST: Boolean)
-  (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, terminalOutParams)(p) {
-  require(!isTerminalInputChannel)
+  (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, egressParams)(p) {
+  require(!isIngressChannel)
 
-  val io = IO(new AbstractInputUnitIO(cParam, outParams, terminalOutParams) {
+  val io = IO(new AbstractInputUnitIO(cParam, outParams, egressParams) {
     val in = Flipped(new Channel(cParam))
   })
   val g_i :: g_r :: g_r_stall :: g_v :: g_v_stall :: g_a :: g_c :: Nil = Enum(7)
@@ -78,12 +79,12 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     assert(id < nVirtualChannels.U)
     assert(states(id).g === g_i)
 
-    val dest_id = outIdToDestId(io.in.flit.bits.out_id)
+    val dest_id = egressIdToDestId(io.in.flit.bits.egress_id)
     states(id).g := Mux(dest_id === nodeId.U, g_v, g_r)
     states(id).dest_id := dest_id
     states(id).ro.foreach(_.foreach(_ := false.B))
-    val term_id = outIdToDestChannelId(io.in.flit.bits.out_id)
-    for (o <- 0 until nTerminalOutputs) {
+    val term_id = egressIdToEgressChannelId(io.in.flit.bits.egress_id)
+    for (o <- 0 until nEgress) {
       when (term_id === o.U) {
         states(id).ro(o+nOutputs)(0) := true.B
       }
@@ -124,7 +125,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   }
 
   val vcalloc_arbiter = Module(new GrantHoldArbiter(
-    new VCAllocReq(cParam, outParams, terminalOutParams), nVirtualChannels,
+    new VCAllocReq(cParam, outParams, egressParams), nVirtualChannels,
     (x: VCAllocReq) => true.B, rr = true))
   (vcalloc_arbiter.io.in zip states).zipWithIndex.map { case ((i,s),idx) =>
     if (virtualChannelParams(idx).traversable) {

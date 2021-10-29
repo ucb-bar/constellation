@@ -9,12 +9,14 @@ import freechips.rocketchip.rocket.{DecodeLogic}
 
 import constellation._
 
-class VCAllocReq(val cParam: ChannelParams, val outParams: Seq[ChannelParams], val terminalOutParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle with HasChannelParams with HasRouterOutputParams{
+class VCAllocReq(val cParam: ChannelParams, val outParams: Seq[ChannelParams], val egressParams: Seq[ChannelParams])
+  (implicit val p: Parameters) extends Bundle with HasChannelParams with HasRouterOutputParams{
   val in_virt_channel = UInt(virtualChannelBits.W)
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
 }
 
-class VCAllocResp(val cParam: ChannelParams, val outParams: Seq[ChannelParams], val terminalOutParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle with HasChannelParams with HasRouterOutputParams {
+class VCAllocResp(val cParam: ChannelParams, val outParams: Seq[ChannelParams], val egressParams: Seq[ChannelParams])
+  (implicit val p: Parameters) extends Bundle with HasChannelParams with HasRouterOutputParams {
   val in_virt_channel = UInt(virtualChannelBits.W)
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
 }
@@ -69,9 +71,9 @@ class VCAllocator(val rP: RouterParams)(implicit val p: Parameters) extends Modu
     with HasRouterParams {
   val io = IO(new Bundle {
     val req = MixedVec(allInParams.map { u =>
-      Flipped(Decoupled(new VCAllocReq(u, outParams, terminalOutParams))) })
+      Flipped(Decoupled(new VCAllocReq(u, outParams, egressParams))) })
     val resp = MixedVec(allInParams.map { u =>
-      Valid(new VCAllocResp(u, outParams, terminalOutParams)) })
+      Valid(new VCAllocResp(u, outParams, egressParams)) })
 
     val channel_available = MixedVec(allOutParams.map { u =>
       Vec(u.nVirtualChannels, Input(Bool())) })

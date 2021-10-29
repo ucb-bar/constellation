@@ -16,7 +16,7 @@ class RouteComputerReq(val cParam: ChannelParams)(implicit val p: Parameters) ex
 
 class RouteComputerResp(val cParam: ChannelParams,
   val outParams: Seq[ChannelParams],
-  val terminalOutParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle
+  val egressParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle
     with HasChannelParams with HasRouterOutputParams {
 
   val src_virt_id = UInt(virtualChannelBits.W)
@@ -28,7 +28,7 @@ class RouteComputerResp(val cParam: ChannelParams,
 class RouteComputer(val rP: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
   val io = IO(new Bundle {
     val req = MixedVec(allInParams.map { u => Flipped(Decoupled(new RouteComputerReq(u))) })
-    val resp = MixedVec(allInParams.map { u => Valid(new RouteComputerResp(u, outParams, terminalOutParams)) })
+    val resp = MixedVec(allInParams.map { u => Valid(new RouteComputerResp(u, outParams, egressParams)) })
   })
 
   (io.req zip io.resp).zipWithIndex.map { case ((req, resp), i) =>

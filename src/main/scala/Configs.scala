@@ -75,49 +75,49 @@ class WithUniformVirtualChannels(n: Int, v: VirtualChannelParams) extends Config
 
 class UnidirectionalLineConfig(
   nNodes: Int = 2,
-  inputNodes: Seq[Int] = Seq(0),
-  outputNodes: Seq[Int] = Seq(1)
+  ingressNodes: Seq[Int] = Seq(0),
+  egressNodes: Seq[Int] = Seq(1)
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
     topology = TopologyConverter(Topologies.unidirectionalLine),
-    inputNodes = inputNodes,
-    outputNodes = outputNodes
+    ingressNodes = ingressNodes,
+    egressNodes = egressNodes
   )
 })
 
 class BidirectionalLineConfig(
   nNodes: Int = 2,
-  inputNodes: Seq[Int] = Seq(0, 1),
-  outputNodes: Seq[Int] = Seq(0, 1),
+  ingressNodes: Seq[Int] = Seq(0, 1),
+  egressNodes: Seq[Int] = Seq(0, 1),
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
     topology = TopologyConverter(Topologies.bidirectionalLine),
     masterAllocTable = MasterAllocTables.bidirectionalLine,
-    inputNodes = inputNodes,
-    outputNodes = outputNodes
+    ingressNodes = ingressNodes,
+    egressNodes = egressNodes
   )
 })
 
 class UnidirectionalTorus1DConfig(
   nNodes: Int = 2,
-  inputNodes: Seq[Int] = Seq(0),
-  outputNodes: Seq[Int] = Seq(1),
+  ingressNodes: Seq[Int] = Seq(0),
+  egressNodes: Seq[Int] = Seq(1),
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
     topology = TopologyConverter(Topologies.unidirectionalTorus1D(nNodes)),
     masterAllocTable = MasterAllocTables.unidirectionalTorus1DDateline(nNodes),
-    inputNodes = inputNodes,
-    outputNodes = outputNodes
+    ingressNodes = ingressNodes,
+    egressNodes = egressNodes
   )
 })
 
 class BidirectionalTorus1DConfig(
   nNodes: Int = 2,
-  inputNodes: Seq[Int] = Seq(0),
-  outputNodes: Seq[Int] = Seq(1),
+  ingressNodes: Seq[Int] = Seq(0),
+  egressNodes: Seq[Int] = Seq(1),
   randomRoute: Boolean = false
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
@@ -128,8 +128,8 @@ class BidirectionalTorus1DConfig(
     } else {
       MasterAllocTables.bidirectionalTorus1DShortest(nNodes)
     },
-    inputNodes = inputNodes,
-    outputNodes = outputNodes
+    ingressNodes = ingressNodes,
+    egressNodes = egressNodes
   )
 })
 
@@ -143,8 +143,8 @@ class ButterflyConfig(
       nNodes = height * nFly,
       topology = TopologyConverter(Topologies.butterfly(kAry, nFly)),
       masterAllocTable = MasterAllocTables.butterfly(kAry, nFly),
-      inputNodes = (0 until height) ++ (0 until height),
-      outputNodes = ((0 until height) ++ (0 until height)).map(_ + height*(nFly-1))
+      ingressNodes = (0 until height) ++ (0 until height),
+      egressNodes = ((0 until height) ++ (0 until height)).map(_ + height*(nFly-1))
     )
   }
 })
@@ -158,8 +158,8 @@ class Mesh2DConfig(
     nNodes = nX * nY,
     topology = TopologyConverter(Topologies.mesh2D(nX, nY)),
     masterAllocTable = masterAllocTable(nX, nY),
-    inputNodes = (0 until nX * nY),
-    outputNodes = (0 until nX * nY)
+    ingressNodes = (0 until nX * nY),
+    egressNodes = (0 until nX * nY)
   )
 })
 
@@ -171,8 +171,8 @@ class UnidirectionalTorus2DConfig(
     nNodes = nX * nY,
     topology = TopologyConverter(Topologies.unidirectionalTorus2D(nX, nY)),
     masterAllocTable = MasterAllocTables.dimensionOrderedUnidirectionalTorus2DDateline(nX, nY),
-    inputNodes = (0 until nX * nY),
-    outputNodes = (0 until nX * nY)
+    ingressNodes = (0 until nX * nY),
+    egressNodes = (0 until nX * nY)
   )
 })
 
@@ -185,8 +185,8 @@ class BidirectionalTorus2DConfig(
     nNodes = nX * nY,
     topology = TopologyConverter(Topologies.bidirectionalTorus2D(nX, nY)),
     masterAllocTable = MasterAllocTables.dimensionOrderedBidirectionalTorus2DDateline(nX, nY),
-    inputNodes = (0 until nX * nY),
-    outputNodes = (0 until nX * nY)
+    ingressNodes = (0 until nX * nY),
+    egressNodes = (0 until nX * nY)
   )
 })
 

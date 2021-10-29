@@ -248,28 +248,28 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
         val b = new TLBundle(wide_bundle)
         p(NoCKey).copy(
           flitPayloadBits = Seq(b.a, b.b, b.c, b.d, b.e).map(_.bits.getWidth).max,
-          inputNodes = (Seq.tabulate (in.size) { i => Seq.fill(3) { inNodeMapping(i) } } ++
+          ingressNodes = (Seq.tabulate (in.size) { i => Seq.fill(3) { inNodeMapping(i) } } ++
             Seq.tabulate(out.size) { i => Seq.fill(2) { outNodeMapping(i) } }).flatten,
-          outputNodes = (Seq.tabulate (in.size) { i => Seq.fill(2) { inNodeMapping(i) } } ++
+          egressNodes = (Seq.tabulate (in.size) { i => Seq.fill(2) { inNodeMapping(i) } } ++
             Seq.tabulate(out.size) { i => Seq.fill(3) { outNodeMapping(i) } }).flatten,
-          inputOutputConnectivity = connectivity
+          terminalConnectivity = connectivity
         )
     })))
 
 
     for (i <- 0 until in.size) {
-      val inA  = noc.io.in (i*3)
-      val outB = noc.io.out(i*2)
-      val inC  = noc.io.in (i*3+1)
-      val outD = noc.io.out(i*2+1)
-      val inE  = noc.io.in (i*3+2)
+      val inA  = noc.io.ingress (i*3)
+      val outB = noc.io.egress  (i*2)
+      val inC  = noc.io.ingress (i*3+1)
+      val outD = noc.io.egress  (i*2+1)
+      val inE  = noc.io.ingress (i*3+2)
 
       inA.flit.valid := in(i).a.valid
       in(i).a.ready := inA.flit.ready
       inA.flit.bits.head := firstAI(i)
       inA.flit.bits.tail := lastAI(i)
       inA.flit.bits.vnet_id := 4.U
-      inA.flit.bits.out_id := (in.size*2+0).U +& (requestAIIds(i) * 3.U)
+      inA.flit.bits.egress_id := (in.size*2+0).U +& (requestAIIds(i) * 3.U)
       inA.flit.bits.virt_channel_id := 0.U
       inA.flit.bits.payload := in(i).a.bits.asUInt
 
@@ -282,7 +282,7 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       inC.flit.bits.head := firstCI(i)
       inC.flit.bits.tail := lastCI(i)
       inC.flit.bits.vnet_id := 2.U
-      inC.flit.bits.out_id := (in.size*2+1).U +& (requestCIIds(i) * 3.U)
+      inC.flit.bits.egress_id := (in.size*2+1).U +& (requestCIIds(i) * 3.U)
       inC.flit.bits.virt_channel_id := 2.U
       inC.flit.bits.payload := in(i).c.bits.asUInt
 
@@ -295,17 +295,17 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       inE.flit.bits.head := firstEI(i)
       inE.flit.bits.tail := lastEI(i)
       inE.flit.bits.vnet_id := 0.U
-      inE.flit.bits.out_id := (in.size*2+2).U +& (requestEIIds(i) * 3.U)
+      inE.flit.bits.egress_id := (in.size*2+2).U +& (requestEIIds(i) * 3.U)
       inE.flit.bits.virt_channel_id := 0.U
       inE.flit.bits.payload := in(i).e.bits.asUInt
     }
 
     for (i <- 0 until out.size) {
-      val outA  = noc.io.out(in.size*2+i*3)
-      val inB   = noc.io.in (in.size*3+i*2)
-      val outC  = noc.io.out(in.size*2+i*3+1)
-      val inD   = noc.io.in (in.size*3+i*2+1)
-      val outE  = noc.io.out(in.size*2+i*3+2)
+      val outA  = noc.io.egress  (in.size*2+i*3)
+      val inB   = noc.io.ingress (in.size*3+i*2)
+      val outC  = noc.io.egress  (in.size*2+i*3+1)
+      val inD   = noc.io.ingress (in.size*3+i*2+1)
+      val outE  = noc.io.egress  (in.size*2+i*3+2)
 
       out(i).a.valid := outA.flit.valid
       outA.flit.ready := out(i).a.ready
@@ -316,7 +316,7 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       inB.flit.bits.head := firstBO(i)
       inB.flit.bits.tail := lastBO(i)
       inB.flit.bits.vnet_id := 3.U
-      inB.flit.bits.out_id := 0.U +& (requestBOIds(i) * 2.U)
+      inB.flit.bits.egress_id := 0.U +& (requestBOIds(i) * 2.U)
       inB.flit.bits.virt_channel_id := 0.U
       inB.flit.bits.payload := out(i).b.bits.asUInt
 
@@ -329,7 +329,7 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       inD.flit.bits.head := firstDO(i)
       inD.flit.bits.tail := lastDO(i)
       inD.flit.bits.vnet_id := 1.U
-      inD.flit.bits.out_id := 1.U +& (requestDOIds(i) * 2.U)
+      inD.flit.bits.egress_id := 1.U +& (requestDOIds(i) * 2.U)
       inD.flit.bits.virt_channel_id := 0.U
       inD.flit.bits.payload := out(i).d.bits.asUInt
 

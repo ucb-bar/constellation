@@ -11,8 +11,8 @@ case class RouterParams(
   nodeId: Int,
   inParams: Seq[ChannelParams],
   outParams: Seq[ChannelParams],
-  terminalInParams: Seq[ChannelParams],
-  terminalOutParams: Seq[ChannelParams],
+  ingressParams: Seq[ChannelParams],
+  egressParams: Seq[ChannelParams],
   masterAllocTable: (Int, Int, Int, Int, Int, Int) => Boolean,
   combineSAST: Boolean = false,
   combineRCVA: Boolean = false,
@@ -20,23 +20,23 @@ case class RouterParams(
 
 trait HasRouterOutputParams extends HasNoCParams {
   val outParams: Seq[ChannelParams]
-  val terminalOutParams: Seq[ChannelParams]
+  val egressParams: Seq[ChannelParams]
 
-  def allOutParams = outParams ++ terminalOutParams
+  def allOutParams = outParams ++ egressParams
 
   def nOutputs = outParams.size
-  def nTerminalOutputs = terminalOutParams.size
+  def nEgress = egressParams.size
   def nAllOutputs = allOutParams.size
 }
 
 trait HasRouterInputParams extends HasNoCParams {
   val inParams: Seq[ChannelParams]
-  val terminalInParams: Seq[ChannelParams]
+  val ingressParams: Seq[ChannelParams]
 
-  def allInParams = inParams ++ terminalInParams
+  def allInParams = inParams ++ ingressParams
 
   def nInputs = inParams.size
-  def nTerminalInputs = terminalInParams.size
+  def nIngress = ingressParams.size
   def nAllInputs = allInParams.size
 }
 
@@ -46,8 +46,8 @@ trait HasRouterParams extends HasRouterOutputParams with HasRouterInputParams
   val nodeId = rP.nodeId
   val inParams = rP.inParams
   val outParams = rP.outParams
-  val terminalInParams = rP.terminalInParams
-  val terminalOutParams = rP.terminalOutParams
+  val ingressParams = rP.ingressParams
+  val egressParams = rP.egressParams
 
   def possibleTransition(inParam: ChannelParams, outParam: ChannelParams): Boolean = {
 
@@ -62,7 +62,7 @@ trait HasRouterParams extends HasRouterOutputParams with HasRouterInputParams
       nNodes,
       nVirtualNetworks) { case (inV, outV, destId, vNetId) =>
         (rP.masterAllocTable(inParam.srcId, inV, outParam.destId, outV, destId, vNetId) ||
-          (inParam.isTerminalInput && outParam.isTerminalOutput))
+          (inParam.isIngress && outParam.isEgress))
     }.flatten.flatten.flatten.reduce(_||_)
 
     legalVirtualTransition
@@ -75,9 +75,9 @@ class Router(val rP: RouterParams)(implicit val p: Parameters) extends Module wi
 
   val io = IO(new Bundle {
     val in = MixedVec(inParams.map { u => Flipped(new Channel(u)) })
-    val terminal_in = MixedVec(terminalInParams.map { u => Flipped(new IOChannel(u)) })
+    val ingress = MixedVec(ingressParams.map { u => Flipped(new TerminalChannel(u)) })
     val out = MixedVec(outParams.map { u => new Channel(u) })
-    val terminal_out = MixedVec(terminalOutParams.map { u => new IOChannel(u) })
+    val egress = MixedVec(egressParams.map { u => new TerminalChannel(u) })
   })
 
   require(nAllInputs >= 1)
@@ -85,20 +85,20 @@ class Router(val rP: RouterParams)(implicit val p: Parameters) extends Module wi
   require(nodeId < (1 << nodeIdBits))
 
   val input_units = inParams.zipWithIndex.map { case (u,i) =>
-    Module(new InputUnit(u, outParams, terminalOutParams, rP.combineRCVA, rP.combineSAST))
+    Module(new InputUnit(u, outParams, egressParams, rP.combineRCVA, rP.combineSAST))
       .suggestName(s"input_unit_${i}_from_${u.srcId}") }
-  val terminal_input_units = terminalInParams.zipWithIndex.map { case (u,i) =>
-    Module(new TerminalInputUnit(u, outParams, terminalOutParams, rP.combineRCVA, rP.combineSAST))
-      .suggestName(s"terminal_input_unit_${i+nInputs}_from_${u.terminalInputId}") }
-  val all_input_units = input_units ++ terminal_input_units
+  val ingress_units = ingressParams.zipWithIndex.map { case (u,i) =>
+    Module(new IngressUnit(u, outParams, egressParams, rP.combineRCVA, rP.combineSAST))
+      .suggestName(s"ingress_unit_${i+nInputs}_from_${u.ingressId}") }
+  val all_input_units = input_units ++ ingress_units
 
   val output_units = outParams.zipWithIndex.map { case (u,i) =>
-    Module(new OutputUnit(inParams, terminalInParams, u))
+    Module(new OutputUnit(inParams, ingressParams, u))
       .suggestName(s"output_unit_${i}_to_${u.destId}")}
-  val terminal_output_units = terminalOutParams.zipWithIndex.map { case (u,i) =>
-    Module(new TerminalOutputUnit(inParams, terminalInParams, u))
-      .suggestName(s"terminal_output_unit_${i+nOutputs}_to_${u.terminalOutputId}")}
-  val all_output_units = output_units ++ terminal_output_units
+  val egress_units = egressParams.zipWithIndex.map { case (u,i) =>
+    Module(new EgressUnit(inParams, ingressParams, u))
+      .suggestName(s"egress_unit_${i+nOutputs}_to_${u.egressId}")}
+  val all_output_units = output_units ++ egress_units
 
   val switch = Module(new Switch(rP))
   val switch_allocator = Module(new SwitchAllocator(rP))
@@ -107,11 +107,11 @@ class Router(val rP: RouterParams)(implicit val p: Parameters) extends Module wi
 
   (io.in zip input_units).foreach {
     case (i,u) => u.io.in <> i }
-  (io.terminal_in zip terminal_input_units).foreach {
+  (io.ingress zip ingress_units).foreach {
     case (i,u) => u.io.in <> i.flit }
   (output_units zip io.out).foreach {
     case (u,o) => o <> u.io.out }
-  (terminal_output_units zip io.terminal_out).foreach {
+  (egress_units zip io.egress).foreach {
     case (u,o) => o.flit <> u.io.out }
 
   (route_computer.io.req zip all_input_units).foreach {

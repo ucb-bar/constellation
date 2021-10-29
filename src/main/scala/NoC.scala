@@ -12,11 +12,11 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   }.flatten.flatten
   def fullInParams = (0 until nNodes).map { i => fullChannelParams.filter(_.destId == i) }
   def fullOutParams = (0 until nNodes).map { i => fullChannelParams.filter(_.srcId == i) }
-  val inputParams = inputNodes.zipWithIndex.map { case (nId,i) =>
-    ChannelParams(-1, nId, Seq(VirtualChannelParams(-1)), terminalInputId=i)
+  val ingressParams = ingressNodes.zipWithIndex.map { case (nId,i) =>
+    ChannelParams(-1, nId, Seq(VirtualChannelParams(-1)), ingressId=i)
   }
-  val outputParams = outputNodes.zipWithIndex.map { case (nId,i) =>
-    ChannelParams(nId, -1, Seq(VirtualChannelParams(-1)), terminalOutputId=i)
+  val egressParams = egressNodes.zipWithIndex.map { case (nId,i) =>
+    ChannelParams(nId, -1, Seq(VirtualChannelParams(-1)), egressId=i)
   }
 
   // Check sanity of masterAllocTable, all inputs can route to all outputs
@@ -26,9 +26,9 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   var traversableVirtualChannels: Set[Pos] = Set[Pos]()
 
   for (vNetId <- 0 until nVirtualNetworks) {
-    inputNodes.zipWithIndex.map { case (iId,iIdx) =>
-      outputNodes.zipWithIndex.map { case (oId,oIdx) =>
-        if (inputOutputConnectivity(iIdx, oIdx)) {
+    ingressNodes.zipWithIndex.map { case (iId,iIdx) =>
+      egressNodes.zipWithIndex.map { case (oId,oIdx) =>
+        if (terminalConnectivity(iIdx, oIdx)) {
           var positions: Set[Pos] = Set((-1, 0, iId))
           while (positions.size != 0) {
             positions = positions.filter(_._3 != oId).map { case (srcId, srcV, nodeId) =>
@@ -69,16 +69,16 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   val outParams = (0 until nNodes).map { i => channelParams.filter(_.srcId == i) }
 
   val io = IO(new Bundle {
-    val in = MixedVec(inputParams.map { u => Flipped(new IOChannel(u)) })
-    val out = MixedVec(outputParams.map { u => new IOChannel(u) })
+    val ingress = MixedVec(ingressParams.map { u => Flipped(new TerminalChannel(u)) })
+    val egress = MixedVec(egressParams.map { u => new TerminalChannel(u) })
   })
 
   val router_nodes = Seq.tabulate(nNodes) { i => Module(new Router(routerParams(i).copy(
     nodeId = i,
     inParams = inParams(i),
     outParams = outParams(i),
-    terminalInParams = inputParams.filter(_.destId == i),
-    terminalOutParams = outputParams.filter(_.srcId == i),
+    ingressParams = ingressParams.filter(_.destId == i),
+    egressParams = egressParams.filter(_.srcId == i),
     masterAllocTable = masterAllocTable(i),
   ))) }
 
@@ -89,11 +89,11 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
         in.cParam
       )
     }
-    (dst.terminalInParams zip dst.io.terminal_in) map { case (u,i) =>
-      i <> io.in(u.terminalInputId)
+    (dst.ingressParams zip dst.io.ingress) map { case (u,i) =>
+      i <> io.ingress(u.ingressId)
     }
-    (dst.terminalOutParams zip dst.io.terminal_out) map { case (u,i) =>
-      io.out(u.terminalOutputId) <> i
+    (dst.egressParams zip dst.io.egress) map { case (u,i) =>
+      io.egress(u.egressId) <> i
     }
   }
 }

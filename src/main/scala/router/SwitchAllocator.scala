@@ -8,7 +8,8 @@ import freechips.rocketchip.util._
 
 import constellation._
 
-class SwitchAllocReq(val outParams: Seq[ChannelParams], val terminalOutParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle with HasRouterOutputParams {
+class SwitchAllocReq(val outParams: Seq[ChannelParams], val egressParams: Seq[ChannelParams])
+  (implicit val p: Parameters) extends Bundle with HasRouterOutputParams {
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
   val tail = Bool()
 }
@@ -16,14 +17,14 @@ class SwitchAllocReq(val outParams: Seq[ChannelParams], val terminalOutParams: S
 class SwitchAllocator(val rP: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
   val io = IO(new Bundle {
     val req = MixedVec(allInParams.map(u =>
-      Vec(u.nVirtualChannels, Flipped(Decoupled(new SwitchAllocReq(outParams, terminalOutParams))))))
+      Vec(u.nVirtualChannels, Flipped(Decoupled(new SwitchAllocReq(outParams, egressParams))))))
     val credit_alloc = MixedVec(outParams.map { u => Valid(UInt(log2Up(u.nVirtualChannels).W)) })
   })
   val nInputChannels = allInParams.map(_.nVirtualChannels).sum
 
   val in_arbs = io.req.map { r =>
     val arb = Module(new GrantHoldArbiter(
-      new SwitchAllocReq(outParams, terminalOutParams),
+      new SwitchAllocReq(outParams, egressParams),
       r.size,
       (d: SwitchAllocReq) => d.tail,
       rr = true
@@ -32,7 +33,7 @@ class SwitchAllocator(val rP: RouterParams)(implicit val p: Parameters) extends 
     arb
   }
   val arbs = Seq.fill(nAllOutputs) { Module(new GrantHoldArbiter(
-    new SwitchAllocReq(outParams, terminalOutParams),
+    new SwitchAllocReq(outParams, egressParams),
     nAllInputs,
     (d: SwitchAllocReq) => d.tail,
     rr = true

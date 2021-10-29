@@ -44,7 +44,7 @@ class InputGen(idx: Int, cParams: ChannelParams, inputStallProbability: Double)(
   io.out.bits.head := true.B
   io.out.bits.tail := packet_remaining === 0.U
   io.out.bits.vnet_id := 0.U
-  io.out.bits.out_id := LFSR(20) % outputNodes.size.U
+  io.out.bits.egress_id := LFSR(20) % egressNodes.size.U
   io.out.bits.virt_channel_id := idx.U
   io.out.bits.payload := (io.tsc << 16) | (io.rob_idx << 8)
 
@@ -60,7 +60,7 @@ class InputGen(idx: Int, cParams: ChannelParams, inputStallProbability: Double)(
     io.out.valid := !random_delay
     io.out.bits.head := false.B
     io.out.bits.tail := flits_left === 1.U
-    io.out.bits.out_id := head_flit.out_id
+    io.out.bits.egress_id := head_flit.egress_id
     io.out.bits.payload := head_flit.payload | flits_fired
     when (io.out.fire()) {
       flits_fired := flits_fired + 1.U
@@ -78,8 +78,8 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
   val outputStallProbability = 0.0
 
   val io = IO(new Bundle {
-    val to_noc = MixedVec(inputParams.map { u => new IOChannel(u) })
-    val from_noc = MixedVec(outputParams.map { u => Flipped(new IOChannel(u)) })
+    val to_noc = MixedVec(inputParams.map { u => new TerminalChannel(u) })
+    val from_noc = MixedVec(outputParams.map { u => Flipped(new TerminalChannel(u)) })
     val success = Output(Bool())
   })
 
@@ -102,13 +102,13 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
 
   class RobEntry extends Bundle {
     val payload = UInt(flitPayloadBits.W)
-    val out_id = UInt(log2Ceil(nOutputs).W)
+    val egress_id = UInt(log2Ceil(nOutputs).W)
     val n_flits = UInt(flitIdBits.W)
     val flits_returned = UInt(flitIdBits.W)
   }
 
   val rob_payload = Reg(Vec(robSz, UInt(flitPayloadBits.W)))
-  val rob_out_id = Reg(Vec(robSz, UInt(log2Ceil(nOutputs).W)))
+  val rob_egress_id = Reg(Vec(robSz, UInt(log2Ceil(nOutputs).W)))
   val rob_n_flits = Reg(Vec(robSz, UInt(flitIdBits.W)))
   val rob_flits_returned = Reg(Vec(robSz, UInt(flitIdBits.W)))
   val rob_valids = RegInit(0.U(robSz.W))
@@ -135,7 +135,7 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
     i.flit <> igen.io.out
     when (igen.io.fire) {
       rob_payload(rob_idx) := igen.io.out.bits.payload
-      rob_out_id(rob_idx) := igen.io.out.bits.out_id
+      rob_egress_id(rob_idx) := igen.io.out.bits.egress_id
       rob_n_flits(rob_idx) := igen.io.n_flits
       rob_flits_returned(rob_idx) := 0.U
     }
@@ -153,7 +153,7 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
 
       assert(rob_valids(rob_idx), s"out[$i] unexpected response")
       assert(rob_payload(rob_idx) === o.flit.bits.payload, s"out[$i] incorrect payload");
-      assert(o.flit.bits.out_id === i.U && o.flit.bits.out_id === rob_out_id(rob_idx), s"out[$i] incorrect destination")
+      assert(o.flit.bits.egress_id === i.U && o.flit.bits.egress_id === rob_egress_id(rob_idx), s"out[$i] incorrect destination")
       assert(rob_flits_returned(rob_idx) < rob_n_flits(rob_idx), s"out[$i] too many flits returned")
       assert((!packet_valid && o.flit.bits.head) || rob_idx === packet_rob_idx)
 
@@ -179,8 +179,8 @@ class TestHarness(implicit val p: Parameters) extends Module {
   })
 
   val noc = Module(new NoC)
-  val noc_tester = Module(new NoCTester(noc.inputParams, noc.outputParams))
-  noc.io.in <> noc_tester.io.to_noc
-  noc_tester.io.from_noc <> noc.io.out
+  val noc_tester = Module(new NoCTester(noc.ingressParams, noc.egressParams))
+  noc.io.ingress <> noc_tester.io.to_noc
+  noc_tester.io.from_noc <> noc.io.egress
   io.success := noc_tester.io.success
 }

@@ -8,31 +8,31 @@ import freechips.rocketchip.util._
 
 import constellation._
 
-class TerminalInputUnit(
+class IngressUnit(
   cParam: ChannelParams,
   outParams: Seq[ChannelParams],
-  terminalOutParams: Seq[ChannelParams],
+  egressParams: Seq[ChannelParams],
   combineRCVA: Boolean,
   combineSAST: Boolean)
-  (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, terminalOutParams)(p) {
+  (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, egressParams)(p) {
 
-  require(isTerminalInputChannel && !isTerminalOutputChannel)
+  require(isIngressChannel)
   require(nVirtualChannels == 1)
 
-  val io = IO(new AbstractInputUnitIO(cParam, outParams, terminalOutParams) {
+  val io = IO(new AbstractInputUnitIO(cParam, outParams, egressParams) {
     val in = Flipped(Decoupled(new Flit(cParam)))
   })
 
   val route_buffer = Module(new Queue(new Flit(cParam), 2))
-  val route_q = Module(new Queue(new RouteComputerResp(cParam, outParams, terminalOutParams), 2,
+  val route_q = Module(new Queue(new RouteComputerResp(cParam, outParams, egressParams), 2,
     flow=combineRCVA))
 
   route_buffer.io.enq.bits := io.in.bits
   io.router_req.bits.src_virt_id := 0.U
   io.router_req.bits.src_vnet_id := io.in.bits.vnet_id
-  io.router_req.bits.dest_id := outIdToDestId(io.in.bits.out_id)
+  io.router_req.bits.dest_id := egressIdToDestId(io.in.bits.egress_id)
 
-  val out_is_in = outIdToDestId(io.in.bits.out_id) === nodeId.U
+  val out_is_in = egressIdToDestId(io.in.bits.egress_id) === nodeId.U
   route_buffer.io.enq.valid := io.in.valid && (
     io.router_req.ready || !io.in.bits.head || (out_is_in && !io.router_resp.valid))
   io.router_req.valid := io.in.valid && route_buffer.io.enq.ready && io.in.bits.head && !out_is_in
@@ -45,8 +45,8 @@ class TerminalInputUnit(
     route_q.io.enq.valid := true.B
     route_q.io.enq.bits.src_virt_id := 0.U
     route_q.io.enq.bits.vc_sel.foreach(_.foreach(_ := false.B))
-    val term_id = outIdToDestChannelId(io.in.bits.out_id)
-    for (o <- 0 until nTerminalOutputs) {
+    val term_id = egressIdToEgressChannelId(io.in.bits.egress_id)
+    for (o <- 0 until nEgress) {
       when (term_id === o.U) {
         route_q.io.enq.bits.vc_sel(o+nOutputs)(0) := true.B
       }
@@ -55,7 +55,7 @@ class TerminalInputUnit(
   assert(!(route_q.io.enq.valid && !route_q.io.enq.ready))
 
   val vcalloc_buffer = Module(new Queue(new Flit(cParam), 2))
-  val vcalloc_q = Module(new Queue(new VCAllocResp(cParam, outParams, terminalOutParams),
+  val vcalloc_q = Module(new Queue(new VCAllocResp(cParam, outParams, egressParams),
     1, pipe=true))
 
   vcalloc_buffer.io.enq.bits := route_buffer.io.deq.bits
@@ -92,9 +92,9 @@ class TerminalInputUnit(
   vcalloc_q.io.deq.ready := vcalloc_tail && vcalloc_buffer.io.deq.fire()
 
   val out_bundle = if (combineSAST) {
-    Wire(Valid(new SwitchBundle(outParams, terminalOutParams)))
+    Wire(Valid(new SwitchBundle(outParams, egressParams)))
   } else {
-    Reg(Valid(new SwitchBundle(outParams, terminalOutParams)))
+    Reg(Valid(new SwitchBundle(outParams, egressParams)))
   }
   io.out := out_bundle
 
