@@ -27,6 +27,10 @@ class AbstractInputUnitIO(
   val salloc_req = Vec(nVirtualChannels, Decoupled(new SwitchAllocReq(outParams, egressParams)))
 
   val out = Valid(new SwitchBundle(outParams, egressParams))
+  val debug = Output(new Bundle {
+    val va_stall = Bool()
+    val sa_stall = Bool()
+  })
 }
 
 abstract class AbstractInputUnit(
@@ -48,6 +52,9 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   val io = IO(new AbstractInputUnitIO(cParam, outParams, egressParams) {
     val in = Flipped(new Channel(cParam))
   })
+  io.debug.va_stall := false.B
+  io.debug.sa_stall := false.B
+
   val g_i :: g_r :: g_r_stall :: g_v :: g_v_stall :: g_a :: g_c :: Nil = Enum(7)
 
   class InputState extends Bundle {
@@ -147,6 +154,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     }
   }
   io.vcalloc_req <> vcalloc_arbiter.io.out
+  io.debug.va_stall := io.vcalloc_req.valid && !io.vcalloc_req.ready
 
   when (io.vcalloc_resp.fire()) {
     val id = io.vcalloc_resp.bits.in_virt_channel
@@ -171,6 +179,9 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
       }
       when (r.fire() && buffer.io.tail_read_resp(i)) {
         s.g := g_i
+      }
+      when (r.valid && !r.ready) {
+        io.debug.sa_stall := true.B
       }
     } else {
       r.valid := false.B

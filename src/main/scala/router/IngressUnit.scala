@@ -103,4 +103,7 @@ class IngressUnit(
   val out_channel_oh = vcalloc_q.io.deq.bits.vc_sel.map(_.reduce(_||_))
   out_bundle.bits.out_virt_channel := Mux1H(out_channel_oh, vcalloc_q.io.deq.bits.vc_sel.map(v => OHToUInt(v)))
   out_bundle.bits.out_channel_oh := VecInit(out_channel_oh)
+
+  io.debug.va_stall := io.vcalloc_req.valid && !io.vcalloc_req.ready
+  io.debug.sa_stall := io.salloc_req(0).valid && !io.salloc_req(0).ready
 }
