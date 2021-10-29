@@ -7,9 +7,9 @@ import chisel3._
 
 class ChiselTester(implicit val p: Parameters) extends Module {
   val noc = Module(new NoC)
-  val noc_tester = Module(new NoCTester(noc.inputParams, noc.outputParams))
-  noc.io.in <> noc_tester.io.to_noc
-  noc_tester.io.from_noc <> noc.io.out
+  val noc_tester = Module(new NoCTester(noc.ingressParams, noc.egressParams))
+  noc.io.ingress <> noc_tester.io.to_noc
+  noc_tester.io.from_noc <> noc.io.egress
   when(noc_tester.io.success) { stop() }
 }
 
