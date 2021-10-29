@@ -243,11 +243,14 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       }
     }
 
+    val debugPrintLatencies = false
+    val wb = new TLBundle(wide_bundle)
+    val payloadWidth = Seq(wb.a, wb.b, wb.c, wb.d, wb.e).map(_.bits.getWidth).max
+
     val noc = Module(new NoC()(p.alterPartial({
       case NoCKey =>
-        val b = new TLBundle(wide_bundle)
         p(NoCKey).copy(
-          flitPayloadBits = Seq(b.a, b.b, b.c, b.d, b.e).map(_.bits.getWidth).max,
+          flitPayloadBits = payloadWidth + (if (debugPrintLatencies) 64 else 0),
           ingressNodes = (Seq.tabulate (in.size) { i => Seq.fill(3) { inNodeMapping(i) } } ++
             Seq.tabulate(out.size) { i => Seq.fill(2) { outNodeMapping(i) } }).flatten,
           egressNodes = (Seq.tabulate (in.size) { i => Seq.fill(2) { inNodeMapping(i) } } ++
@@ -256,6 +259,16 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
         )
     })))
 
+    val tsc = RegInit(0.U(32.W))
+    tsc := tsc + 1.U
+    def debugPrint(channel: String, payload: UInt, fire: Bool) = {
+      when (fire) {
+        printf(s"TLNoC, $channel, %d, %d, %d\n",
+          tsc - payload(payloadWidth+32-1,payloadWidth),
+          payload(payloadWidth+48-1,payloadWidth+32),
+          payload >> (payloadWidth + 48))
+      }
+    }
 
     for (i <- 0 until in.size) {
       val inA  = noc.io.ingress (i*3)
@@ -271,7 +284,7 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       inA.flit.bits.vnet_id := 4.U
       inA.flit.bits.egress_id := (in.size*2+0).U +& (requestAIIds(i) * 3.U)
       inA.flit.bits.virt_channel_id := 0.U
-      inA.flit.bits.payload := in(i).a.bits.asUInt
+      inA.flit.bits.payload := in(i).a.bits.asUInt | (Cat(requestAIIds(i), i.U(16.W), tsc) << payloadWidth)
 
       in(i).b.valid := outB.flit.valid
       outB.flit.ready := in(i).b.ready
@@ -284,7 +297,7 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       inC.flit.bits.vnet_id := 2.U
       inC.flit.bits.egress_id := (in.size*2+1).U +& (requestCIIds(i) * 3.U)
       inC.flit.bits.virt_channel_id := 2.U
-      inC.flit.bits.payload := in(i).c.bits.asUInt
+      inC.flit.bits.payload := in(i).c.bits.asUInt | (Cat(requestCIIds(i), i.U(16.W), tsc) << payloadWidth)
 
       in(i).d.valid := outD.flit.valid
       outD.flit.ready := in(i).d.ready
@@ -297,7 +310,12 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       inE.flit.bits.vnet_id := 0.U
       inE.flit.bits.egress_id := (in.size*2+2).U +& (requestEIIds(i) * 3.U)
       inE.flit.bits.virt_channel_id := 0.U
-      inE.flit.bits.payload := in(i).e.bits.asUInt
+      inE.flit.bits.payload := in(i).e.bits.asUInt | (Cat(requestEIIds(i), i.U(16.W), tsc) << payloadWidth)
+
+      if (debugPrintLatencies) {
+        debugPrint("B", outB.flit.bits.payload, in(i).b.fire() && edgesIn(i).last(in(i).b))
+        debugPrint("D", outD.flit.bits.payload, in(i).d.fire() && edgesIn(i).last(in(i).d))
+      }
     }
 
     for (i <- 0 until out.size) {
@@ -318,7 +336,7 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       inB.flit.bits.vnet_id := 3.U
       inB.flit.bits.egress_id := 0.U +& (requestBOIds(i) * 2.U)
       inB.flit.bits.virt_channel_id := 0.U
-      inB.flit.bits.payload := out(i).b.bits.asUInt
+      inB.flit.bits.payload := out(i).b.bits.asUInt | (Cat(requestBOIds(i), i.U(16.W), tsc << payloadWidth))
 
       out(i).c.valid := outC.flit.valid
       outC.flit.ready := out(i).c.ready
@@ -331,14 +349,18 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       inD.flit.bits.vnet_id := 1.U
       inD.flit.bits.egress_id := 1.U +& (requestDOIds(i) * 2.U)
       inD.flit.bits.virt_channel_id := 0.U
-      inD.flit.bits.payload := out(i).d.bits.asUInt
+      inD.flit.bits.payload := out(i).d.bits.asUInt | (Cat(requestDOIds(i), i.U(16.W), tsc << payloadWidth))
 
       out(i).e.valid := outE.flit.valid
       outE.flit.ready := out(i).e.ready
       out(i).e.bits := outE.flit.bits.payload.asTypeOf(new TLBundleE(wide_bundle))
 
+      if (debugPrintLatencies) {
+        debugPrint("A", outA.flit.bits.payload, out(i).a.fire() && edgesOut(i).last(out(i).a))
+        debugPrint("C", outC.flit.bits.payload, out(i).c.fire() && edgesOut(i).last(out(i).c))
+        debugPrint("E", outE.flit.bits.payload, out(i).e.fire() && edgesOut(i).last(out(i).e))
+      }
     }
-
   }
 }
 
