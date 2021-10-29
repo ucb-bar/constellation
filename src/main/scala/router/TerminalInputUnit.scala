@@ -102,5 +102,5 @@ class TerminalInputUnit(
   out_bundle.bits.flit := vcalloc_buffer.io.deq.bits
   val out_channel_oh = vcalloc_q.io.deq.bits.vc_sel.map(_.reduce(_||_))
   out_bundle.bits.out_virt_channel := Mux1H(out_channel_oh, vcalloc_q.io.deq.bits.vc_sel.map(v => OHToUInt(v)))
-  out_bundle.bits.out_channel := OHToUInt(out_channel_oh)
+  out_bundle.bits.out_channel_oh := out_channel_oh.asUInt
 }

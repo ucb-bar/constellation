@@ -193,7 +193,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     val p = UInt(log2Up(maxBufferSize).W)
     val vid = UInt(virtualChannelBits.W)
     val out_vid = UInt(log2Up(allOutParams.map(_.nVirtualChannels).max).W)
-    val out_id = UInt(log2Up(nAllOutputs).W)
+    val out_id = UInt(nAllOutputs.W)
   }
 
   val salloc_out = if (combineSAST) {
@@ -208,7 +208,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   val channel_oh = ro.map(_.reduce(_||_))
   val virt_channel = Mux1H(channel_oh, ro.map(v => OHToUInt(v)))
   salloc_out.out_vid := virt_channel
-  salloc_out.out_id := OHToUInt(channel_oh)
+  salloc_out.out_id := channel_oh.asUInt
 
   buffer.io.read_req.valid := salloc_out.valid
   buffer.io.read_req.bits.addr := salloc_out.p
@@ -217,7 +217,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   io.out.valid := buffer.io.read_req.valid
   io.out.bits.flit := buffer.io.read_resp
   io.out.bits.out_virt_channel := salloc_out.out_vid
-  io.out.bits.out_channel := salloc_out.out_id
+  io.out.bits.out_channel_oh := salloc_out.out_id
 
   (0 until nVirtualChannels).map { i =>
     if (!virtualChannelParams(i).traversable) states(i) := DontCare

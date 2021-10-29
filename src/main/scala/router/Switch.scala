@@ -10,7 +10,7 @@ import constellation._
 
 class SwitchBundle(val outParams: Seq[ChannelParams], val terminalOutParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle with HasRouterOutputParams{
   val flit = new Flit(allOutParams(0))
-  val out_channel = UInt(log2Up(nAllOutputs).W)
+  val out_channel_oh = UInt(nAllOutputs.W)
   val out_virt_channel = UInt(log2Up(allOutParams.map(_.nVirtualChannels).max).W)
 }
 
@@ -22,7 +22,7 @@ class Switch(val rP: RouterParams)(implicit val p: Parameters) extends Module wi
   })
 
   io.out.zipWithIndex.map { case (o,x) =>
-    val oh = io.in.map(i => i.valid && i.bits.out_channel === x.U)
+    val oh = io.in.map(i => i.valid && i.bits.out_channel_oh(x))
     assert(PopCount(oh) <= 1.U)
     o.valid := oh.reduce(_||_)
     o.bits := Mux1H(oh, io.in.map(_.bits.flit))
