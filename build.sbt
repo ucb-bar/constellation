@@ -15,4 +15,4 @@ scalacOptions ++= Seq(
 resolvers += Resolver.sonatypeRepo("snapshots")
 libraryDependencies += "edu.berkeley.cs" %% "rocketchip" % "1.5-SNAPSHOT"
 libraryDependencies += "edu.berkeley.cs" %% "chiseltest" % "0.5-SNAPSHOT" % Test
-addCompilerPlugin("edu.berkeley.cs" % "chisel3-plugin" % "3.5-SNAPSHOT" cross CrossVersion.full)
+addCompilerPlugin("edu.berkeley.cs" % "chisel3-plugin" % "3.4.1" cross CrossVersion.full)
