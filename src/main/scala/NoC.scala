@@ -10,13 +10,13 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   val fullChannelParams: Seq[ChannelParams] = Seq.tabulate(nNodes, nNodes) { case (i,j) =>
     topologyFunction(i, j)
   }.flatten.flatten
-  def fullInParams = (0 until nNodes).map { i => fullChannelParams.filter(_.destId == i) }
-  def fullOutParams = (0 until nNodes).map { i => fullChannelParams.filter(_.srcId == i) }
   val ingressParams = ingressNodes.zipWithIndex.map { case (nId,i) =>
-    ChannelParams(-1, nId, Seq(VirtualChannelParams(-1)), ingressId=i)
+    ChannelParams(-1, nId, Seq(VirtualChannelParams(-1,
+      possibleEgresses=Seq.tabulate(egressNodes.size) { e => (terminalConnectivity(i,e), e) }.filter(_._1).map(_._2).toSet
+    )), ingressId=i)
   }
   val egressParams = egressNodes.zipWithIndex.map { case (nId,i) =>
-    ChannelParams(nId, -1, Seq(VirtualChannelParams(-1)), egressId=i)
+    ChannelParams(nId, -1, Seq(VirtualChannelParams(-1, possibleEgresses=Set(i))), egressId=i)
   }
 
   // Check sanity of masterAllocTable, all inputs can route to all outputs
@@ -24,6 +24,7 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   // srcId, vId, dstId
   type Pos = (Int, Int, Int)
   var traversableVirtualChannels: Set[Pos] = Set[Pos]()
+  val possibleEgressMap = scala.collection.mutable.Map[Pos, Set[Int]]().withDefaultValue(Set[Int]())
 
   for (vNetId <- 0 until nVirtualNetworks) {
     ingressNodes.zipWithIndex.map { case (iId,iIdx) =>
@@ -31,14 +32,16 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
         if (terminalConnectivity(iIdx, oIdx)) {
           var positions: Set[Pos] = Set((-1, 0, iId))
           while (positions.size != 0) {
+            positions.foreach { pos => possibleEgressMap(pos) += oIdx }
             positions = positions.filter(_._3 != oId).map { case (srcId, srcV, nodeId) =>
-              val nexts = fullOutParams(nodeId).map { nxtC =>
+              val nexts = fullChannelParams.filter(_.srcId == nodeId).map { nxtC =>
                 (0 until nxtC.nVirtualChannels).map { nxtV =>
                   val can_transition = masterAllocTable(
                     nodeId)(srcId, srcV, nxtC.destId, nxtV, oId, vNetId)
                   if (can_transition) Some((nodeId, nxtV, nxtC.destId)) else None
                 }.flatten
               }.flatten
+
               require(nexts.size > 0,
                 s"Failed to route from $iId to $oId at $srcId, $srcV, $nodeId")
               traversableVirtualChannels = traversableVirtualChannels ++ nexts.toSet
@@ -50,23 +53,19 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
     }
   }
 
-  // Tie off inaccessible virtual channels
+  // Tie off inpossible virtual channels
+  // Also set possible nodes for each channel
   val channelParams = fullChannelParams.map { cP => cP.copy(
     virtualChannelParams=cP.virtualChannelParams.zipWithIndex.map { case (vP,vId) =>
-      vP.copy(traversable=
-        if (traversableVirtualChannels.contains((cP.srcId, vId, cP.destId))) {
-          true
-        } else {
-          println(s"WARNING, virtual channel $vId from ${cP.srcId} to ${cP.destId} appears to be untraversable")
-          false
-        }
-      )
+      if (!traversableVirtualChannels.contains((cP.srcId, vId, cP.destId))) {
+        require(possibleEgressMap((cP.srcId, vId, cP.destId)).size == 0)
+        println(s"WARNING, virtual channel $vId from ${cP.srcId} to ${cP.destId} appears to be untraversable")
+      }
+      vP.copy(possibleEgresses=possibleEgressMap((cP.srcId, vId, cP.destId)))
     }
   )}
   channelParams.map(cP => if (!cP.traversable)
     println(s"WARNING, physical channel from ${cP.srcId} to ${cP.destId} appears to be untraversable"))
-  val inParams = (0 until nNodes).map { i => channelParams.filter(_.destId == i) }
-  val outParams = (0 until nNodes).map { i => channelParams.filter(_.srcId == i) }
 
   val io = IO(new Bundle {
     val ingress = MixedVec(ingressParams.map { u => Flipped(new TerminalChannel(u)) })
@@ -75,8 +74,8 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
 
   val router_nodes = Seq.tabulate(nNodes) { i => Module(new Router(routerParams(i).copy(
     nodeId = i,
-    inParams = inParams(i),
-    outParams = outParams(i),
+    inParams = channelParams.filter(_.destId == i),
+    outParams = channelParams.filter(_.srcId == i),
     ingressParams = ingressParams.filter(_.destId == i),
     egressParams = egressParams.filter(_.srcId == i),
     masterAllocTable = masterAllocTable(i),

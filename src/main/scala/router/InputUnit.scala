@@ -11,7 +11,7 @@ import constellation._
 class AbstractInputUnitIO(
   val cParam: ChannelParams,
   val outParams: Seq[ChannelParams],
-  val egressParams: Seq[ChannelParams]
+  val egressParams: Seq[ChannelParams],
 )(implicit val p: Parameters) extends Bundle
     with HasRouterOutputParams with HasChannelParams {
   val nodeId = cParam.destId
@@ -36,17 +36,38 @@ class AbstractInputUnitIO(
 abstract class AbstractInputUnit(
   val cParam: ChannelParams,
   val outParams: Seq[ChannelParams],
-  val egressParams: Seq[ChannelParams]
+  val egressParams: Seq[ChannelParams],
+  allocTable: (Int, Int, Int, Int, Int) => Boolean,
 )(implicit val p: Parameters) extends Module with HasRouterOutputParams with HasChannelParams {
   val nodeId = cParam.destId
 
   def io: AbstractInputUnitIO
+
+  def filterVCSel(in: MixedVec[Vec[Bool]], srcV: Int): MixedVec[Vec[Bool]] = {
+    val out = WireInit(in)
+    if (virtualChannelParams(srcV).traversable) {
+      outParams.zipWithIndex.map { case (oP, oI) =>
+        (0 until oP.nVirtualChannels).map { oV =>
+          val allow = Seq.tabulate(nVirtualNetworks) { vNetId =>
+            virtualChannelParams(srcV).possibleEgresses.map { e =>
+              allocTable(srcV, oP.destId, oV, egressNodes(e), vNetId)
+            }.reduce(_||_)
+          }.reduce(_||_)
+          if (!allow)
+            out(oI)(oV) := false.B
+        }
+      }
+    }
+    out
+  }
 }
 
 class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   egressParams: Seq[ChannelParams],
-  combineRCVA: Boolean, combineSAST: Boolean)
-  (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, egressParams)(p) {
+  combineRCVA: Boolean, combineSAST: Boolean,
+  allocTable: (Int, Int, Int, Int, Int) => Boolean,
+)
+  (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, egressParams, allocTable)(p) {
   require(!isIngressChannel)
 
   val io = IO(new AbstractInputUnitIO(cParam, outParams, egressParams) {
@@ -59,7 +80,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
 
   class InputState extends Bundle {
     val g = UInt(3.W)
-    val ro = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
+    val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
     val p = UInt(log2Up(maxBufferSize).W)
     val c = UInt(log2Up(1+maxBufferSize).W)
     val vnet_id = UInt(vNetBits.W)
@@ -89,11 +110,11 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     val dest_id = egressIdToDestId(io.in.flit.bits.egress_id)
     states(id).g := Mux(dest_id === nodeId.U, g_v, g_r)
     states(id).dest_id := dest_id
-    states(id).ro.foreach(_.foreach(_ := false.B))
+    states(id).vc_sel.foreach(_.foreach(_ := false.B))
     val term_id = egressIdToEgressChannelId(io.in.flit.bits.egress_id)
     for (o <- 0 until nEgress) {
       when (term_id === o.U) {
-        states(id).ro(o+nOutputs)(0) := true.B
+        states(id).vc_sel(o+nOutputs)(0) := true.B
       }
     }
     states(id).p := buffer.io.head
@@ -128,7 +149,11 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     val id = io.router_resp.bits.src_virt_id
     assert(states(id).g.isOneOf(g_r, g_r_stall))
     states(id).g := g_v
-    states(id).ro := io.router_resp.bits.vc_sel
+    for (i <- 0 until nVirtualChannels) {
+      when (i.U === id) {
+        states(i).vc_sel := filterVCSel(io.router_resp.bits.vc_sel, i)
+      }
+    }
   }
 
   val vcalloc_arbiter = Module(new GrantHoldArbiter(
@@ -138,7 +163,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     if (virtualChannelParams(idx).traversable) {
       i.valid := s.g === g_v
       i.bits.in_virt_channel := idx.U
-      i.bits.vc_sel := s.ro
+      i.bits.vc_sel := s.vc_sel
 
       if (combineRCVA) {
         when (io.router_resp.fire() && io.router_resp.bits.src_virt_id === idx.U) {
@@ -158,20 +183,24 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
 
   when (io.vcalloc_resp.fire()) {
     val id = io.vcalloc_resp.bits.in_virt_channel
-    states(id).ro := io.vcalloc_resp.bits.vc_sel
+    for (i <- 0 until nVirtualChannels) {
+      when (i.U === id) {
+        states(i).vc_sel := filterVCSel(io.vcalloc_resp.bits.vc_sel, i)
+      }
+    }
     states(id).g := g_a
   }
 
   (states zip io.salloc_req).zipWithIndex.map { case ((s,r),i) =>
     if (virtualChannelParams(i).traversable) {
-      val credit_available = (s.ro.asUInt & io.out_credit_available.asUInt) =/= 0.U
+      val credit_available = (s.vc_sel.asUInt & io.out_credit_available.asUInt) =/= 0.U
       val bypass_input = if (combineSAST) {
         false.B
       } else {
         io.in.flit.valid && io.in.flit.bits.virt_channel_id === i.U
       }
       r.valid := s.g === g_a && credit_available && (s.c =/= 0.U || bypass_input)
-      r.bits.vc_sel := s.ro
+      r.bits.vc_sel := s.vc_sel
       buffer.io.tail_read_req(i) := s.p
       r.bits.tail := buffer.io.tail_read_resp(i)
       when (r.fire()) {
@@ -216,9 +245,9 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   salloc_out.valid := salloc_fire
   salloc_out.p := Mux1H(salloc_fires, states.map(_.p))
   salloc_out.vid := salloc_fire_id
-  val ro = Mux1H(salloc_fires, states.map(_.ro))
-  val channel_oh = ro.map(_.reduce(_||_))
-  val virt_channel = Mux1H(channel_oh, ro.map(v => OHToUInt(v)))
+  val vc_sel = Mux1H(salloc_fires, states.map(_.vc_sel))
+  val channel_oh = vc_sel.map(_.reduce(_||_))
+  val virt_channel = Mux1H(channel_oh, vc_sel.map(v => OHToUInt(v)))
   salloc_out.out_vid := virt_channel
   salloc_out.out_id := VecInit(channel_oh)
 

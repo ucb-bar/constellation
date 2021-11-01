@@ -13,8 +13,10 @@ class IngressUnit(
   outParams: Seq[ChannelParams],
   egressParams: Seq[ChannelParams],
   combineRCVA: Boolean,
-  combineSAST: Boolean)
-  (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, egressParams)(p) {
+  combineSAST: Boolean,
+  allocTable: (Int, Int, Int, Int, Int) => Boolean,
+)
+  (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, egressParams, allocTable)(p) {
 
   require(isIngressChannel)
   require(nVirtualChannels == 1)
