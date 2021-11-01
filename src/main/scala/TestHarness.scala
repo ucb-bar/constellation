@@ -109,6 +109,7 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
 
   val rob_payload = Reg(Vec(robSz, UInt(flitPayloadBits.W)))
   val rob_egress_id = Reg(Vec(robSz, UInt(log2Ceil(nOutputs).W)))
+  val rob_ingress_id = Reg(Vec(robSz, UInt(log2Ceil(nInputs).W)))
   val rob_n_flits = Reg(Vec(robSz, UInt(flitIdBits.W)))
   val rob_flits_returned = Reg(Vec(robSz, UInt(flitIdBits.W)))
   val rob_valids = RegInit(0.U(robSz.W))
@@ -136,6 +137,7 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
     when (igen.io.fire) {
       rob_payload(rob_idx) := igen.io.out.bits.payload
       rob_egress_id(rob_idx) := igen.io.out.bits.egress_id
+      rob_ingress_id(rob_idx) := idx.U
       rob_n_flits(rob_idx) := igen.io.n_flits
       rob_flits_returned(rob_idx) := 0.U
     }
@@ -156,6 +158,10 @@ class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams
       assert(o.flit.bits.egress_id === i.U && o.flit.bits.egress_id === rob_egress_id(rob_idx), s"out[$i] incorrect destination")
       assert(rob_flits_returned(rob_idx) < rob_n_flits(rob_idx), s"out[$i] too many flits returned")
       assert((!packet_valid && o.flit.bits.head) || rob_idx === packet_rob_idx)
+
+      when (o.flit.bits.head) {
+        printf(s"%d, $i, %d\n", rob_ingress_id(rob_idx), tsc - (o.flit.bits.payload >> 16))
+      }
 
       rob_flits_returned(rob_idx) := rob_flits_returned(rob_idx) + 1.U
       rob_payload(rob_idx) := rob_payload(rob_idx) + 1.U
