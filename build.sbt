@@ -7,8 +7,7 @@ scalacOptions ++= Seq(
   "-Xsource:2.11",
   "-language:reflectiveCalls",
   "-deprecation",
-  "-feature",
-  "-Xcheckinit",  
+  "-feature"
 )
 
 // SNAPSHOT repositories
