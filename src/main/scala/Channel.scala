@@ -7,9 +7,9 @@ import freechips.rocketchip.config.{Field, Parameters}
 
 case class VirtualChannelParams(
   bufferSize: Int = 1,
-  possibleEgresses: Set[Int] = Set(),
+  possiblePackets: Set[(Int, Int)] = Set(),
 ) {
-  val traversable = possibleEgresses.size > 0
+  val traversable = possiblePackets.size > 0
 }
 
 case class ChannelParams(
@@ -24,7 +24,7 @@ case class ChannelParams(
   val isIngress = ingressId >= 0
   val isEgress = egressId >= 0
   def traversable = virtualChannelParams.map(_.traversable).reduce(_||_)
-  def possibleEgresses = virtualChannelParams.map(_.possibleEgresses).reduce(_++_)
+  def possiblePackets = virtualChannelParams.map(_.possiblePackets).reduce(_++_)
   require(!(srcId == -1 ^ isIngress))
   require(!(destId == -1 ^ isEgress))
   require(!(isIngress && isEgress))

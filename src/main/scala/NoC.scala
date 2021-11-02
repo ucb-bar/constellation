@@ -12,11 +12,16 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   }.flatten.flatten
   val ingressParams = ingressNodes.zipWithIndex.map { case (nId,i) =>
     ChannelParams(-1, nId, Seq(VirtualChannelParams(-1,
-      possibleEgresses=Seq.tabulate(egressNodes.size) { e => (terminalConnectivity(i,e), e) }.filter(_._1).map(_._2).toSet
+      possiblePackets=Seq.tabulate(egressNodes.size, nVirtualNetworks) { case (e, v) => (terminalConnectivity(i,e,v), (e, v)) }
+        .flatten.filter(_._1).map(_._2).toSet
     )), ingressId=i)
   }
-  val egressParams = egressNodes.zipWithIndex.map { case (nId,i) =>
-    ChannelParams(nId, -1, Seq(VirtualChannelParams(-1, possibleEgresses=Set(i))), egressId=i)
+  val egressParams = egressNodes.zipWithIndex.map { case (nId,e) =>
+    ChannelParams(nId, -1, Seq(VirtualChannelParams(-1,
+      possiblePackets=Seq.tabulate(nVirtualNetworks) { v =>
+        ((0 until ingressNodes.size).map { i => terminalConnectivity(i,e,v) }.reduce(_||_), (e, v))
+      }.filter(_._1).map(_._2).toSet
+    )), egressId=e)
   }
 
   // Check sanity of masterAllocTable, all inputs can route to all outputs
@@ -24,15 +29,15 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   // srcId, vId, dstId
   type Pos = (Int, Int, Int)
   var traversableVirtualChannels: Set[Pos] = Set[Pos]()
-  val possibleEgressMap = scala.collection.mutable.Map[Pos, Set[Int]]().withDefaultValue(Set[Int]())
+  val possiblePacketMap = scala.collection.mutable.Map[Pos, Set[(Int, Int)]]().withDefaultValue(Set[(Int, Int)]())
 
   for (vNetId <- 0 until nVirtualNetworks) {
     ingressNodes.zipWithIndex.map { case (iId,iIdx) =>
       egressNodes.zipWithIndex.map { case (oId,oIdx) =>
-        if (terminalConnectivity(iIdx, oIdx)) {
+        if (terminalConnectivity(iIdx, oIdx, vNetId)) {
           var positions: Set[Pos] = Set((-1, 0, iId))
           while (positions.size != 0) {
-            positions.foreach { pos => possibleEgressMap(pos) += oIdx }
+            positions.foreach { pos => possiblePacketMap(pos) += ((oIdx, vNetId)) }
             positions = positions.filter(_._3 != oId).map { case (srcId, srcV, nodeId) =>
               val nexts = fullChannelParams.filter(_.srcId == nodeId).map { nxtC =>
                 (0 until nxtC.nVirtualChannels).map { nxtV =>
@@ -58,10 +63,10 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   val channelParams = fullChannelParams.map { cP => cP.copy(
     virtualChannelParams=cP.virtualChannelParams.zipWithIndex.map { case (vP,vId) =>
       if (!traversableVirtualChannels.contains((cP.srcId, vId, cP.destId))) {
-        require(possibleEgressMap((cP.srcId, vId, cP.destId)).size == 0)
+        require(possiblePacketMap((cP.srcId, vId, cP.destId)).size == 0)
         println(s"WARNING, virtual channel $vId from ${cP.srcId} to ${cP.destId} appears to be untraversable")
       }
-      vP.copy(possibleEgresses=possibleEgressMap((cP.srcId, vId, cP.destId)))
+      vP.copy(possiblePackets=possiblePacketMap((cP.srcId, vId, cP.destId)))
     }
   )}
   channelParams.map(cP => if (!cP.traversable)

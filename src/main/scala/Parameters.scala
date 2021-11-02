@@ -16,8 +16,8 @@ case class NoCConfig(
 
   // srcNodeId, destNodeId => virtualChannelParams
   topology: (Int, Int) => Option[ChannelParams] = (a: Int, b: Int) => None,
-  // src, dst
-  terminalConnectivity: (Int, Int) => Boolean = (_: Int, _: Int) => true,
+  // src, dst, vNetId
+  terminalConnectivity: (Int, Int, Int) => Boolean = (_: Int, _: Int, _: Int) => true,
   masterAllocTable: MasterAllocTable = MasterAllocTables.allLegal,
   routerParams: Int => RouterParams =
     (i: Int) => RouterParams(i, Nil, Nil, Nil, Nil, (_,_,_,_,_,_) => false, false, false),

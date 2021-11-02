@@ -5,6 +5,7 @@ import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
+import freechips.rocketchip.rocket.DecodeLogic
 
 import constellation._
 
@@ -42,18 +43,36 @@ class RouteComputer(val rP: RouterParams)(implicit val p: Parameters) extends Mo
       (0 until nAllOutputs).map { o =>
         if (o < nOutputs) {
           (0 until outParams(o).nVirtualChannels).map { outVId =>
-            val table = Seq.tabulate(allInParams(i).nVirtualChannels, nVirtualNetworks, nNodes) {
-              case (inVId, vNetId, dest) => {
+            val table = allInParams(i).possiblePackets
+              .toSeq.map { t => (egressNodes(t._1), t._2) }.distinct.map { case (dest, vNetId) =>
+              Seq.tabulate(allInParams(i).nVirtualChannels) { inVId =>
                 val v = rP.masterAllocTable(
                   allInParams(i).srcId, inVId,
                   outParams(o).destId, outVId,
                   dest, vNetId)
                 ((((inVId << vNetBits) + vNetId) << nodeIdBits) + dest, v)
               }
-            }.flatten.flatten
-
+            }.flatten
+            val trues = table.filter(_._2).map(_._1.U)
+            val falses = table.filter(!_._2).map(_._1.U)
             val addr = Cat(req.bits.src_virt_id, req.bits.src_vnet_id, req.bits.dest_id)
-            resp.bits.vc_sel(o)(outVId) := table.filter(_._2).map(_._1.U === addr).orR
+
+            resp.bits.vc_sel(o)(outVId) := (if (falses.size == 0) {
+              true.B
+            } else if (trues.size == 0) {
+              false.B
+            } else {
+              // The Quine-McCluskey impl in rocketchip memory leaks sometimes here...
+              if (trues.size + falses.size >= 100) {
+                if (trues.size > falses.size) {
+                  falses.map(_ =/= addr).andR
+                } else {
+                  trues.map(_ === addr).orR
+                }
+              } else {
+                DecodeLogic(addr, trues, falses)
+              }
+            })
           }
         } else {
           resp.bits.vc_sel(o)(0) := false.B

@@ -48,10 +48,8 @@ abstract class AbstractInputUnit(
     if (virtualChannelParams(srcV).traversable) {
       outParams.zipWithIndex.map { case (oP, oI) =>
         (0 until oP.nVirtualChannels).map { oV =>
-          val allow = Seq.tabulate(nVirtualNetworks) { vNetId =>
-            virtualChannelParams(srcV).possibleEgresses.map { e =>
-              allocTable(srcV, oP.destId, oV, egressNodes(e), vNetId)
-            }.reduce(_||_)
+          val allow = virtualChannelParams(srcV).possiblePackets.map { case (e,vNetId) =>
+            allocTable(srcV, oP.destId, oV, egressNodes(e), vNetId)
           }.reduce(_||_)
           if (!allow)
             out(oI)(oV) := false.B

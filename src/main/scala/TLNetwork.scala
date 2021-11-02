@@ -227,17 +227,17 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
     def isEOut(o: Int) = o >= in.size * 2 && (o - in.size*2) % 3 == 2
 
 
-    def connectivity(src: Int, dst: Int) = {
+    def connectivity(src: Int, dst: Int, vNetId: Int) = {
       if (isAIn(src) && isAOut(dst)) {
-        connectAIO(src/3)((dst-in.size*2)/3)
+        connectAIO(src/3)((dst-in.size*2)/3) && vNetId == 4
       } else if (isBIn(src) && isBOut(dst)) {
-        connectBOI((src-in.size*3)/2)(dst/2)
+        connectBOI((src-in.size*3)/2)(dst/2) && vNetId == 3
       } else if (isCIn(src) && isCOut(dst)) {
-        connectCIO(src/3)((dst-in.size*2)/3)
+        connectCIO(src/3)((dst-in.size*2)/3) && vNetId == 2
       } else if (isDIn(src) && isDOut(dst)) {
-        connectDOI((src-in.size*3)/2)(dst/2)
+        connectDOI((src-in.size*3)/2)(dst/2) && vNetId == 1
       } else if (isEIn(src) && isEOut(dst)) {
-        connectEIO(src/3)((dst-in.size*2)/3)
+        connectEIO(src/3)((dst-in.size*2)/3) && vNetId == 0
       } else {
         false
       }
