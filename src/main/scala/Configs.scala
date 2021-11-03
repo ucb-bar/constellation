@@ -335,3 +335,9 @@ class TestConfig39 extends Config(
 class TestConfig40 extends Config(
   new WithUniformVirtualChannels(2, VirtualChannelParams(1)) ++
   new BidirectionalTorus2DConfig(3, 3))
+
+class TLTestConfig00 extends Config(
+  new WithTLNoCTesterParams(TLNoCTesterParams(Seq(4, 0, 2, 5, 6, 9, 11), Seq(7, 1, 3, 8, 10))) ++
+  new WithNNonblockingVirtualNetworksWithSharing(5, 2) ++
+  new WithUniformVirtualChannels(2, VirtualChannelParams(3)) ++
+  new Mesh2DConfig(4, 3, MasterAllocTables.mesh2DAlternatingDimensionOrdered))

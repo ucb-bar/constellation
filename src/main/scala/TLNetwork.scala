@@ -198,7 +198,6 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
     val lastDO = (out zip edgesOut) map { case (o, e) => e.last(o.d) }
     val lastEI = (in  zip edgesIn)  map { case (i, e) => e.last(i.e) }
 
-
     val requestAIIds = VecInit(requestAIO.map(OHToUInt(_)))
     val requestCIIds = VecInit(requestCIO.map(OHToUInt(_)))
     val requestBOIds = VecInit(requestBOI.map(OHToUInt(_)))
@@ -390,7 +389,6 @@ class ConstellationSystemBus(params: SystemBusParams, inNodeMapping: Seq[Int], o
 
 class WithConstellationNoCSystemBus(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])
     extends Config(
-  new WithNNonblockingVirtualNetworksWithSharing(5, 2) ++
   new Config((site, here, up) => {
     case TLNetworkTopologyLocated(InSubsystem) =>
       up(TLNetworkTopologyLocated(InSubsystem), site).map(topo =>

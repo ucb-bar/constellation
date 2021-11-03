@@ -4,8 +4,10 @@ import chisel3._
 import chisel3.util._
 import chisel3.util.random.LFSR
 
-import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImpLike, LazyModuleImp}
-import freechips.rocketchip.config.{Field, Parameters}
+import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImpLike, LazyModuleImp, AddressSet}
+import freechips.rocketchip.config.{Field, Parameters, Config}
+import freechips.rocketchip.tilelink._
+import freechips.rocketchip.util._
 
 object SelectFirstNUInt
 {
@@ -189,4 +191,57 @@ class TestHarness(implicit val p: Parameters) extends Module {
   noc.io.ingress <> noc_tester.io.to_noc
   noc_tester.io.from_noc <> noc.io.egress
   io.success := noc_tester.io.success
+}
+
+case class TLNoCTesterParams(
+  inNodeMapping: Seq[Int],
+  outNodeMapping: Seq[Int],
+  txns: Int = 1000
+)
+
+case object TLNoCTesterKey extends Field[TLNoCTesterParams](TLNoCTesterParams(Nil, Nil))
+
+class WithTLNoCTesterParams(p: TLNoCTesterParams) extends Config((site, here, up) => {
+  case TLNoCTesterKey => p
+})
+
+class TLNoCTester(implicit p: Parameters) extends LazyModule {
+  val tParams = p(TLNoCTesterKey)
+  val txns = tParams.txns
+  val inNodeMapping = tParams.inNodeMapping
+  val outNodeMapping = tParams.outNodeMapping
+  val nManagers = outNodeMapping.size
+  val nClients = inNodeMapping.size
+  val xbar = LazyModule(new TLNoC(inNodeMapping, outNodeMapping))
+
+  val fuzzers = (0 until nClients) map { n =>
+    val fuzz = LazyModule(new TLFuzzer(txns))
+    xbar.node := TLDelayer(0.1) := fuzz.node
+    fuzz
+  }
+
+  (0 until nManagers) foreach { n =>
+    val ram = LazyModule(new TLRAM(AddressSet(0x0+0x400*n, 0x3ff)))
+    ram.node := TLFragmenter(4, 256) := TLDelayer(0.1) := xbar.node
+  }
+
+  lazy val module = new LazyModuleImp(this) {
+    val io = IO(new Bundle {
+      val finished = Output(Bool())
+    })
+    io.finished := fuzzers.last.module.io.finished
+  }
+}
+
+class TLTestHarness(implicit val p: Parameters) extends Module {
+  val io = IO(new Bundle {
+    val success = Output(Bool())
+  })
+  val tester = Module(LazyModule(new TLNoCTester).module)
+  io.success := tester.io.finished
+
+  // Dummy plusarg to avoid breaking verilator builds with emulator.cc
+  val useless_plusarg = PlusArg("useless_plusarg", width=1)
+  dontTouch(useless_plusarg)
+  ElaborationArtefacts.add("plusArgs", PlusArgArtefacts.serialize_cHeader)
 }
