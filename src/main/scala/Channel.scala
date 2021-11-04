@@ -16,13 +16,14 @@ case class ChannelParams(
   srcId: Int,
   destId: Int,
   virtualChannelParams: Seq[VirtualChannelParams] = Seq(VirtualChannelParams()),
-  ingressId: Int = -1,
-  egressId: Int = -1,
+  ingressId: Option[Int] = None,
+  egressId: Option[Int] = None,
+  vNetId: Option[Int] = None,
   depth: Int = 0
 ) {
   val nVirtualChannels = virtualChannelParams.size
-  val isIngress = ingressId >= 0
-  val isEgress = egressId >= 0
+  val isIngress = ingressId.isDefined
+  val isEgress = egressId.isDefined
   def traversable = virtualChannelParams.map(_.traversable).reduce(_||_)
   def possiblePackets = virtualChannelParams.map(_.possiblePackets).reduce(_++_)
   require(!(srcId == -1 ^ isIngress))
@@ -55,7 +56,7 @@ class Channel(val cParam: ChannelParams)(implicit val p: Parameters) extends Bun
 class TerminalChannel(val cParam: ChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   require(isTerminalChannel)
 
-  val flit = Decoupled(new Flit(cParam))
+  val flit = Decoupled(new IOFlit(cParam))
 }
 
 object ChannelBuffer {

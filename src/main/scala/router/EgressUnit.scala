@@ -14,13 +14,16 @@ class EgressUnit(inParams: Seq[ChannelParams], ingressParams: Seq[ChannelParams]
   require(nVirtualChannels == 1)
 
   val io = IO(new AbstractOutputUnitIO(inParams, ingressParams, cParam) {
-    val out = Decoupled(new Flit(cParam))
+    val out = Decoupled(new IOFlit(cParam))
   })
 
   val channel_empty = RegInit(true.B)
-  val q = Module(new Queue(new Flit(cParam), 3, flow=true))
+  val q = Module(new Queue(new IOFlit(cParam), 3, flow=true))
   q.io.enq.valid := io.in.valid
-  q.io.enq.bits := io.in.bits
+  q.io.enq.bits.head := io.in.bits.head
+  q.io.enq.bits.tail := io.in.bits.tail
+  q.io.enq.bits.egress_id := io.in.bits.egress_id
+  q.io.enq.bits.payload := io.in.bits.payload
   io.out <> q.io.deq
   assert(!(q.io.enq.valid && !q.io.enq.ready))
 

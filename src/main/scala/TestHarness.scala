@@ -26,7 +26,7 @@ object SelectFirstNUInt
 
 class InputGen(idx: Int, cParams: ChannelParams, inputStallProbability: Double)(implicit val p: Parameters) extends Module with HasNoCParams {
   val io = IO(new Bundle {
-    val out = Decoupled(new Flit(cParams))
+    val out = Decoupled(new IOFlit(cParams))
     val rob_ready = Input(Bool())
     val rob_idx = Input(UInt())
     val tsc = Input(UInt(64.W))
@@ -36,7 +36,7 @@ class InputGen(idx: Int, cParams: ChannelParams, inputStallProbability: Double)(
 
   val flits_left = RegInit(0.U(flitIdBits.W))
   val flits_fired = RegInit(0.U(flitIdBits.W))
-  val head_flit = Reg(new Flit(cParams))
+  val head_flit = Reg(new IOFlit(cParams))
 
   val can_fire = (flits_left === 0.U) && io.rob_ready
 
@@ -45,9 +45,7 @@ class InputGen(idx: Int, cParams: ChannelParams, inputStallProbability: Double)(
   io.out.valid := !random_delay && flits_left === 0.U && io.rob_ready
   io.out.bits.head := true.B
   io.out.bits.tail := packet_remaining === 0.U
-  io.out.bits.vnet_id := 0.U
   io.out.bits.egress_id := LFSR(20) % egressNodes.size.U
-  io.out.bits.virt_channel_id := idx.U
   io.out.bits.payload := (io.tsc << 16) | (io.rob_idx << 8)
 
   io.n_flits := packet_remaining + 1.U

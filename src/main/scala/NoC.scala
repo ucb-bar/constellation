@@ -14,14 +14,14 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
     ChannelParams(-1, nId, Seq(VirtualChannelParams(-1,
       possiblePackets=Seq.tabulate(egressNodes.size, nVirtualNetworks) { case (e, v) => (terminalConnectivity(i,e,v), (e, v)) }
         .flatten.filter(_._1).map(_._2).toSet
-    )), ingressId=i)
+    )), ingressId=Some(i), vNetId=Some(ingressVNets(i)))
   }
   val egressParams = egressNodes.zipWithIndex.map { case (nId,e) =>
     ChannelParams(nId, -1, Seq(VirtualChannelParams(-1,
       possiblePackets=Seq.tabulate(nVirtualNetworks) { v =>
         ((0 until ingressNodes.size).map { i => terminalConnectivity(i,e,v) }.reduce(_||_), (e, v))
       }.filter(_._1).map(_._2).toSet
-    )), egressId=e)
+    )), egressId=Some(e))
   }
 
   // Check sanity of masterAllocTable, all inputs can route to all outputs
@@ -31,28 +31,27 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   var traversableVirtualChannels: Set[Pos] = Set[Pos]()
   val possiblePacketMap = scala.collection.mutable.Map[Pos, Set[(Int, Int)]]().withDefaultValue(Set[(Int, Int)]())
 
-  for (vNetId <- 0 until nVirtualNetworks) {
-    ingressNodes.zipWithIndex.map { case (iId,iIdx) =>
-      egressNodes.zipWithIndex.map { case (oId,oIdx) =>
-        if (terminalConnectivity(iIdx, oIdx, vNetId)) {
-          var positions: Set[Pos] = Set((-1, 0, iId))
-          while (positions.size != 0) {
-            positions.foreach { pos => possiblePacketMap(pos) += ((oIdx, vNetId)) }
-            positions = positions.filter(_._3 != oId).map { case (srcId, srcV, nodeId) =>
-              val nexts = fullChannelParams.filter(_.srcId == nodeId).map { nxtC =>
-                (0 until nxtC.nVirtualChannels).map { nxtV =>
-                  val can_transition = masterAllocTable(
-                    nodeId)(srcId, srcV, nxtC.destId, nxtV, oId, vNetId)
-                  if (can_transition) Some((nodeId, nxtV, nxtC.destId)) else None
-                }.flatten
+  ingressNodes.zipWithIndex.map { case (iId,iIdx) =>
+    val vNetId = ingressVNets(iIdx)
+    egressNodes.zipWithIndex.map { case (oId,oIdx) =>
+      if (terminalConnectivity(iIdx, oIdx, vNetId)) {
+        var positions: Set[Pos] = Set((-1, 0, iId))
+        while (positions.size != 0) {
+          positions.foreach { pos => possiblePacketMap(pos) += ((oIdx, vNetId)) }
+          positions = positions.filter(_._3 != oId).map { case (srcId, srcV, nodeId) =>
+            val nexts = fullChannelParams.filter(_.srcId == nodeId).map { nxtC =>
+              (0 until nxtC.nVirtualChannels).map { nxtV =>
+                val can_transition = masterAllocTable(
+                  nodeId)(srcId, srcV, nxtC.destId, nxtV, oId, vNetId)
+                if (can_transition) Some((nodeId, nxtV, nxtC.destId)) else None
               }.flatten
+            }.flatten
 
-              require(nexts.size > 0,
-                s"Failed to route from $iId to $oId at $srcId, $srcV, $nodeId")
-              traversableVirtualChannels = traversableVirtualChannels ++ nexts.toSet
-              nexts
-            }.flatten.toSet
-          }
+            require(nexts.size > 0,
+              s"Failed to route from $iId to $oId at $srcId, $srcV, $nodeId")
+            traversableVirtualChannels = traversableVirtualChannels ++ nexts.toSet
+            nexts
+          }.flatten.toSet
         }
       }
     }
@@ -94,10 +93,10 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
       )
     }
     (dst.ingressParams zip dst.io.ingress) map { case (u,i) =>
-      i <> io.ingress(u.ingressId)
+      i <> io.ingress(u.ingressId.get)
     }
     (dst.egressParams zip dst.io.egress) map { case (u,i) =>
-      io.egress(u.egressId) <> i
+      io.egress(u.egressId.get) <> i
     }
   }
 }

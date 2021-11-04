@@ -24,6 +24,8 @@ case class NoCConfig(
 
   // Seq[nodeId]
   ingressNodes: Seq[Int] = Nil,
+  // ingressId => vNetId
+  ingressVNets: Int => Int = (_: Int) => 0,
   // Seq[nodeId]
   egressNodes: Seq[Int] = Nil
 )
@@ -35,6 +37,11 @@ trait HasNoCParams {
   val params = p(NoCKey)
 
   val ingressNodes = params.ingressNodes
+  def ingressVNets(i: Int) = {
+    val r = params.ingressVNets(i)
+    require(r < params.nVirtualNetworks)
+    r
+  }
   val egressNodes = params.egressNodes
 
   val nNodes = params.nNodes
