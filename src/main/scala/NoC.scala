@@ -28,7 +28,6 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
 
   // srcId, vId, dstId
   type Pos = (Int, Int, Int)
-  var traversableVirtualChannels: Set[Pos] = Set[Pos]()
   val possiblePacketMap = scala.collection.mutable.Map[Pos, Set[(Int, Int)]]().withDefaultValue(Set[(Int, Int)]())
 
   ingressNodes.zipWithIndex.map { case (iId,iIdx) =>
@@ -49,7 +48,6 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
 
             require(nexts.size > 0,
               s"Failed to route from $iId to $oId at $srcId, $srcV, $nodeId")
-            traversableVirtualChannels = traversableVirtualChannels ++ nexts.toSet
             nexts
           }.flatten.toSet
         }
@@ -61,8 +59,8 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   // Also set possible nodes for each channel
   val channelParams = fullChannelParams.map { cP => cP.copy(
     virtualChannelParams=cP.virtualChannelParams.zipWithIndex.map { case (vP,vId) =>
-      if (!traversableVirtualChannels.contains((cP.srcId, vId, cP.destId))) {
-        require(possiblePacketMap((cP.srcId, vId, cP.destId)).size == 0)
+      val traversable = possiblePacketMap((cP.srcId, vId, cP.destId)).size != 0
+      if (!traversable) {
         println(s"WARNING, virtual channel $vId from ${cP.srcId} to ${cP.destId} appears to be untraversable")
       }
       vP.copy(possiblePackets=possiblePacketMap((cP.srcId, vId, cP.destId)))
