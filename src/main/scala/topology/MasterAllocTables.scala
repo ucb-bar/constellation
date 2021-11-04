@@ -288,6 +288,15 @@ object MasterAllocTables {
     (nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, destId: Int, vNetId: Int) = {
     def trueVIdToVirtualVId(vId: Int) = if (vId < n) 0 else vId - n
     f(nodeId)(srcId, trueVIdToVirtualVId(srcV), nxtId, trueVIdToVirtualVId(nxtV), destId, 0)
+  }
 
+  def blockingVirtualSubnetworks(f: MasterAllocTable, n: Int)
+    (nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, destId: Int, vNetId: Int) = {
+    val lNxtV = nxtV - vNetId
+    if (lNxtV < 0) {
+      false
+    } else {
+      f(nodeId)(srcId, srcV, nxtId, lNxtV, destId, 0)
+    }
   }
 }

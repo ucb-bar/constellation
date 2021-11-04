@@ -46,10 +46,19 @@ class WithUniformVirtualChannelBufferSize(size: Int) extends Config((site, here,
 
 class WithNNonblockingVirtualNetworks(n: Int) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
-    masterAllocTable = MasterAllocTables.nonblockingVirtualSubnetworks(up(NoCKey, site).masterAllocTable, n),
+    masterAllocTable = MasterAllocTables.nonblockingVirtualSubnetworks(
+      up(NoCKey, site).masterAllocTable, n),
     topology = (src: Int, dst: Int) => up(NoCKey, site).topology(src, dst).map(u => u.copy(
       virtualChannelParams = u.virtualChannelParams.map(c => Seq.fill(n) { c }).flatten
     )),
+    nVirtualNetworks = n
+  )
+})
+
+class WithNBlockingVirtualNetworks(n: Int) extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(
+    masterAllocTable = MasterAllocTables.blockingVirtualSubnetworks(
+      up(NoCKey, site).masterAllocTable, n),
     nVirtualNetworks = n
   )
 })
@@ -340,4 +349,10 @@ class TLTestConfig00 extends Config(
   new WithTLNoCTesterParams(TLNoCTesterParams(Seq(4, 0, 2, 5, 6, 9, 11), Seq(7, 1, 3, 8, 10))) ++
   new WithNNonblockingVirtualNetworksWithSharing(5, 2) ++
   new WithUniformVirtualChannels(2, VirtualChannelParams(3)) ++
+  new Mesh2DConfig(4, 3, MasterAllocTables.mesh2DAlternatingDimensionOrdered))
+
+class TLTestConfig01 extends Config(
+  new WithTLNoCTesterParams(TLNoCTesterParams(Seq(4, 0, 2, 5, 6, 9, 11), Seq(7, 1, 3, 8, 10))) ++
+  new WithNBlockingVirtualNetworks(5) ++
+  new WithUniformVirtualChannels(6, VirtualChannelParams(3)) ++
   new Mesh2DConfig(4, 3, MasterAllocTables.mesh2DAlternatingDimensionOrdered))
