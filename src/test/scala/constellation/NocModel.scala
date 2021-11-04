@@ -25,12 +25,41 @@ class NocModelStatus extends Bundle {
   val packetReceived = Bool()
 }
 
-class NocModel(nNodes: Int) extends Module {
-  require(nNodes > 1)
-  def routingRel(nodeId: UInt)(srcId: UInt, nxtId: UInt, dstId: UInt): Bool = {
+// TODO: if we make the default relations in the topology package chisel functions, then we do not
+//       need to duplicate them here
+object Relations {
+  type Routing = (UInt, UInt) => (UInt) => (UInt, UInt, UInt) => Bool
+  type Topology = (UInt, UInt) => (UInt, UInt) => Bool
+  def routingBidirectionalLine(nX: UInt, nY: UInt)(nodeId: UInt)(srcId: UInt, nxtId: UInt, dstId: UInt): Bool = {
     Mux(nodeId < nxtId, dstId >= nxtId, dstId <= nxtId) && nxtId =/= srcId
   }
-  def topologyRel(src: UInt, dest: UInt): Bool = (dest - src).abs === 1.U
+  def topologyBidirectionalLine(nX: UInt, nY: UInt)(src: UInt, dst: UInt): Bool =
+    (src > dst && src - dst === 1.U) || (dst > src && dst - src === 1.U)
+  def routingMesh2DMinimal(nX: UInt, nY: UInt)(nodeId: UInt)(srcId: UInt, nxtId: UInt, dstId: UInt): Bool = {
+    val (nxtX, nxtY)   = (nxtId % nX , nxtId / nX)
+    val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
+    val (dstX, dstY)   = (dstId % nX , dstId / nX)
+    val (srcX, srcY)   = (srcId % nX , srcId / nX)
+
+    val xR: Bool = Mux(nodeX < nxtX, dstX >= nxtX, Mux(nodeX > nxtX, dstX <= nxtX, nodeX === nxtX))
+    val yR: Bool = Mux(nodeY < nxtY, dstY >= nxtY, Mux(nodeY > nxtY, dstY <= nxtY, nodeY === nxtY))
+    xR && yR
+  }
+  def topologyMesh2D(nX: UInt, nY: UInt)(src: UInt, dst: UInt): Bool = {
+    val (srcX, srcY) = (src % nX, src / nX)
+    val (dstX, dstY) = (dst % nX, dst / nX)
+    (srcX === dstX && (srcY - dstY).abs === 1.U) || (srcY === dstY && (srcX - dstX).abs === 1.U)
+  }
+}
+
+case class NocConfig(nX: Int, nY: Int, topology: Relations.Topology, routing: Relations.Routing) {
+  def nNodes: Int = nX * nY
+}
+
+
+class NocModel(conf: NocConfig) extends Module {
+  val nNodes = conf.nNodes
+  require(nNodes > 1)
 
   // I/O
   val choices = IO(Input(new NocModelChoices(nNodes)))
@@ -55,23 +84,41 @@ class NocModel(nNodes: Int) extends Module {
   status.hopCount := hopCount
   status.packetReceived := state === Received
 
+  def nodeExists(rel: UInt => Bool): Bool = {
+    Cat((0 until nNodes).map(ii => rel(ii.U))) =/= 0.U
+  }
+
   when(state === Start) {
     // we start at an arbitrary node and route to an arbitrary node
     currentNode := choices.startNode
     srcNode := choices.startNode
     dstNode := choices.dstNode
-    state := InTransmission
+    val triviallyReceived = choices.startNode === choices.dstNode
+    state := Mux(triviallyReceived, Received, InTransmission)
   } .elsewhen(state === InTransmission) {
     // count the number of hops
     hopCount := hopCount + 1.U
 
+    // check that a next node exists
+    assert(nodeExists(ii => ii =/= currentNode && conf.topology(conf.nX.U, conf.nY.U)(currentNode, ii)),
+      "We are stuck trying to route from %d to %d! there is no neighboring node to %d in the topology!", srcNode, dstNode, currentNode
+    )
+
+    // check that a routing path exists
+    val routeAvailable = nodeExists(ii =>
+      ii =/= currentNode && conf.topology(conf.nX.U, conf.nY.U)(currentNode, ii) &&
+      conf.routing(conf.nX.U, conf.nY.U)(currentNode)(srcNode, ii, dstNode)
+    )
+    assert(routeAvailable, "We are stuck! there is no route from %d to %d through %d", srcNode, dstNode, currentNode)
+
     // we want to pick an adjacent node that is allowed by the routing table
     val nextNodeChoice = choices.nextNode
-    assume(topologyRel(currentNode, nextNodeChoice), "next node needs to be adjacent in the topology")
-    assume(routingRel(currentNode)(srcNode, nextNodeChoice, dstNode), "hop needs to be allowed by the routing table")
-
-    // TODO: check that a valid choice actually exists!
-
+    when(routeAvailable) {
+      assume(conf.topology(conf.nX.U, conf.nY.U)(currentNode, nextNodeChoice),
+        "next node needs to be adjacent in the topology")
+      assume(conf.routing(conf.nX.U, conf.nY.U)(currentNode)(srcNode, nextNodeChoice, dstNode),
+        "hop needs to be allowed by the routing table")
+    }
     currentNode := nextNodeChoice
 
     // we will be done if the next hop gets us to our destination
@@ -81,29 +128,39 @@ class NocModel(nNodes: Int) extends Module {
   }
 }
 
-class NocModelProperties(makeModel: => NocModel) extends Module {
+class NocModelProperties(makeModel: => NocModel, maxHops: Int) extends Module {
   val model = Module(makeModel)
   val choices = IO(Input(chiselTypeOf(model.choices)))
   choices <> model.choices
 
 
-  // check that the packet will be routed after at max 4 hops
-  assert(model.status.hopCount <= 4.U)
+  // check that the packet will be routed after at max N hops
+  require(maxHops > 0)
+  assert(model.status.hopCount <= maxHops.U)
 }
 
 class NocModelTests extends AnyFlatSpec with ChiselScalatestTester with Formal {
   behavior of "NocModel"
 
   it should "route packet after at max 4 hops with a bidirectional line and 5 nodes" in {
-    verify(new NocModelProperties(new NocModel(5)), Seq(BoundedCheck(10)))
+    val conf = NocConfig(5, 1, Relations.topologyBidirectionalLine, Relations.routingBidirectionalLine)
+    verify(new NocModelProperties(new NocModel(conf), maxHops = 4), Seq(BoundedCheck(10), CVC4EngineAnnotation))
   }
 
   it should "find a packet that cannot be routed in 4 hops with a bidirectional line and 6 nodes" in {
     assertThrows[FailedBoundedCheckException] {
-      verify(new NocModelProperties(new NocModel(6)), Seq(BoundedCheck(10)))
+      val conf = NocConfig(6, 1, Relations.topologyBidirectionalLine, Relations.routingBidirectionalLine)
+      verify(new NocModelProperties(new NocModel(conf), maxHops = 4), Seq(BoundedCheck(10), CVC4EngineAnnotation))
     }
     // checkout the VCD in:
     // test_run_dir/NocModel_should_find_a_packet_that_cannot_be_routed_in_4_hops_with_a_bidirectional_line_and_6_nodes/NocModelProperties.vcd
   }
+
+  // TODO: fix problem in firrtl SMT backend
+  it should "route packet after at max 10 hops with in a 4 x 4 network" ignore {
+    val conf = NocConfig(4, 4, Relations.topologyMesh2D, Relations.routingMesh2DMinimal)
+    verify(new NocModelProperties(new NocModel(conf), maxHops = 10), Seq(BoundedCheck(12), CVC4EngineAnnotation))
+  }
+
 
 }
