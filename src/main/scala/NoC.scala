@@ -28,30 +28,64 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
 
   // srcId, vId, dstId
   type Pos = (Int, Int, Int)
-  val possiblePacketMap = scala.collection.mutable.Map[Pos, Set[(Int, Int)]]().withDefaultValue(Set[(Int, Int)]())
+  // outIdx, vNetId
+  type Pkt = (Int, Int)
 
-  ingressNodes.zipWithIndex.map { case (iId,iIdx) =>
-    val vNetId = ingressVNets(iIdx)
-    egressNodes.zipWithIndex.map { case (oId,oIdx) =>
-      if (terminalConnectivity(iIdx, oIdx, vNetId)) {
-        var positions: Set[Pos] = Set((-1, 0, iId))
-        while (positions.size != 0) {
-          positions.foreach { pos => possiblePacketMap(pos) += ((oIdx, vNetId)) }
-          positions = positions.filter(_._3 != oId).map { case (srcId, srcV, nodeId) =>
-            val nexts = fullChannelParams.filter(_.srcId == nodeId).map { nxtC =>
-              (0 until nxtC.nVirtualChannels).map { nxtV =>
-                val can_transition = masterAllocTable(
-                  nodeId)(srcId, srcV, nxtC.destId, nxtV, oId, vNetId)
-                if (can_transition) Some((nodeId, nxtV, nxtC.destId)) else None
+  // Tracks the set of every possible packet that might occupy each virtual channel
+  val possiblePacketMap = scala.collection.mutable.Map[Pos, Set[Pkt]]().withDefaultValue(Set[Pkt]())
+
+  def checkConnectivity(vNetId: Int, f: (Int, Int, Int, Int, Int, Int, Int) => Boolean) = {
+    // Loop through accessible ingress/egress pairs
+    ingressNodes.zipWithIndex.map { case (iId,iIdx) =>
+      egressNodes.zipWithIndex.map { case (oId,oIdx) =>
+        if (ingressVNets(iIdx) == vNetId && terminalConnectivity(iIdx, oIdx, vNetId)) {
+          // Track the positions a packet performing ingress->egress might occupy
+          var positions: Set[Pos] = Set((-1, 0, iId))
+          while (positions.size != 0) {
+            positions.foreach { pos => possiblePacketMap(pos) += ((oIdx, vNetId)) }
+            // Determine next possible positions based on current possible positions
+            // and connectivity function
+            positions = positions.filter(_._3 != oId).map { case (srcId, srcV, nodeId) =>
+              val nexts = fullChannelParams.filter(_.srcId == nodeId).map { nxtC =>
+                (0 until nxtC.nVirtualChannels).map { nxtV =>
+                  val can_transition = f(nodeId, srcId, srcV, nxtC.destId, nxtV, oId, vNetId)
+                  if (can_transition) Some((nodeId, nxtV, nxtC.destId)) else None
+                }.flatten
               }.flatten
-            }.flatten
-
-            require(nexts.size > 0,
-              s"Failed to route from $iId to $oId at $srcId, $srcV, $nodeId")
-            nexts
-          }.flatten.toSet
+              require(nexts.size > 0,
+                s"Failed to route from $iId to $oId at $srcId, $srcV, $nodeId")
+              nexts
+            }.flatten.toSet
+          }
         }
       }
+    }
+  }
+
+  // Check connectivity, ignoring blocking properties of virtual subnets
+  for (vNetId <- 0 until nVirtualNetworks) {
+    checkConnectivity(vNetId,
+      (nodeId: Int, srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, oId: Int, vNetId: Int) => {
+        masterAllocTable(nodeId)(srcId, srcV, nxtId, nxtV, oId, vNetId)
+      }
+    )
+  }
+
+  // Connectivity for each virtual subnet
+  for (vNetId <- 0 until nVirtualNetworks) {
+    // blockees are vNets which the current vNet can block without affecting its own forwards progress
+    val blockees = (0 until nVirtualNetworks).filter(v => v != vNetId && params.vNetBlocking(vNetId, v))
+    val blockeeSets = blockees.toSet.subsets
+    // For each subset of blockers for this virtual network, recheck connectivity assuming
+    // every virtual channel accessible to each blocker is locked
+    for (b <- blockeeSets) {
+      checkConnectivity(vNetId,
+        (nodeId: Int, srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, oId: Int, vNetId: Int) => {
+          (masterAllocTable(nodeId)(srcId, srcV, nxtId, nxtV, oId, vNetId) &&
+            !(b.map { v => possiblePacketMap((nodeId, nxtV, nxtId)).map(_._2 == v) }.flatten.fold(false)(_||_))
+          )
+        }
+      )
     }
   }
 

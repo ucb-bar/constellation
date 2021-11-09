@@ -59,7 +59,8 @@ class WithNBlockingVirtualNetworks(n: Int) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     masterAllocTable = MasterAllocTables.blockingVirtualSubnetworks(
       up(NoCKey, site).masterAllocTable, n),
-    nVirtualNetworks = n
+    nVirtualNetworks = n,
+    vNetBlocking = (blocker: Int, blockee: Int) => blocker < blockee
   )
 })
 
@@ -330,18 +331,39 @@ class TestConfig36 extends Config(
   new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
   new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DNorthLast))
 
-// 2D Torus
 class TestConfig37 extends Config(
+  new constellation.WithNBlockingVirtualNetworks(3) ++
+  new constellation.WithUniformVirtualChannels(4, VirtualChannelParams(3)) ++
+  new constellation.Mesh2DConfig(3, 3, MasterAllocTables.mesh2DDimensionOrderedHighest))
+
+class TestConfig38 extends Config(
+  new constellation.WithNBlockingVirtualNetworks(3) ++
+  new constellation.WithUniformVirtualChannels(4, VirtualChannelParams(3)) ++
+  new constellation.Mesh2DConfig(3, 3, MasterAllocTables.mesh2DAlternatingDimensionOrdered))
+
+class TestConfig39 extends Config(
+  new constellation.WithNNonblockingVirtualNetworks(3) ++
+  new constellation.WithUniformVirtualChannels(4, VirtualChannelParams(3)) ++
+  new constellation.Mesh2DConfig(3, 3, MasterAllocTables.mesh2DDimensionOrderedHighest))
+
+class TestConfig40 extends Config(
+  new constellation.WithNNonblockingVirtualNetworksWithSharing(3) ++
+  new constellation.WithUniformVirtualChannels(4, VirtualChannelParams(3)) ++
+  new constellation.Mesh2DConfig(3, 3, MasterAllocTables.mesh2DDimensionOrderedHighest))
+
+
+// 2D Torus
+class TestConfig41 extends Config(
   new WithUniformVirtualChannels(2, VirtualChannelParams(1)) ++
   new UnidirectionalTorus2DConfig(3, 3))
-class TestConfig38 extends Config(
+class TestConfig42 extends Config(
   new WithUniformVirtualChannels(3, VirtualChannelParams(3)) ++
   new UnidirectionalTorus2DConfig(3, 3))
-class TestConfig39 extends Config(
+class TestConfig43 extends Config(
   new WithUniformVirtualChannels(4, VirtualChannelParams(4)) ++
   new UnidirectionalTorus2DConfig(5, 5))
 
-class TestConfig40 extends Config(
+class TestConfig44 extends Config(
   new WithUniformVirtualChannels(2, VirtualChannelParams(1)) ++
   new BidirectionalTorus2DConfig(3, 3))
 

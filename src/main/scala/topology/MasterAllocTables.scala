@@ -177,12 +177,8 @@ object MasterAllocTables {
 
     val sel = if (srcId == -1) {
       canRouteNext
-    } else if (canRouteThis) {
-      nxtV % 2 == srcV % 2 && nxtV <= srcV
-    } else if (canRouteNext) {
-      nxtV % 2 != srcV % 2 && nxtV <= srcV
     } else {
-      false
+      (canRouteThis && nxtV % 2 == srcV % 2 && nxtV <= srcV) || (canRouteNext && nxtV % 2 != srcV % 2 && nxtV <= srcV)
     }
     sel && mesh2DMinimal(nX, nY)(nodeId)(srcId, nxtId, dstId, vNetId)
   }
@@ -280,7 +276,7 @@ object MasterAllocTables {
   // Independent virtual subnets with no resource sharing
   def nonblockingVirtualSubnetworks(f: MasterAllocTable, n: Int)
     (nodeId: Int)(srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, destId: Int, vNetId: Int) = {
-    (vNetId % n == nxtV) && f(nodeId)(srcId, srcV / n, nxtId, nxtV / n, destId, 0)
+    (nxtV % n == vNetId) && f(nodeId)(srcId, srcV / n, nxtId, nxtV / n, destId, 0)
   }
 
   // Virtual subnets with 1 dedicated virtual channel each, and some number of shared channels

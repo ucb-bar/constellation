@@ -21,6 +21,8 @@ case class NoCConfig(
   masterAllocTable: MasterAllocTable = MasterAllocTables.allLegal,
   routerParams: Int => RouterParams =
     (i: Int) => RouterParams(i, Nil, Nil, Nil, Nil, (_,_,_,_,_,_) => false, false, false),
+  // blocker, blocked => bool
+  vNetBlocking: (Int, Int) => Boolean = (_: Int, _: Int) => false,
 
   // Seq[nodeId]
   ingressNodes: Seq[Int] = Nil,
