@@ -9,15 +9,15 @@ import freechips.rocketchip.rocket.DecodeLogic
 
 import constellation._
 
-class RouteComputerReq(val cParam: ChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
+class RouteComputerReq(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   val src_virt_id = UInt(virtualChannelBits.W)
   val src_vnet_id = UInt(vNetBits.W)
   val dest_id = UInt(nodeIdBits.W)
 }
 
-class RouteComputerResp(val cParam: ChannelParams,
+class RouteComputerResp(val cParam: BaseChannelParams,
   val outParams: Seq[ChannelParams],
-  val egressParams: Seq[ChannelParams])(implicit val p: Parameters) extends Bundle
+  val egressParams: Seq[EgressChannelParams])(implicit val p: Parameters) extends Bundle
     with HasChannelParams with HasRouterOutputParams {
 
   val src_virt_id = UInt(virtualChannelBits.W)

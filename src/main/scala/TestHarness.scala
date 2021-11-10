@@ -24,7 +24,7 @@ object SelectFirstNUInt
   }
 }
 
-class InputGen(idx: Int, cParams: ChannelParams, inputStallProbability: Double)(implicit val p: Parameters) extends Module with HasNoCParams {
+class InputGen(idx: Int, cParams: IngressChannelParams, inputStallProbability: Double)(implicit val p: Parameters) extends Module with HasNoCParams {
   val io = IO(new Bundle {
     val out = Decoupled(new IOFlit(cParams))
     val rob_ready = Input(Bool())
@@ -70,7 +70,7 @@ class InputGen(idx: Int, cParams: ChannelParams, inputStallProbability: Double)(
 
 }
 
-class NoCTester(inputParams: Seq[ChannelParams], outputParams: Seq[ChannelParams])(implicit val p: Parameters) extends Module with HasNoCParams {
+class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[EgressChannelParams])(implicit val p: Parameters) extends Module with HasNoCParams {
   require(flitPayloadBits >= 64)
   val robSz = 128
   val totalTxs = 50000

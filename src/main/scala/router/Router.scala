@@ -11,8 +11,8 @@ case class RouterParams(
   nodeId: Int,
   inParams: Seq[ChannelParams],
   outParams: Seq[ChannelParams],
-  ingressParams: Seq[ChannelParams],
-  egressParams: Seq[ChannelParams],
+  ingressParams: Seq[IngressChannelParams],
+  egressParams: Seq[EgressChannelParams],
   masterAllocTable: (Int, Int, Int, Int, Int, Int) => Boolean,
   combineSAST: Boolean = false,
   combineRCVA: Boolean = false,
@@ -20,7 +20,7 @@ case class RouterParams(
 
 trait HasRouterOutputParams extends HasNoCParams {
   val outParams: Seq[ChannelParams]
-  val egressParams: Seq[ChannelParams]
+  val egressParams: Seq[EgressChannelParams]
 
   def allOutParams = outParams ++ egressParams
 
@@ -31,7 +31,7 @@ trait HasRouterOutputParams extends HasNoCParams {
 
 trait HasRouterInputParams extends HasNoCParams {
   val inParams: Seq[ChannelParams]
-  val ingressParams: Seq[ChannelParams]
+  val ingressParams: Seq[IngressChannelParams]
 
   def allInParams = inParams ++ ingressParams
 
@@ -49,7 +49,7 @@ trait HasRouterParams extends HasRouterOutputParams with HasRouterInputParams
   val ingressParams = rP.ingressParams
   val egressParams = rP.egressParams
 
-  def possibleTransition(inParam: ChannelParams, outParam: ChannelParams): Boolean = {
+  def possibleTransition(inParam: BaseChannelParams, outParam: BaseChannelParams): Boolean = {
 
     // Always allow transition to output if the packet has reached
     // its destination
@@ -61,8 +61,7 @@ trait HasRouterParams extends HasRouterOutputParams with HasRouterInputParams
       outParam.nVirtualChannels,
       nNodes,
       nVirtualNetworks) { case (inV, outV, destId, vNetId) =>
-        (rP.masterAllocTable(inParam.srcId, inV, outParam.destId, outV, destId, vNetId) ||
-          (inParam.isIngress && outParam.isEgress))
+        rP.masterAllocTable(inParam.srcId, inV, outParam.destId, outV, destId, vNetId)
     }.flatten.flatten.flatten.reduce(_||_)
 
     legalVirtualTransition

@@ -8,7 +8,7 @@ import freechips.rocketchip.util._
 
 import constellation._
 
-class EgressUnit(inParams: Seq[ChannelParams], ingressParams: Seq[ChannelParams], cParam: ChannelParams)
+class EgressUnit(inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannelParams], cParam: EgressChannelParams)
   (implicit p: Parameters) extends AbstractOutputUnit(inParams, ingressParams, cParam)(p) {
 
   require(nVirtualChannels == 1)

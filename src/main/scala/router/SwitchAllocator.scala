@@ -8,7 +8,7 @@ import freechips.rocketchip.util._
 
 import constellation._
 
-class SwitchAllocReq(val outParams: Seq[ChannelParams], val egressParams: Seq[ChannelParams])
+class SwitchAllocReq(val outParams: Seq[ChannelParams], val egressParams: Seq[EgressChannelParams])
   (implicit val p: Parameters) extends Bundle with HasRouterOutputParams {
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
   val tail = Bool()

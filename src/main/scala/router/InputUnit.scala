@@ -9,9 +9,9 @@ import freechips.rocketchip.util._
 import constellation._
 
 class AbstractInputUnitIO(
-  val cParam: ChannelParams,
+  val cParam: BaseChannelParams,
   val outParams: Seq[ChannelParams],
-  val egressParams: Seq[ChannelParams],
+  val egressParams: Seq[EgressChannelParams],
 )(implicit val p: Parameters) extends Bundle
     with HasRouterOutputParams with HasChannelParams {
   val nodeId = cParam.destId
@@ -34,9 +34,9 @@ class AbstractInputUnitIO(
 }
 
 abstract class AbstractInputUnit(
-  val cParam: ChannelParams,
+  val cParam: BaseChannelParams,
   val outParams: Seq[ChannelParams],
-  val egressParams: Seq[ChannelParams],
+  val egressParams: Seq[EgressChannelParams],
   allocTable: (Int, Int, Int, Int, Int) => Boolean,
 )(implicit val p: Parameters) extends Module with HasRouterOutputParams with HasChannelParams {
   val nodeId = cParam.destId
@@ -61,15 +61,14 @@ abstract class AbstractInputUnit(
 }
 
 class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
-  egressParams: Seq[ChannelParams],
+  egressParams: Seq[EgressChannelParams],
   combineRCVA: Boolean, combineSAST: Boolean,
   allocTable: (Int, Int, Int, Int, Int) => Boolean,
 )
   (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, egressParams, allocTable)(p) {
-  require(!isIngressChannel)
 
   val io = IO(new AbstractInputUnitIO(cParam, outParams, egressParams) {
-    val in = Flipped(new Channel(cParam))
+    val in = Flipped(new Channel(cParam.asInstanceOf[ChannelParams]))
   })
   io.debug.va_stall := false.B
   io.debug.sa_stall := false.B

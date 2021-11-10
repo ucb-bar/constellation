@@ -11,17 +11,17 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
     topologyFunction(i, j)
   }.flatten.flatten
   val ingressParams = ingressNodes.zipWithIndex.map { case (nId,i) =>
-    ChannelParams(-1, nId, Seq(VirtualChannelParams(-1,
+    IngressChannelParams(nId, Seq(VirtualChannelParams(-1,
       possiblePackets=Seq.tabulate(egressNodes.size, nVirtualNetworks) { case (e, v) => (terminalConnectivity(i,e,v), (e, v)) }
         .flatten.filter(_._1).map(_._2).toSet
-    )), ingressId=Some(i), vNetId=Some(ingressVNets(i)))
+    )), ingressId=i, vNetId=ingressVNets(i))
   }
   val egressParams = egressNodes.zipWithIndex.map { case (nId,e) =>
-    ChannelParams(nId, -1, Seq(VirtualChannelParams(-1,
+    EgressChannelParams(nId, Seq(VirtualChannelParams(-1,
       possiblePackets=Seq.tabulate(nVirtualNetworks) { v =>
         ((0 until ingressNodes.size).map { i => terminalConnectivity(i,e,v) }.reduce(_||_), (e, v))
       }.filter(_._1).map(_._2).toSet
-    )), egressId=Some(e))
+    )), egressId=e)
   }
 
   // Check sanity of masterAllocTable, all inputs can route to all outputs
@@ -129,10 +129,10 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
       )
     }
     (dst.ingressParams zip dst.io.ingress) map { case (u,i) =>
-      i <> io.ingress(u.ingressId.get)
+      i <> io.ingress(u.ingressId)
     }
     (dst.egressParams zip dst.io.egress) map { case (u,i) =>
-      io.egress(u.egressId.get) <> i
+      io.egress(u.egressId) <> i
     }
   }
 }

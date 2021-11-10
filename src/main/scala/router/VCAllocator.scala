@@ -9,14 +9,13 @@ import freechips.rocketchip.rocket.{DecodeLogic}
 
 import constellation._
 
-class VCAllocReq(val cParam: ChannelParams, val outParams: Seq[ChannelParams], val egressParams: Seq[ChannelParams])
+class VCAllocReq(val cParam: BaseChannelParams, val outParams: Seq[ChannelParams], val egressParams: Seq[EgressChannelParams])
   (implicit val p: Parameters) extends Bundle with HasChannelParams with HasRouterOutputParams{
   val in_virt_channel = UInt(virtualChannelBits.W)
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
 }
 
-class VCAllocResp(val cParam: ChannelParams, val outParams: Seq[ChannelParams], val egressParams: Seq[ChannelParams])
-  (implicit val p: Parameters) extends Bundle with HasChannelParams with HasRouterOutputParams {
+class VCAllocResp(val cParam: BaseChannelParams, val outParams: Seq[ChannelParams], val egressParams: Seq[EgressChannelParams])(implicit val p: Parameters) extends Bundle with HasChannelParams with HasRouterOutputParams {
   val in_virt_channel = UInt(virtualChannelBits.W)
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
 }

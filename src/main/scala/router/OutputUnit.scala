@@ -8,8 +8,8 @@ import constellation._
 
 class AbstractOutputUnitIO(
   val inParams: Seq[ChannelParams],
-  val ingressParams: Seq[ChannelParams],
-  val cParam: ChannelParams
+  val ingressParams: Seq[IngressChannelParams],
+  val cParam: BaseChannelParams
 )(implicit val p: Parameters) extends Bundle with HasRouterInputParams with HasChannelParams {
   val nodeId = cParam.srcId
 
@@ -21,19 +21,19 @@ class AbstractOutputUnitIO(
 
 abstract class AbstractOutputUnit(
   val inParams: Seq[ChannelParams],
-  val ingressParams: Seq[ChannelParams],
-  val cParam: ChannelParams
+  val ingressParams: Seq[IngressChannelParams],
+  val cParam: BaseChannelParams
 )(implicit val p: Parameters) extends Module with HasRouterInputParams with HasChannelParams {
   val nodeId = cParam.srcId
 
   def io: AbstractOutputUnitIO
 }
 
-class OutputUnit(inParams: Seq[ChannelParams], ingressParams: Seq[ChannelParams], cParam: ChannelParams)
+class OutputUnit(inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannelParams], cParam: ChannelParams)
   (implicit p: Parameters) extends AbstractOutputUnit(inParams, ingressParams, cParam)(p) {
 
   val io = IO(new AbstractOutputUnitIO(inParams, ingressParams, cParam) {
-    val out = new Channel(cParam)
+    val out = new Channel(cParam.asInstanceOf[ChannelParams])
     val credit_alloc = Input(Valid(UInt(virtualChannelBits.W)))
   })
 
