@@ -41,8 +41,6 @@ class OutputUnit(inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannel
 
   class OutputState(val bufferSize: Int) extends Bundle {
     val g = UInt(2.W)
-    val i_p = UInt(log2Up(nInputs).W)
-    val i_c = UInt(log2Up(allInParams.map(_.virtualChannelParams.size).max).W)
     val c = UInt(log2Up(1+bufferSize).W)
   }
 

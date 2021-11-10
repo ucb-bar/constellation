@@ -15,11 +15,9 @@ case class VirtualChannelParams(
 trait BaseChannelParams {
   def srcId: Int
   def destId: Int
+  def possiblePackets: Set[(Int, Int)]
+  def nVirtualChannels: Int
   def virtualChannelParams: Seq[VirtualChannelParams]
-
-  def nVirtualChannels = virtualChannelParams.size
-  def traversable = virtualChannelParams.map(_.traversable).reduce(_||_)
-  def possiblePackets = virtualChannelParams.map(_.possiblePackets).reduce(_++_)
 }
 
 case class ChannelParams(
@@ -27,25 +25,35 @@ case class ChannelParams(
   destId: Int,
   virtualChannelParams: Seq[VirtualChannelParams] = Seq(VirtualChannelParams()),
   depth: Int = 0
-) extends BaseChannelParams
+) extends BaseChannelParams {
+  def nVirtualChannels = virtualChannelParams.size
+  val maxBufferSize = virtualChannelParams.map(_.bufferSize).max
+
+  def possiblePackets = virtualChannelParams.map(_.possiblePackets).reduce(_++_)
+  val traversable = virtualChannelParams.map(_.traversable).reduce(_||_)
+
+}
 
 case class IngressChannelParams(
   destId: Int,
-  virtualChannelParams: Seq[VirtualChannelParams],
   ingressId: Int,
-  vNetId: Int
+  vNetId: Int,
+  possibleEgresses: Set[Int]
 ) extends BaseChannelParams {
   def srcId = -1
-  require(virtualChannelParams.size == 1)
+  def nVirtualChannels = 1
+  def virtualChannelParams = { require(false); Nil }
+  def possiblePackets = possibleEgresses.map { e => (e, vNetId) }
 }
 
 case class EgressChannelParams(
   srcId: Int,
-  virtualChannelParams: Seq[VirtualChannelParams],
-  egressId: Int
+  egressId: Int,
+  possiblePackets: Set[(Int, Int)]
 ) extends BaseChannelParams {
   def destId = -1
-  require(virtualChannelParams.size == 1)
+  def nVirtualChannels = 1
+  def virtualChannelParams = { require(false); Nil }
 }
 
 
@@ -53,11 +61,10 @@ case class EgressChannelParams(
 trait HasChannelParams extends HasNoCParams {
   val cParam: BaseChannelParams
 
-  val virtualChannelParams = cParam.virtualChannelParams
   val nVirtualChannels = cParam.nVirtualChannels
   val virtualChannelBits = log2Up(nVirtualChannels)
-
-  val maxBufferSize = virtualChannelParams.map(_.bufferSize).max
+  def virtualChannelParams = cParam.virtualChannelParams
+  def maxBufferSize = virtualChannelParams.map(_.bufferSize).max
 }
 
 class Channel(val cParam: ChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {

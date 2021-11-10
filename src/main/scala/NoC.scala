@@ -11,17 +11,17 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
     topologyFunction(i, j)
   }.flatten.flatten
   val ingressParams = ingressNodes.zipWithIndex.map { case (nId,i) =>
-    IngressChannelParams(nId, Seq(VirtualChannelParams(-1,
-      possiblePackets=Seq.tabulate(egressNodes.size, nVirtualNetworks) { case (e, v) => (terminalConnectivity(i,e,v), (e, v)) }
-        .flatten.filter(_._1).map(_._2).toSet
-    )), ingressId=i, vNetId=ingressVNets(i))
+    IngressChannelParams(
+      destId=nId, ingressId=i, vNetId=ingressVNets(i),
+      possibleEgresses=(0 until egressNodes.size).toSet.filter(e => terminalConnectivity(i,e,ingressVNets(i))))
   }
   val egressParams = egressNodes.zipWithIndex.map { case (nId,e) =>
-    EgressChannelParams(nId, Seq(VirtualChannelParams(-1,
+    EgressChannelParams(
+      srcId=nId, egressId=e,
       possiblePackets=Seq.tabulate(nVirtualNetworks) { v =>
         ((0 until ingressNodes.size).map { i => terminalConnectivity(i,e,v) }.reduce(_||_), (e, v))
       }.filter(_._1).map(_._2).toSet
-    )), egressId=e)
+    )
   }
 
   // Check sanity of masterAllocTable, all inputs can route to all outputs
