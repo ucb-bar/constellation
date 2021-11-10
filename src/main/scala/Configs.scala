@@ -84,7 +84,9 @@ class WithUniformVirtualChannels(n: Int, v: VirtualChannelParams) extends Config
 })
 
 class WithIngressVNets(f: Int => Int) extends Config((site, here, up) => {
-  case NoCKey => up(NoCKey, site).copy(ingressVNets = f)
+  case NoCKey => up(NoCKey, site).copy(ingresses = up(NoCKey, site).ingresses.zipWithIndex.map { case (u,i) =>
+    u.copy(vNetId = f(i))
+  })
 })
 
 class UnidirectionalLineConfig(
@@ -95,8 +97,8 @@ class UnidirectionalLineConfig(
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
     topology = TopologyConverter(Topologies.unidirectionalLine),
-    ingressNodes = ingressNodes,
-    egressNodes = egressNodes
+    ingresses = ingressNodes.map(i => IngressChannelParams(i, (0 until egressNodes.size).toSet)),
+    egresses = egressNodes.map(i => EgressChannelParams(i))
   )
 })
 
@@ -109,8 +111,8 @@ class BidirectionalLineConfig(
     nNodes = nNodes,
     topology = TopologyConverter(Topologies.bidirectionalLine),
     masterAllocTable = MasterAllocTables.bidirectionalLine,
-    ingressNodes = ingressNodes,
-    egressNodes = egressNodes
+    ingresses = ingressNodes.map(i => IngressChannelParams(i, (0 until egressNodes.size).toSet)),
+    egresses = egressNodes.map(i => EgressChannelParams(i))
   )
 })
 
@@ -123,8 +125,8 @@ class UnidirectionalTorus1DConfig(
     nNodes = nNodes,
     topology = TopologyConverter(Topologies.unidirectionalTorus1D(nNodes)),
     masterAllocTable = MasterAllocTables.unidirectionalTorus1DDateline(nNodes),
-    ingressNodes = ingressNodes,
-    egressNodes = egressNodes
+    ingresses = ingressNodes.map(i => IngressChannelParams(i, (0 until egressNodes.size).toSet)),
+    egresses = egressNodes.map(i => EgressChannelParams(i))
   )
 })
 
@@ -142,8 +144,8 @@ class BidirectionalTorus1DConfig(
     } else {
       MasterAllocTables.bidirectionalTorus1DShortest(nNodes)
     },
-    ingressNodes = ingressNodes,
-    egressNodes = egressNodes
+    ingresses = ingressNodes.map(i => IngressChannelParams(i, (0 until egressNodes.size).toSet)),
+    egresses = egressNodes.map(i => EgressChannelParams(i))
   )
 })
 
@@ -157,8 +159,8 @@ class ButterflyConfig(
       nNodes = height * nFly,
       topology = TopologyConverter(Topologies.butterfly(kAry, nFly)),
       masterAllocTable = MasterAllocTables.butterfly(kAry, nFly),
-      ingressNodes = (0 until height) ++ (0 until height),
-      egressNodes = ((0 until height) ++ (0 until height)).map(_ + height*(nFly-1))
+      ingresses = ((0 until height) ++ (0 until height)).map(i => IngressChannelParams(i, (0 until 2*height).toSet)),
+      egresses = ((0 until height) ++ (0 until height)).map(i => EgressChannelParams(i + height*(nFly-1)))
     )
   }
 })
@@ -172,8 +174,8 @@ class Mesh2DConfig(
     nNodes = nX * nY,
     topology = TopologyConverter(Topologies.mesh2D(nX, nY)),
     masterAllocTable = masterAllocTable(nX, nY),
-    ingressNodes = (0 until nX * nY),
-    egressNodes = (0 until nX * nY)
+    ingresses = (0 until nX * nY).map(i => IngressChannelParams(i, (0 until nX * nY).toSet)),
+    egresses = (0 until nX * nY).map(i => EgressChannelParams(i))
   )
 })
 
@@ -185,8 +187,8 @@ class UnidirectionalTorus2DConfig(
     nNodes = nX * nY,
     topology = TopologyConverter(Topologies.unidirectionalTorus2D(nX, nY)),
     masterAllocTable = MasterAllocTables.dimensionOrderedUnidirectionalTorus2DDateline(nX, nY),
-    ingressNodes = (0 until nX * nY),
-    egressNodes = (0 until nX * nY)
+    ingresses = (0 until nX * nY).map(i => IngressChannelParams(i, (0 until nX * nY).toSet)),
+    egresses = (0 until nX * nY).map(i => EgressChannelParams(i))
   )
 })
 
@@ -199,8 +201,8 @@ class BidirectionalTorus2DConfig(
     nNodes = nX * nY,
     topology = TopologyConverter(Topologies.bidirectionalTorus2D(nX, nY)),
     masterAllocTable = MasterAllocTables.dimensionOrderedBidirectionalTorus2DDateline(nX, nY),
-    ingressNodes = (0 until nX * nY),
-    egressNodes = (0 until nX * nY)
+    ingresses = (0 until nX * nY).map(i => IngressChannelParams(i, (0 until nX * nY).toSet)),
+    egresses = (0 until nX * nY).map(i => EgressChannelParams(i))
   )
 })
 

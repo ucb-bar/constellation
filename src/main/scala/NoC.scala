@@ -10,19 +10,6 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   val fullChannelParams: Seq[ChannelParams] = Seq.tabulate(nNodes, nNodes) { case (i,j) =>
     topologyFunction(i, j)
   }.flatten.flatten
-  val ingressParams = ingressNodes.zipWithIndex.map { case (nId,i) =>
-    IngressChannelParams(
-      destId=nId, ingressId=i, vNetId=ingressVNets(i),
-      possibleEgresses=(0 until egressNodes.size).toSet.filter(e => terminalConnectivity(i,e,ingressVNets(i))))
-  }
-  val egressParams = egressNodes.zipWithIndex.map { case (nId,e) =>
-    EgressChannelParams(
-      srcId=nId, egressId=e,
-      possiblePackets=Seq.tabulate(nVirtualNetworks) { v =>
-        ((0 until ingressNodes.size).map { i => terminalConnectivity(i,e,v) }.reduce(_||_), (e, v))
-      }.filter(_._1).map(_._2).toSet
-    )
-  }
 
   // Check sanity of masterAllocTable, all inputs can route to all outputs
 
@@ -36,27 +23,29 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
 
   def checkConnectivity(vNetId: Int, f: (Int, Int, Int, Int, Int, Int, Int) => Boolean) = {
     // Loop through accessible ingress/egress pairs
-    ingressNodes.zipWithIndex.map { case (iId,iIdx) =>
-      egressNodes.zipWithIndex.map { case (oId,oIdx) =>
-        if (ingressVNets(iIdx) == vNetId && terminalConnectivity(iIdx, oIdx, vNetId)) {
-          // Track the positions a packet performing ingress->egress might occupy
-          var positions: Set[Pos] = Set((-1, 0, iId))
-          while (positions.size != 0) {
-            positions.foreach { pos => possiblePacketMap(pos) += ((oIdx, vNetId)) }
-            // Determine next possible positions based on current possible positions
-            // and connectivity function
-            positions = positions.filter(_._3 != oId).map { case (srcId, srcV, nodeId) =>
-              val nexts = fullChannelParams.filter(_.srcId == nodeId).map { nxtC =>
-                (0 until nxtC.nVirtualChannels).map { nxtV =>
-                  val can_transition = f(nodeId, srcId, srcV, nxtC.destId, nxtV, oId, vNetId)
-                  if (can_transition) Some((nodeId, nxtV, nxtC.destId)) else None
-                }.flatten
+    globalIngressParams.filter(_.vNetId == vNetId).zipWithIndex.map { case (iP,iIdx) =>
+      val iId = iP.destId
+      iP.possibleEgresses.map { oIdx =>
+        val oP = globalEgressParams(oIdx)
+        val oId = oP.srcId
+
+        // Track the positions a packet performing ingress->egress might occupy
+        var positions: Set[Pos] = Set((-1, 0, iId))
+        while (positions.size != 0) {
+          positions.foreach { pos => possiblePacketMap(pos) += ((oIdx, vNetId)) }
+          // Determine next possible positions based on current possible positions
+          // and connectivity function
+          positions = positions.filter(_._3 != oId).map { case (srcId, srcV, nodeId) =>
+            val nexts = fullChannelParams.filter(_.srcId == nodeId).map { nxtC =>
+              (0 until nxtC.nVirtualChannels).map { nxtV =>
+                val can_transition = f(nodeId, srcId, srcV, nxtC.destId, nxtV, oId, vNetId)
+                if (can_transition) Some((nodeId, nxtV, nxtC.destId)) else None
               }.flatten
-              require(nexts.size > 0,
-                s"Failed to route from $iId to $oId at $srcId, $srcV, $nodeId")
-              nexts
-            }.flatten.toSet
-          }
+            }.flatten
+            require(nexts.size > 0,
+              s"Failed to route from $iId to $oId at $srcId, $srcV, $nodeId")
+            nexts
+          }.flatten.toSet
         }
       }
     }
@@ -108,16 +97,16 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   println("Constellation: Starting NoC RTL generation")
 
   val io = IO(new Bundle {
-    val ingress = MixedVec(ingressParams.map { u => Flipped(new TerminalChannel(u)) })
-    val egress = MixedVec(egressParams.map { u => new TerminalChannel(u) })
+    val ingress = MixedVec(globalIngressParams.map { u => Flipped(new TerminalChannel(u)) })
+    val egress = MixedVec(globalEgressParams.map { u => new TerminalChannel(u) })
   })
 
   val router_nodes = Seq.tabulate(nNodes) { i => Module(new Router(routerParams(i).copy(
     nodeId = i,
     inParams = channelParams.filter(_.destId == i),
     outParams = channelParams.filter(_.srcId == i),
-    ingressParams = ingressParams.filter(_.destId == i),
-    egressParams = egressParams.filter(_.srcId == i),
+    ingressParams = globalIngressParams.filter(_.destId == i),
+    egressParams = globalEgressParams.filter(_.srcId == i),
     masterAllocTable = masterAllocTable(i),
   ))) }
 

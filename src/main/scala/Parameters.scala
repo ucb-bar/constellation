@@ -16,35 +16,28 @@ case class NoCConfig(
 
   // srcNodeId, destNodeId => virtualChannelParams
   topology: (Int, Int) => Option[ChannelParams] = (a: Int, b: Int) => None,
-  // src, dst, vNetId
-  terminalConnectivity: (Int, Int, Int) => Boolean = (_: Int, _: Int, _: Int) => true,
+  ingresses: Seq[IngressChannelParams] = Nil,
+  egresses: Seq[EgressChannelParams] = Nil,
   masterAllocTable: MasterAllocTable = MasterAllocTables.allLegal,
   routerParams: Int => RouterParams =
     (i: Int) => RouterParams(i, Nil, Nil, Nil, Nil, (_,_,_,_,_,_) => false, false, false),
   // blocker, blocked => bool
   vNetBlocking: (Int, Int) => Boolean = (_: Int, _: Int) => false,
-
-  // Seq[nodeId]
-  ingressNodes: Seq[Int] = Nil,
-  // ingressId => vNetId
-  ingressVNets: Int => Int = (_: Int) => 0,
-  // Seq[nodeId]
-  egressNodes: Seq[Int] = Nil
 )
-
 case object NoCKey extends Field[NoCConfig](NoCConfig())
 
 trait HasNoCParams {
   implicit val p: Parameters
   val params = p(NoCKey)
 
-  val ingressNodes = params.ingressNodes
-  def ingressVNets(i: Int) = {
-    val r = params.ingressVNets(i)
-    require(r < params.nVirtualNetworks)
-    r
-  }
-  val egressNodes = params.egressNodes
+  val globalIngressParams = params.ingresses.zipWithIndex.map { case (u,i) => u.copy(ingressId=i) }
+  val globalEgressParams = params.egresses.zipWithIndex.map { case (u,e) => u.copy(egressId=e,
+    possiblePackets=globalIngressParams.map { i =>
+      (i.possibleEgresses.contains(e), (e, i.vNetId))
+    }.filter(_._1).map(_._2).toSet
+  ) }
+
+  globalIngressParams.foreach(_.possibleEgresses.foreach(e => require(e < globalEgressParams.size)))
 
   val nNodes = params.nNodes
   val maxFlits = params.maxFlits
@@ -54,24 +47,23 @@ trait HasNoCParams {
   val nodeIdBits = log2Ceil(params.nNodes)
   val flitIdBits = log2Up(params.maxFlits+1)
   val vNetBits = log2Up(params.nVirtualNetworks)
-  val egressIdBits = log2Up(egressNodes.size)
+  val egressIdBits = log2Up(globalEgressParams.size)
 
   val topologyFunction = params.topology
   val masterAllocTable = params.masterAllocTable
-  val terminalConnectivity = params.terminalConnectivity
   val routerParams = params.routerParams
 
 
   def ingressIdToIngressChannelId(ingressId: Int): Int = {
-    val t: Seq[Int] = ingressNodes.zipWithIndex.map { case (e,i) =>
-      ingressNodes.take(i).count(_ == e) }
+    val t: Seq[Int] = globalIngressParams.zipWithIndex.map { case (e,i) =>
+      globalIngressParams.take(i).count(_.destId == e.destId) }
     t(ingressId)
   }
 
-  def egressIdToDestId(egressId: UInt): UInt = VecInit(egressNodes.map(_.U))(egressId)
+  def egressIdToDestId(egressId: UInt): UInt = VecInit(globalEgressParams.map(_.srcId.U))(egressId)
   def egressIdToEgressChannelId(egressId: UInt): UInt = {
-    VecInit(egressNodes.zipWithIndex.map { case (e,i) =>
-      egressNodes.take(i).count(_ == e).U })(egressId)
+    VecInit(globalEgressParams.zipWithIndex.map { case (e,i) =>
+      globalEgressParams.take(i).count(_.srcId == e.srcId).U })(egressId)
   }
 
 }

@@ -261,16 +261,21 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
     val wb = new TLBundle(wide_bundle)
     val payloadWidth = Seq(wb.a, wb.b, wb.c, wb.d, wb.e).map(_.bits.getWidth).max
 
+    val nIngresses = in.size * 3 + out.size * 2
+    val nEgresses = out.size * 3 + in.size * 2
     val noc = Module(new NoC()(p.alterPartial({
       case NoCKey =>
         p(NoCKey).copy(
           flitPayloadBits = payloadWidth + (if (debugPrintLatencies) 64 else 0),
-          ingressNodes = (Seq.tabulate (in.size) { i => Seq.fill(3) { inNodeMapping(i) } } ++
-            Seq.tabulate(out.size) { i => Seq.fill(2) { outNodeMapping(i) } }).flatten,
-          egressNodes = (Seq.tabulate (in.size) { i => Seq.fill(2) { inNodeMapping(i) } } ++
-            Seq.tabulate(out.size) { i => Seq.fill(3) { outNodeMapping(i) } }).flatten,
-          terminalConnectivity = connectivity,
-          ingressVNets = ingressVNets
+          ingresses = ((Seq.tabulate (in.size) { i => Seq.fill(3) { inNodeMapping(i) } } ++
+            Seq.tabulate(out.size) { i => Seq.fill(2) { outNodeMapping(i) } }).flatten
+          ).zipWithIndex.map { case (i,iId) => IngressChannelParams(i,
+            (0 until nEgresses).filter(e => connectivity(iId, e, ingressVNets(iId))).toSet,
+            ingressVNets(iId)
+          )},
+          egresses = ((Seq.tabulate (in.size) { i => Seq.fill(2) { inNodeMapping(i) } } ++
+            Seq.tabulate(out.size) { i => Seq.fill(3) { outNodeMapping(i) } }).flatten
+          ).zipWithIndex.map { case (e,eId) => EgressChannelParams(e)},
         )
     })))
 

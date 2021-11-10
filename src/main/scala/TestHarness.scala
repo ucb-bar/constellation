@@ -45,7 +45,7 @@ class InputGen(idx: Int, cParams: IngressChannelParams, inputStallProbability: D
   io.out.valid := !random_delay && flits_left === 0.U && io.rob_ready
   io.out.bits.head := true.B
   io.out.bits.tail := packet_remaining === 0.U
-  io.out.bits.egress_id := LFSR(20) % egressNodes.size.U
+  io.out.bits.egress_id := LFSR(20) % globalEgressParams.size.U
   io.out.bits.payload := (io.tsc << 16) | (io.rob_idx << 8)
 
   io.n_flits := packet_remaining + 1.U
@@ -185,7 +185,7 @@ class TestHarness(implicit val p: Parameters) extends Module {
   })
 
   val noc = Module(new NoC)
-  val noc_tester = Module(new NoCTester(noc.ingressParams, noc.egressParams))
+  val noc_tester = Module(new NoCTester(noc.globalIngressParams, noc.globalEgressParams))
   noc.io.ingress <> noc_tester.io.to_noc
   noc_tester.io.from_noc <> noc.io.egress
   io.success := noc_tester.io.success

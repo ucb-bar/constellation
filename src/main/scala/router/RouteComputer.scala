@@ -44,7 +44,7 @@ class RouteComputer(val rP: RouterParams)(implicit val p: Parameters) extends Mo
         if (o < nOutputs) {
           (0 until outParams(o).nVirtualChannels).map { outVId =>
             val table = allInParams(i).possiblePackets
-              .toSeq.map { t => (egressNodes(t._1), t._2) }.distinct.map { case (dest, vNetId) =>
+              .toSeq.map { t => (globalEgressParams(t._1).srcId, t._2) }.distinct.map { case (dest, vNetId) =>
                 Seq.tabulate(allInParams(i).nVirtualChannels) { inVId =>
                   val v = rP.masterAllocTable(
                     allInParams(i).srcId, inVId,

@@ -49,7 +49,7 @@ abstract class AbstractInputUnit(
       outParams.zipWithIndex.map { case (oP, oI) =>
         (0 until oP.nVirtualChannels).map { oV =>
           val allow = virtualChannelParams(srcV).possiblePackets.map { case (e,vNetId) =>
-            allocTable(srcV, oP.destId, oV, egressNodes(e), vNetId)
+            allocTable(srcV, oP.destId, oV, globalEgressParams(e).srcId, vNetId)
           }.reduce(_||_)
           if (!allow)
             out(oI)(oV) := false.B

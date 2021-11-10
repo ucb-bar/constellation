@@ -36,9 +36,9 @@ case class ChannelParams(
 
 case class IngressChannelParams(
   destId: Int,
-  ingressId: Int,
-  vNetId: Int,
-  possibleEgresses: Set[Int]
+  possibleEgresses: Set[Int],
+  vNetId: Int = 0,
+  ingressId: Int = -1,
 ) extends BaseChannelParams {
   def srcId = -1
   def nVirtualChannels = 1
@@ -48,8 +48,8 @@ case class IngressChannelParams(
 
 case class EgressChannelParams(
   srcId: Int,
-  egressId: Int,
-  possiblePackets: Set[(Int, Int)]
+  egressId: Int = -1,
+  possiblePackets: Set[(Int, Int)] = Set[(Int, Int)]()
 ) extends BaseChannelParams {
   def destId = -1
   def nVirtualChannels = 1
