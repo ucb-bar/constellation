@@ -28,6 +28,8 @@ class NocModelStatus extends Bundle {
 // TODO: if we make the default relations in the topology package chisel functions, then we do not
 //       need to duplicate them here
 object Relations {
+  private def adjacent(a: UInt, b: UInt): Bool =
+    (a > b && a - b === 1.U) || (a > b && a - b === 1.U)
   type Routing = (UInt, UInt) => (UInt) => (UInt, UInt, UInt) => Bool
   type Topology = (UInt, UInt) => (UInt, UInt) => Bool
   def routingBidirectionalLine(nX: UInt, nY: UInt)(nodeId: UInt)(srcId: UInt, nxtId: UInt, dstId: UInt): Bool = {
@@ -48,7 +50,7 @@ object Relations {
   def topologyMesh2D(nX: UInt, nY: UInt)(src: UInt, dst: UInt): Bool = {
     val (srcX, srcY) = (src % nX, src / nX)
     val (dstX, dstY) = (dst % nX, dst / nX)
-    (srcX === dstX && (srcY - dstY).abs === 1.U) || (srcY === dstY && (srcX - dstX).abs === 1.U)
+    (srcX === dstX && adjacent(srcY, dstY)) || (srcY === dstY && adjacent(srcX, dstX))
   }
 }
 
@@ -100,7 +102,8 @@ class NocModel(conf: NocConfig) extends Module {
     hopCount := hopCount + 1.U
 
     // check that a next node exists
-    assert(nodeExists(ii => ii =/= currentNode && conf.topology(conf.nX.U, conf.nY.U)(currentNode, ii)),
+    val adjacentNodeExists = nodeExists(ii => ii =/= currentNode && conf.topology(conf.nX.U, conf.nY.U)(currentNode, ii))
+    assert(adjacentNodeExists,
       "We are stuck trying to route from %d to %d! there is no neighboring node to %d in the topology!", srcNode, dstNode, currentNode
     )
 
@@ -144,22 +147,22 @@ class NocModelTests extends AnyFlatSpec with ChiselScalatestTester with Formal {
 
   it should "route packet after at max 4 hops with a bidirectional line and 5 nodes" in {
     val conf = NocConfig(5, 1, Relations.topologyBidirectionalLine, Relations.routingBidirectionalLine)
-    verify(new NocModelProperties(new NocModel(conf), maxHops = 4), Seq(BoundedCheck(10), CVC4EngineAnnotation))
+    verify(new NocModelProperties(new NocModel(conf), maxHops = 4), Seq(BoundedCheck(10), BtormcEngineAnnotation))
   }
 
   it should "find a packet that cannot be routed in 4 hops with a bidirectional line and 6 nodes" in {
     assertThrows[FailedBoundedCheckException] {
       val conf = NocConfig(6, 1, Relations.topologyBidirectionalLine, Relations.routingBidirectionalLine)
-      verify(new NocModelProperties(new NocModel(conf), maxHops = 4), Seq(BoundedCheck(10), CVC4EngineAnnotation))
+      verify(new NocModelProperties(new NocModel(conf), maxHops = 4), Seq(BoundedCheck(10), BtormcEngineAnnotation))
     }
     // checkout the VCD in:
     // test_run_dir/NocModel_should_find_a_packet_that_cannot_be_routed_in_4_hops_with_a_bidirectional_line_and_6_nodes/NocModelProperties.vcd
   }
 
   // TODO: fix problem in firrtl SMT backend
-  it should "route packet after at max 10 hops with in a 4 x 4 network" ignore {
+  it should "route packet after at max 10 hops with in a 4 x 4 network" in {
     val conf = NocConfig(4, 4, Relations.topologyMesh2D, Relations.routingMesh2DMinimal)
-    verify(new NocModelProperties(new NocModel(conf), maxHops = 10), Seq(BoundedCheck(12), CVC4EngineAnnotation))
+    verify(new NocModelProperties(new NocModel(conf), maxHops = 10), Seq(BoundedCheck(12), BtormcEngineAnnotation))
   }
 
 
