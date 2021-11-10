@@ -63,15 +63,18 @@ class RouteComputer(val rP: RouterParams)(implicit val p: Parameters) extends Mo
               false.B
             } else {
               // The Quine-McCluskey impl in rocketchip memory leaks sometimes here...
-              if (trues.size + falses.size >= 100) {
-                if (trues.size > falses.size) {
-                  falses.map(_ =/= addr).andR
-                } else {
-                  trues.map(_ === addr).orR
-                }
+              //if (trues.size + falses.size >= 100) {
+              if (trues.size > falses.size) {
+                falses.map(_ =/= addr).andR
               } else {
-                DecodeLogic(addr, trues, falses)
+                trues.map(_ === addr).orR
               }
+              // } else {
+              //   println(s"DecodeLogic ${trues.size} ${falses.size}")
+              //   val r = DecodeLogic(addr, trues, falses)
+              //   println("Done DecodeLogic")
+              //   r
+              // }
             })
           }
         } else {

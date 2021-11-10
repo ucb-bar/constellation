@@ -83,6 +83,10 @@ class WithUniformVirtualChannels(n: Int, v: VirtualChannelParams) extends Config
   )
 })
 
+class WithIngressVNets(f: Int => Int) extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(ingressVNets = f)
+})
+
 class UnidirectionalLineConfig(
   nNodes: Int = 2,
   ingressNodes: Seq[Int] = Seq(0),
@@ -332,22 +336,26 @@ class TestConfig36 extends Config(
   new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DNorthLast))
 
 class TestConfig37 extends Config(
-  new constellation.WithNBlockingVirtualNetworks(3) ++
+  new constellation.WithIngressVNets((i: Int) => i % 4) ++
+  new constellation.WithNBlockingVirtualNetworks(4) ++
   new constellation.WithUniformVirtualChannels(4, VirtualChannelParams(3)) ++
   new constellation.Mesh2DConfig(3, 3, MasterAllocTables.mesh2DDimensionOrderedHighest))
 
 class TestConfig38 extends Config(
-  new constellation.WithNBlockingVirtualNetworks(3) ++
+  new constellation.WithIngressVNets((i: Int) => i % 4) ++
+  new constellation.WithNBlockingVirtualNetworks(4) ++
   new constellation.WithUniformVirtualChannels(4, VirtualChannelParams(3)) ++
   new constellation.Mesh2DConfig(3, 3, MasterAllocTables.mesh2DAlternatingDimensionOrdered))
 
 class TestConfig39 extends Config(
-  new constellation.WithNNonblockingVirtualNetworks(3) ++
+  new constellation.WithIngressVNets((i: Int) => i % 4) ++
+  new constellation.WithNNonblockingVirtualNetworks(4) ++
   new constellation.WithUniformVirtualChannels(4, VirtualChannelParams(3)) ++
   new constellation.Mesh2DConfig(3, 3, MasterAllocTables.mesh2DDimensionOrderedHighest))
 
 class TestConfig40 extends Config(
-  new constellation.WithNNonblockingVirtualNetworksWithSharing(3) ++
+  new constellation.WithIngressVNets((i: Int) => i % 4) ++
+  new constellation.WithNNonblockingVirtualNetworksWithSharing(4) ++
   new constellation.WithUniformVirtualChannels(4, VirtualChannelParams(3)) ++
   new constellation.Mesh2DConfig(3, 3, MasterAllocTables.mesh2DDimensionOrderedHighest))
 

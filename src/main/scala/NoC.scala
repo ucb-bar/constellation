@@ -63,6 +63,7 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   }
 
   // Check connectivity, ignoring blocking properties of virtual subnets
+  println("Constellation: Checking full connectivity")
   for (vNetId <- 0 until nVirtualNetworks) {
     checkConnectivity(vNetId,
       (nodeId: Int, srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, oId: Int, vNetId: Int) => {
@@ -72,6 +73,7 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   }
 
   // Connectivity for each virtual subnet
+  println("Constellation: Checking virtual subnet connectivity")
   for (vNetId <- 0 until nVirtualNetworks) {
     // blockees are vNets which the current vNet can block without affecting its own forwards progress
     val blockees = (0 until nVirtualNetworks).filter(v => v != vNetId && params.vNetBlocking(vNetId, v))
@@ -95,13 +97,15 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
     virtualChannelParams=cP.virtualChannelParams.zipWithIndex.map { case (vP,vId) =>
       val traversable = possiblePacketMap((cP.srcId, vId, cP.destId)).size != 0
       if (!traversable) {
-        println(s"WARNING, virtual channel $vId from ${cP.srcId} to ${cP.destId} appears to be untraversable")
+        println(s"Constellation WARNING: virtual channel $vId from ${cP.srcId} to ${cP.destId} appears to be untraversable")
       }
       vP.copy(possiblePackets=possiblePacketMap((cP.srcId, vId, cP.destId)))
     }
   )}
   channelParams.map(cP => if (!cP.traversable)
-    println(s"WARNING, physical channel from ${cP.srcId} to ${cP.destId} appears to be untraversable"))
+    println(s"Constellation WARNING: physical channel from ${cP.srcId} to ${cP.destId} appears to be untraversable"))
+
+  println("Constellation: Starting NoC RTL generation")
 
   val io = IO(new Bundle {
     val ingress = MixedVec(ingressParams.map { u => Flipped(new TerminalChannel(u)) })
