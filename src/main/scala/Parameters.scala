@@ -52,19 +52,5 @@ trait HasNoCParams {
   val topologyFunction = params.topology
   val masterAllocTable = params.masterAllocTable
   val routerParams = params.routerParams
-
-
-  def ingressIdToIngressChannelId(ingressId: Int): Int = {
-    val t: Seq[Int] = globalIngressParams.zipWithIndex.map { case (e,i) =>
-      globalIngressParams.take(i).count(_.destId == e.destId) }
-    t(ingressId)
-  }
-
-  def egressIdToDestId(egressId: UInt): UInt = VecInit(globalEgressParams.map(_.srcId.U))(egressId)
-  def egressIdToEgressChannelId(egressId: UInt): UInt = {
-    VecInit(globalEgressParams.zipWithIndex.map { case (e,i) =>
-      globalEgressParams.take(i).count(_.srcId == e.srcId).U })(egressId)
-  }
-
 }
 

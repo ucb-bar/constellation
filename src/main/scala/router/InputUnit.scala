@@ -58,6 +58,11 @@ abstract class AbstractInputUnit(
     }
     out
   }
+
+  def egressIdToNodeId(egressId: UInt): UInt = MuxLookup(egressId, 0.U(nodeIdBits.W),
+    cParam.possiblePackets.toSeq.map(u => u.egressId.U -> globalEgressParams(u.egressId).srcId.U)
+  )
+
 }
 
 class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
@@ -104,13 +109,12 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     assert(id < nVirtualChannels.U)
     assert(states(id).g === g_i)
 
-    val dest_id = egressIdToDestId(io.in.flit.bits.egress_id)
+    val dest_id = egressIdToNodeId(io.in.flit.bits.egress_id)
     states(id).g := Mux(dest_id === nodeId.U, g_v, g_r)
     states(id).dest_id := dest_id
     states(id).vc_sel.foreach(_.foreach(_ := false.B))
-    val term_id = egressIdToEgressChannelId(io.in.flit.bits.egress_id)
     for (o <- 0 until nEgress) {
-      when (term_id === o.U) {
+      when (egressParams(o).egressId.U === io.in.flit.bits.egress_id) {
         states(id).vc_sel(o+nOutputs)(0) := true.B
       }
     }

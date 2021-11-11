@@ -29,9 +29,9 @@ class IngressUnit(
   route_buffer.io.enq.bits := io.in.bits
   io.router_req.bits.src_virt_id := 0.U
   io.router_req.bits.src_vnet_id := cParam.vNetId.U
-  io.router_req.bits.dest_id := egressIdToDestId(io.in.bits.egress_id)
+  io.router_req.bits.dest_id := egressIdToNodeId(io.in.bits.egress_id)
 
-  val out_is_in = egressIdToDestId(io.in.bits.egress_id) === nodeId.U
+  val out_is_in = io.router_req.bits.dest_id === nodeId.U
   route_buffer.io.enq.valid := io.in.valid && (
     io.router_req.ready || !io.in.bits.head || (out_is_in && !io.router_resp.valid))
   io.router_req.valid := io.in.valid && route_buffer.io.enq.ready && io.in.bits.head && !out_is_in
@@ -44,9 +44,8 @@ class IngressUnit(
     route_q.io.enq.valid := true.B
     route_q.io.enq.bits.src_virt_id := 0.U
     route_q.io.enq.bits.vc_sel.foreach(_.foreach(_ := false.B))
-    val term_id = egressIdToEgressChannelId(io.in.bits.egress_id)
     for (o <- 0 until nEgress) {
-      when (term_id === o.U) {
+      when (egressParams(o).egressId.U === io.in.bits.egress_id) {
         route_q.io.enq.bits.vc_sel(o+nOutputs)(0) := true.B
       }
     }
