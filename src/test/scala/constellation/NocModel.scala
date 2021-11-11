@@ -29,7 +29,7 @@ class NocModelStatus extends Bundle {
 //       need to duplicate them here
 object Relations {
   private def adjacent(a: UInt, b: UInt): Bool =
-    (a > b && a - b === 1.U) || (a > b && a - b === 1.U)
+    (a > b && a - b === 1.U) || (b > a && b - a === 1.U)
   type Routing = (UInt, UInt) => (UInt) => (UInt, UInt, UInt) => Bool
   type Topology = (UInt, UInt) => (UInt, UInt) => Bool
   def routingBidirectionalLine(nX: UInt, nY: UInt)(nodeId: UInt)(srcId: UInt, nxtId: UInt, dstId: UInt): Bool = {
@@ -102,16 +102,21 @@ class NocModel(conf: NocConfig) extends Module {
     hopCount := hopCount + 1.U
 
     // check that a next node exists
-    val adjacentNodeExists = nodeExists(ii => ii =/= currentNode && conf.topology(conf.nX.U, conf.nY.U)(currentNode, ii))
+    val isAdjacent = (0 until nNodes).map { ii =>
+      val isAdjacent = ii.U =/= currentNode && conf.topology(conf.nX.U, conf.nY.U)(currentNode, ii.U)
+      isAdjacent.suggestName(s"node_${ii}_is_adjacent_to_currentNode")
+    }
+    val adjacentNodeExists = Cat(isAdjacent) =/= 0.U
+
     assert(adjacentNodeExists,
       "We are stuck trying to route from %d to %d! there is no neighboring node to %d in the topology!", srcNode, dstNode, currentNode
     )
 
     // check that a routing path exists
-    val routeAvailable = nodeExists(ii =>
-      ii =/= currentNode && conf.topology(conf.nX.U, conf.nY.U)(currentNode, ii) &&
-      conf.routing(conf.nX.U, conf.nY.U)(currentNode)(srcNode, ii, dstNode)
-    )
+    val routeAvailable =  Cat(isAdjacent.zipWithIndex.map { case (isAdjacent, ii) =>
+      val isPossibleNext = isAdjacent && conf.routing(conf.nX.U, conf.nY.U)(currentNode)(srcNode, ii.U, dstNode)
+      isPossibleNext.suggestName(s"node_${ii}_is_a_possible_next_hop")
+    }) =/= 0.U
     assert(routeAvailable, "We are stuck! there is no route from %d to %d through %d", srcNode, dstNode, currentNode)
 
     // we want to pick an adjacent node that is allowed by the routing table
@@ -129,6 +134,16 @@ class NocModel(conf: NocConfig) extends Module {
       state := Received
     }
   }
+}
+
+class TopologyCheck(conf: NocConfig, adjacent: Iterable[(Int, Int)], bidirectional: Boolean = false) extends Module {
+  adjacent.foreach { case (a, b) =>
+    assert(conf.topology(conf.nX.U, conf.nY.U)(a.U, b.U), s"Node $a should be adjacent to $b")
+    if(bidirectional) {
+      assert(conf.topology(conf.nX.U, conf.nY.U)(b.U, a.U), s"Node $b should be adjacent to $a")
+    }
+  }
+  stop()
 }
 
 class NocModelProperties(makeModel: => NocModel, maxHops: Int) extends Module {
@@ -159,7 +174,18 @@ class NocModelTests extends AnyFlatSpec with ChiselScalatestTester with Formal {
     // test_run_dir/NocModel_should_find_a_packet_that_cannot_be_routed_in_4_hops_with_a_bidirectional_line_and_6_nodes/NocModelProperties.vcd
   }
 
-  // TODO: fix problem in firrtl SMT backend
+  it should "sanity check the 2d mesh topology" in {
+    val conf = NocConfig(4, 4, Relations.topologyMesh2D, Relations.routingMesh2DMinimal)
+    test(new TopologyCheck(conf, Seq(0 -> 1, 0 -> 4, 9 -> 8, 9-> 5, 9 -> 10, 9 -> 13), true)).runUntilStop()
+  }
+
+  it should "fail a topology check if nodes are not actually adjacent" in {
+    val conf = NocConfig(4, 4, Relations.topologyMesh2D, Relations.routingMesh2DMinimal)
+    assertThrows[ChiselAssertionError] {
+      test(new TopologyCheck(conf, Seq(0 -> 10))).runUntilStop()
+    }
+  }
+
   it should "route packet after at max 10 hops with in a 4 x 4 network" in {
     val conf = NocConfig(4, 4, Relations.topologyMesh2D, Relations.routingMesh2DMinimal)
     verify(new NocModelProperties(new NocModel(conf), maxHops = 10), Seq(BoundedCheck(12), BtormcEngineAnnotation))
