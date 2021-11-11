@@ -15,11 +15,9 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
 
   // srcId, vId, dstId
   type Pos = (Int, Int, Int)
-  // outIdx, vNetId
-  type Pkt = (Int, Int)
 
   // Tracks the set of every possible packet that might occupy each virtual channel
-  val possiblePacketMap = scala.collection.mutable.Map[Pos, Set[Pkt]]().withDefaultValue(Set[Pkt]())
+  val possiblePacketMap = scala.collection.mutable.Map[Pos, Set[PacketRoutingInfo]]().withDefaultValue(Set())
 
   def checkConnectivity(vNetId: Int, f: (Int, Int, Int, Int, Int, Int, Int) => Boolean) = {
     // Loop through accessible ingress/egress pairs
@@ -32,7 +30,7 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
         // Track the positions a packet performing ingress->egress might occupy
         var positions: Set[Pos] = Set((-1, 0, iId))
         while (positions.size != 0) {
-          positions.foreach { pos => possiblePacketMap(pos) += ((oIdx, vNetId)) }
+          positions.foreach { pos => possiblePacketMap(pos) += (PacketRoutingInfo(oIdx, vNetId)) }
           // Determine next possible positions based on current possible positions
           // and connectivity function
           positions = positions.filter(_._3 != oId).map { case (srcId, srcV, nodeId) =>
@@ -73,7 +71,7 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
       checkConnectivity(vNetId,
         (nodeId: Int, srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, oId: Int, vNetId: Int) => {
           (masterAllocTable(nodeId)(srcId, srcV, nxtId, nxtV, oId, vNetId) &&
-            !(b.map { v => possiblePacketMap((nodeId, nxtV, nxtId)).map(_._2 == v) }.flatten.fold(false)(_||_))
+            !(b.map { v => possiblePacketMap((nodeId, nxtV, nxtId)).map(_.vNetId == v) }.flatten.fold(false)(_||_))
           )
         }
       )

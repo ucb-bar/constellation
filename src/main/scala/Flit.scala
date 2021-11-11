@@ -5,6 +5,11 @@ import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 
+case class PacketRoutingInfo(
+  egressId: Int,
+  vNetId: Int)
+
+
 class IOFlit(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   val head = Bool()
   val tail = Bool()

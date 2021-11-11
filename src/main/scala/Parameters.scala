@@ -33,7 +33,7 @@ trait HasNoCParams {
   val globalIngressParams = params.ingresses.zipWithIndex.map { case (u,i) => u.copy(ingressId=i) }
   val globalEgressParams = params.egresses.zipWithIndex.map { case (u,e) => u.copy(egressId=e,
     possiblePackets=globalIngressParams.map { i =>
-      (i.possibleEgresses.contains(e), (e, i.vNetId))
+      (i.possibleEgresses.contains(e), PacketRoutingInfo(e, i.vNetId))
     }.filter(_._1).map(_._2).toSet
   ) }
 
