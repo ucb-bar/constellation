@@ -79,8 +79,8 @@ class Router(val rP: RouterParams)(implicit val p: Parameters) extends Module wi
     val egress = MixedVec(egressParams.map { u => new TerminalChannel(u) })
 
     val debug = Output(new Bundle {
-      val va_stall = Vec(nAllInputs, Bool())
-      val sa_stall = Vec(nAllInputs, Bool())
+      val va_stall = Vec(nAllInputs, UInt())
+      val sa_stall = Vec(nAllInputs, UInt())
     })
   })
   dontTouch(io.debug)
@@ -159,7 +159,6 @@ class Router(val rP: RouterParams)(implicit val p: Parameters) extends Module wi
   (all_output_units zip switch.io.out).foreach {
     case (u,o) => u.io.in <> o }
 
-  io.debug.va_stall := VecInit(all_input_units.map(_.io.debug.va_stall))
-  io.debug.sa_stall := VecInit(all_input_units.map(_.io.debug.sa_stall))
-
+  (io.debug.va_stall zip all_input_units.map(_.io.debug.va_stall)).map { case (l,r) => l := r }
+  (io.debug.sa_stall zip all_input_units.map(_.io.debug.sa_stall)).map { case (l,r) => l := r }
 }

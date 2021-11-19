@@ -28,8 +28,8 @@ class AbstractInputUnitIO(
 
   val out = Valid(new SwitchBundle(outParams, egressParams))
   val debug = Output(new Bundle {
-    val va_stall = Bool()
-    val sa_stall = Bool()
+    val va_stall = UInt(log2Ceil(nVirtualChannels).W)
+    val sa_stall = UInt(log2Ceil(nVirtualChannels).W)
   })
 }
 
@@ -75,8 +75,6 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   val io = IO(new AbstractInputUnitIO(cParam, outParams, egressParams) {
     val in = Flipped(new Channel(cParam.asInstanceOf[ChannelParams]))
   })
-  io.debug.va_stall := false.B
-  io.debug.sa_stall := false.B
 
   val g_i :: g_r :: g_r_stall :: g_v :: g_v_stall :: g_a :: g_c :: Nil = Enum(7)
 
@@ -180,7 +178,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     }
   }
   io.vcalloc_req <> vcalloc_arbiter.io.out
-  io.debug.va_stall := io.vcalloc_req.valid && !io.vcalloc_req.ready
+  io.debug.va_stall := PopCount(vcalloc_arbiter.io.in.map { i => i.valid && !i.ready })
 
   when (io.vcalloc_resp.fire()) {
     val id = io.vcalloc_resp.bits.in_virt_channel
@@ -210,15 +208,14 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
       when (r.fire() && buffer.io.tail_read_resp(i)) {
         s.g := g_i
       }
-      when (r.valid && !r.ready) {
-        io.debug.sa_stall := true.B
-      }
     } else {
       r.valid := false.B
       r.bits := DontCare
       buffer.io.tail_read_req(i) := 0.U
     }
   }
+  io.debug.sa_stall := PopCount(io.salloc_req.map(r => r.valid && !r.ready))
+
   val salloc_fires = io.salloc_req.map(_.fire())
   val salloc_fire_id = OHToUInt(salloc_fires)
   val salloc_fire = salloc_fires.reduce(_||_)
