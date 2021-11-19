@@ -122,4 +122,10 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
       io.egress(u.egressId) <> i
     }
   }
+
+  val debug_va_stall_ctr = RegInit(0.U(64.W))
+  val debug_sa_stall_ctr = RegInit(0.U(64.W))
+  val debug_any_stall_ctr = debug_va_stall_ctr + debug_sa_stall_ctr
+  debug_va_stall_ctr := debug_va_stall_ctr + router_nodes.map(r => PopCount(r.io.debug.va_stall)).reduce(_+_)
+  debug_sa_stall_ctr := debug_sa_stall_ctr + router_nodes.map(r => PopCount(r.io.debug.sa_stall)).reduce(_+_)
 }
