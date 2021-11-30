@@ -3,17 +3,17 @@ package constellation.topology
 import scala.math.pow
 
 object Topologies {
-  def unidirectionalLine(src: Int, dest: Int) = dest - src == 1
-  def bidirectionalLine(src: Int, dest: Int) = (dest - src).abs == 1
+  val unidirectionalLine: PhysicalTopology = (src: Int, dest: Int) => dest - src == 1
+  val bidirectionalLine: PhysicalTopology = (src: Int, dest: Int) => (dest - src).abs == 1
 
-  def unidirectionalTorus1D(nNodes: Int)(src: Int, dest: Int) = {
+  def unidirectionalTorus1D(nNodes: Int): PhysicalTopology = (src: Int, dest: Int) => {
     dest - src == 1 || (dest == 0 && src == nNodes - 1)
   }
-  def bidirectionalTorus1D(nNodes: Int)(src: Int, dest: Int) = {
+  def bidirectionalTorus1D(nNodes: Int): PhysicalTopology = (src: Int, dest: Int) => {
     (dest + nNodes - src) % nNodes == 1 || (src + nNodes - dest) % nNodes == 1
   }
 
-  def butterfly(kAry: Int, nFly: Int) = {
+  def butterfly(kAry: Int, nFly: Int): PhysicalTopology = {
     require(kAry >= 2 && nFly >= 2)
     val height = pow(kAry, nFly-1).toInt
     def digitsToNum(dig: Seq[Int]) = dig.zipWithIndex.map { case (d,i) => d * pow(kAry,i).toInt }.sum
@@ -35,19 +35,19 @@ object Topologies {
     }
   }
 
-  def mesh2D(nX: Int, nY: Int)(src: Int, dst: Int) = {
+  def mesh2D(nX: Int, nY: Int): PhysicalTopology = (src: Int, dst: Int) => {
     val (srcX, srcY) = (src % nX, src / nX)
     val (dstX, dstY) = (dst % nX, dst / nX)
     (srcX == dstX && (srcY - dstY).abs == 1) || (srcY == dstY && (srcX - dstX).abs == 1)
   }
 
-  def unidirectionalTorus2D(nX: Int, nY: Int)(src: Int, dst: Int) = {
+  def unidirectionalTorus2D(nX: Int, nY: Int): PhysicalTopology = (src: Int, dst: Int) => {
     val (srcX, srcY) = (src % nX, src / nX)
     val (dstX, dstY) = (dst % nX, dst / nX)
     (srcY == dstY && unidirectionalTorus1D(nX)(srcX, dstX)) || (srcX == dstX && unidirectionalTorus1D(nY)(srcY, dstY))
   }
 
-  def bidirectionalTorus2D(nX: Int, nY: Int)(src: Int, dst: Int) = {
+  def bidirectionalTorus2D(nX: Int, nY: Int): PhysicalTopology = (src: Int, dst: Int) => {
     val (srcX, srcY) = (src % nX, src / nX)
     val (dstX, dstY) = (dst % nX, dst / nX)
     (srcY == dstY && bidirectionalTorus1D(nX)(srcX, dstX)) || (srcX == dstX && bidirectionalTorus1D(nY)(srcY, dstY))

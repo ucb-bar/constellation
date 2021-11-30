@@ -1,8 +1,11 @@
 package constellation
 
+import scala.math.pow
+import scala.language.implicitConversions
+
 import chisel3._
 import chisel3.util._
-import scala.math.pow
+
 import freechips.rocketchip.config.{Field, Parameters, Config}
 
 import constellation.topology._
@@ -12,9 +15,6 @@ object TopologyConverter {
     (src: Int, dst: Int) => if (topo(src, dst)) Some(ChannelParams(src, dst)) else None
   }
 }
-
-// Why does this not make the implicit def work everywhere
-// Manually call TopologyConverter for now
 import TopologyConverter._
 
 class WithCombineRCVA extends Config((site, here, up) => {
@@ -96,7 +96,7 @@ class UnidirectionalLineConfig(
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
-    topology = TopologyConverter(Topologies.unidirectionalLine),
+    topology = Topologies.unidirectionalLine,
     ingresses = ingressNodes.map(i => IngressChannelParams(i, (0 until egressNodes.size).toSet)),
     egresses = egressNodes.map(i => EgressChannelParams(i))
   )
@@ -109,7 +109,7 @@ class BidirectionalLineConfig(
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
-    topology = TopologyConverter(Topologies.bidirectionalLine),
+    topology = Topologies.bidirectionalLine,
     masterAllocTable = MasterAllocTables.bidirectionalLine,
     ingresses = ingressNodes.map(i => IngressChannelParams(i, (0 until egressNodes.size).toSet)),
     egresses = egressNodes.map(i => EgressChannelParams(i))
@@ -123,7 +123,7 @@ class UnidirectionalTorus1DConfig(
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
-    topology = TopologyConverter(Topologies.unidirectionalTorus1D(nNodes)),
+    topology = Topologies.unidirectionalTorus1D(nNodes),
     masterAllocTable = MasterAllocTables.unidirectionalTorus1DDateline(nNodes),
     ingresses = ingressNodes.map(i => IngressChannelParams(i, (0 until egressNodes.size).toSet)),
     egresses = egressNodes.map(i => EgressChannelParams(i))
@@ -138,7 +138,7 @@ class BidirectionalTorus1DConfig(
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
-    topology = TopologyConverter(Topologies.bidirectionalTorus1D(nNodes)),
+    topology = Topologies.bidirectionalTorus1D(nNodes),
     masterAllocTable = if (randomRoute) {
       MasterAllocTables.bidirectionalTorus1DRandom(nNodes)
     } else {
@@ -157,7 +157,7 @@ class ButterflyConfig(
     val height = pow(kAry,nFly-1).toInt
     up(NoCKey, site).copy(
       nNodes = height * nFly,
-      topology = TopologyConverter(Topologies.butterfly(kAry, nFly)),
+      topology = Topologies.butterfly(kAry, nFly),
       masterAllocTable = MasterAllocTables.butterfly(kAry, nFly),
       ingresses = ((0 until height) ++ (0 until height)).map(i => IngressChannelParams(i, (0 until 2*height).toSet)),
       egresses = ((0 until height) ++ (0 until height)).map(i => EgressChannelParams(i + height*(nFly-1)))
@@ -172,7 +172,7 @@ class Mesh2DConfig(
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nX * nY,
-    topology = TopologyConverter(Topologies.mesh2D(nX, nY)),
+    topology = Topologies.mesh2D(nX, nY),
     masterAllocTable = masterAllocTable(nX, nY),
     ingresses = (0 until nX * nY).map(i => IngressChannelParams(i, (0 until nX * nY).toSet)),
     egresses = (0 until nX * nY).map(i => EgressChannelParams(i))
@@ -185,7 +185,7 @@ class UnidirectionalTorus2DConfig(
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nX * nY,
-    topology = TopologyConverter(Topologies.unidirectionalTorus2D(nX, nY)),
+    topology = Topologies.unidirectionalTorus2D(nX, nY),
     masterAllocTable = MasterAllocTables.dimensionOrderedUnidirectionalTorus2DDateline(nX, nY),
     ingresses = (0 until nX * nY).map(i => IngressChannelParams(i, (0 until nX * nY).toSet)),
     egresses = (0 until nX * nY).map(i => EgressChannelParams(i))
@@ -199,7 +199,7 @@ class BidirectionalTorus2DConfig(
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nX * nY,
-    topology = TopologyConverter(Topologies.bidirectionalTorus2D(nX, nY)),
+    topology = Topologies.bidirectionalTorus2D(nX, nY),
     masterAllocTable = MasterAllocTables.dimensionOrderedBidirectionalTorus2DDateline(nX, nY),
     ingresses = (0 until nX * nY).map(i => IngressChannelParams(i, (0 until nX * nY).toSet)),
     egresses = (0 until nX * nY).map(i => EgressChannelParams(i))
