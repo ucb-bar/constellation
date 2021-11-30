@@ -20,7 +20,7 @@ case class NoCConfig(
   egresses: Seq[EgressChannelParams] = Nil,
   masterAllocTable: MasterAllocTable = MasterAllocTables.allLegal,
   routerParams: Int => RouterParams =
-    (i: Int) => RouterParams(i, Nil, Nil, Nil, Nil, (_,_,_,_,_,_) => false, false, false),
+    (i: Int) => RouterParams(i, Nil, Nil, Nil, Nil, (_: AllocParams) => false, false, false),
   // blocker, blocked => bool
   vNetBlocking: (Int, Int) => Boolean = (_: Int, _: Int) => false,
 )

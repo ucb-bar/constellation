@@ -5,6 +5,7 @@ import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 import constellation.router.{Router, RouterParams}
+import constellation.topology.{MasterAllocTable, AllocParams}
 
 class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   val fullChannelParams: Seq[ChannelParams] = Seq.tabulate(nNodes, nNodes) { case (i,j) =>
@@ -19,7 +20,7 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   // Tracks the set of every possible packet that might occupy each virtual channel
   val possiblePacketMap = scala.collection.mutable.Map[Pos, Set[PacketRoutingInfo]]().withDefaultValue(Set())
 
-  def checkConnectivity(vNetId: Int, f: (Int, Int, Int, Int, Int, Int, Int) => Boolean) = {
+  def checkConnectivity(vNetId: Int, f: MasterAllocTable) = {
     // Loop through accessible ingress/egress pairs
     globalIngressParams.filter(_.vNetId == vNetId).zipWithIndex.map { case (iP,iIdx) =>
       val iId = iP.destId
@@ -36,7 +37,7 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
           positions = positions.filter(_._3 != oId).map { case (srcId, srcV, nodeId) =>
             val nexts = fullChannelParams.filter(_.srcId == nodeId).map { nxtC =>
               (0 until nxtC.nVirtualChannels).map { nxtV =>
-                val can_transition = f(nodeId, srcId, srcV, nxtC.destId, nxtV, oId, vNetId)
+                val can_transition = f(nodeId)(AllocParams(srcId, srcV, nxtC.destId, nxtV, oId, vNetId))
                 if (can_transition) Some((nodeId, nxtV, nxtC.destId)) else None
               }.flatten
             }.flatten
@@ -52,11 +53,7 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   // Check connectivity, ignoring blocking properties of virtual subnets
   println("Constellation: Checking full connectivity")
   for (vNetId <- 0 until nVirtualNetworks) {
-    checkConnectivity(vNetId,
-      (nodeId: Int, srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, oId: Int, vNetId: Int) => {
-        masterAllocTable(nodeId)(srcId, srcV, nxtId, nxtV, oId, vNetId)
-      }
-    )
+    checkConnectivity(vNetId, masterAllocTable)
   }
 
   // Connectivity for each virtual subnet
@@ -68,13 +65,11 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
     // For each subset of blockers for this virtual network, recheck connectivity assuming
     // every virtual channel accessible to each blocker is locked
     for (b <- blockeeSets) {
-      checkConnectivity(vNetId,
-        (nodeId: Int, srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, oId: Int, vNetId: Int) => {
-          (masterAllocTable(nodeId)(srcId, srcV, nxtId, nxtV, oId, vNetId) &&
-            !(b.map { v => possiblePacketMap((nodeId, nxtV, nxtId)).map(_.vNetId == v) }.flatten.fold(false)(_||_))
-          )
-        }
-      )
+      checkConnectivity(vNetId, (nodeId: Int) => (p: AllocParams) => {
+        (masterAllocTable(nodeId)(p) &&
+          !(b.map { v => possiblePacketMap((nodeId, p.nxtV, p.nxtId)).map(_.vNetId == v) }.flatten.fold(false)(_||_))
+        )
+      })
     }
   }
 
@@ -105,7 +100,7 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
     outParams = channelParams.filter(_.srcId == i),
     ingressParams = globalIngressParams.filter(_.destId == i),
     egressParams = globalEgressParams.filter(_.srcId == i),
-    masterAllocTable = masterAllocTable(i),
+    nodeAllocTable = masterAllocTable(i),
   ))) }
 
   router_nodes.zipWithIndex.map { case (dst,dstId) =>

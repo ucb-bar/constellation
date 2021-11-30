@@ -6,6 +6,7 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 
 import constellation._
+import constellation.topology.{NodeAllocTable, AllocParams}
 
 case class RouterParams(
   nodeId: Int,
@@ -13,7 +14,7 @@ case class RouterParams(
   outParams: Seq[ChannelParams],
   ingressParams: Seq[IngressChannelParams],
   egressParams: Seq[EgressChannelParams],
-  masterAllocTable: (Int, Int, Int, Int, Int, Int) => Boolean,
+  nodeAllocTable: NodeAllocTable,
   combineSAST: Boolean = false,
   combineRCVA: Boolean = false,
 )
@@ -61,7 +62,7 @@ trait HasRouterParams extends HasRouterOutputParams with HasRouterInputParams
       outParam.nVirtualChannels,
       nNodes,
       nVirtualNetworks) { case (inV, outV, destId, vNetId) =>
-        rP.masterAllocTable(inParam.srcId, inV, outParam.destId, outV, destId, vNetId)
+        rP.nodeAllocTable(AllocParams(inParam.srcId, inV, outParam.destId, outV, destId, vNetId))
     }.flatten.flatten.flatten.reduce(_||_)
 
     legalVirtualTransition
@@ -92,13 +93,13 @@ class Router(val rP: RouterParams)(implicit val p: Parameters) extends Module wi
   val input_units = inParams.zipWithIndex.map { case (u,i) =>
     Module(new InputUnit(u, outParams, egressParams, rP.combineRCVA, rP.combineSAST,
       (srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) => {
-        rP.masterAllocTable(u.srcId, srcV, nxtId, nxtV, dstId, vNetId)
+        rP.nodeAllocTable(AllocParams(u.srcId, srcV, nxtId, nxtV, dstId, vNetId))
       }
     )).suggestName(s"input_unit_${i}_from_${u.srcId}") }
   val ingress_units = ingressParams.zipWithIndex.map { case (u,i) =>
     Module(new IngressUnit(u, outParams, egressParams, rP.combineRCVA, rP.combineSAST,
       (srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) => {
-        rP.masterAllocTable(u.srcId, srcV, nxtId, nxtV, dstId, vNetId)
+        rP.nodeAllocTable(AllocParams(u.srcId, srcV, nxtId, nxtV, dstId, vNetId))
       }
     )).suggestName(s"ingress_unit_${i+nInputs}_from_${u.ingressId}") }
   val all_input_units = input_units ++ ingress_units

@@ -4,8 +4,11 @@ package object topology {
   // srcNodeId, destNodeId => Bool
   type PhysicalTopology = (Int, Int) => Boolean
 
-  // nodeId => srcNodeId, inVChannelId, nextNodeId, outVChannelId, destId, vNetId => legalPath
-  type MasterAllocTable = Int => (Int, Int, Int, Int, Int, Int) => Boolean
+  case class AllocParams(
+    srcId: Int, srcV: Int, nxtId: Int, nxtV: Int, destId: Int, vNetId: Int)
+
+  type NodeAllocTable = AllocParams => Boolean
+  type MasterAllocTable = Int => NodeAllocTable
 }
 
 
