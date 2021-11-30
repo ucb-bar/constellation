@@ -2,9 +2,25 @@ package constellation.topology
 
 import scala.math.pow
 
-
-
 object MasterAllocTables {
+
+  implicit class MasterAllocTableOps(private val a1: MasterAllocTable) {
+    def unary_!(): MasterAllocTable = (nodeId: Int) => (p: AllocParams) => !a1(nodeId)(p)
+    def ||(a2: MasterAllocTable): MasterAllocTable = (nodeId: Int) => (p: AllocParams) => {
+      a1(nodeId)(p) || a2(nodeId)(p)
+    }
+    def ||(a2: Boolean): MasterAllocTable = (nodeId: Int) => (p: AllocParams) => {
+      a1(nodeId)(p) || a2
+    }
+    def &&(a2: MasterAllocTable): MasterAllocTable = (nodeId: Int) => (p: AllocParams) => {
+      a1(nodeId)(p) && a2(nodeId)(p)
+    }
+    def &&(a2: Boolean): MasterAllocTable = (nodeId: Int) => (p: AllocParams) => {
+      a1(nodeId)(p) && a2
+    }
+  }
+
+
   // Utility functions
   val srcIsIngress: MasterAllocTable = (_: Int) => (p: AllocParams) => p.srcId == -1
   val nxtIsVC0    : MasterAllocTable = (_: Int) => (p: AllocParams) => p.nxtV == 0
@@ -20,15 +36,25 @@ object MasterAllocTables {
   }
 
   def unidirectionalTorus1DDateline(nNodes: Int): MasterAllocTable = (nodeId: Int) => (p: AllocParams) => {
-    if (p.srcId == -1)  {
-      p.nxtV != 0
-    } else if (p.srcV == 0) {
-      p.nxtV == 0
+    (if (srcIsIngress(nodeId)(p)) {
+      !nxtIsVC0
+    } else if (srcIsVC0(nodeId)(p)) {
+      nxtIsVC0
     } else if (nodeId == nNodes - 1) {
-      p.nxtV < p.srcV
+      nxtVLTSrcV
     } else {
-      p.nxtV <= p.srcV && p.nxtV != 0
-    }
+      nxtVLESrcV && !nxtIsVC0
+    })(nodeId)(p)
+
+    // if (p.srcId == -1)  {
+    //   p.nxtV != 0
+    // } else if (p.srcV == 0) {
+    //   p.nxtV == 0
+    // } else if (nodeId == nNodes - 1) {
+    //   p.nxtV < p.srcV
+    // } else {
+    //   p.nxtV <= p.srcV && p.nxtV != 0
+    // }
   }
 
 
