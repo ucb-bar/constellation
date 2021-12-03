@@ -52,6 +52,8 @@ class RouteComputer(val rP: RouterParams)(implicit val p: Parameters) extends Mo
                     allInParams(i).srcId, inVId,
                     outParams(o).destId, outVId,
                     dest, vNetId))
+                  println(s"srcId=${allInParams(i).srcId},inVId=${inVId}," +
+                    s"destId=${outParams(o).destId},outVId=${outVId},dest=${dest},vNetId=${vNetId}")
                   ((((inVId << vNetBits) + vNetId) << nodeIdBits) + dest, v)
                 }
             }.flatten
