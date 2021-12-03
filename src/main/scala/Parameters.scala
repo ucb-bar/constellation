@@ -19,6 +19,7 @@ case class NoCConfig(
   ingresses: Seq[IngressChannelParams] = Nil,
   egresses: Seq[EgressChannelParams] = Nil,
   masterAllocTable: MasterAllocTable = MasterAllocTables.allLegal,
+  escapeAllocTable: MasterAllocTable = MasterAllocTables.allLegal,
   routerParams: Int => RouterParams =
     (i: Int) => RouterParams(i, Nil, Nil, Nil, Nil, (_: AllocParams) => false, false, false),
   // blocker, blocked => bool
