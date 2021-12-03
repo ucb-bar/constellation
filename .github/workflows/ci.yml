@@ -10,6 +10,7 @@ jobs:
     name: "Try to compile the project"
     runs-on: ubuntu-20.04
     env:
+      CONSTELLATION_CI: 1
       JAVA_TOOL_OPTIONS: -Xmx4G -Xss8M
     steps:
     - uses: actions/checkout@v2
@@ -38,6 +39,7 @@ jobs:
 	    "40", "41", "42", "43", "44", "45"
         ]
     env:
+      CONSTELLATION_CI: 1
       JAVA_TOOL_OPTIONS: -Xmx4G -Xss8M
 
     steps:
