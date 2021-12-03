@@ -5,73 +5,81 @@ import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
 import chisel3._
 
-class ChiselTester(implicit val p: Parameters) extends Module {
-  val noc = Module(new NoC)
-  val noc_tester = Module(new NoCTester(noc.globalIngressParams, noc.globalEgressParams))
-  noc.io.ingress <> noc_tester.io.to_noc
-  noc_tester.io.from_noc <> noc.io.egress
-  when(noc_tester.io.success) { stop() }
+class NoCChiselTester(implicit val p: Parameters) extends Module {
+  val th = Module(new TestHarness)
+  when (th.io.success) { stop() }
 }
 
-abstract class NocTest(configs: Seq[Config]) extends AnyFlatSpec with ChiselScalatestTester {
+class TLNoCChiselTester(implicit val p: Parameters) extends Module {
+  val th = Module(new TLTestHarness)
+  when (th.io.success) { stop() }
+}
+
+abstract class BaseNoCTest(gen: Parameters => Module, configs: Seq[Config]) extends AnyFlatSpec with ChiselScalatestTester {
   behavior of "NoC"
 
   configs.foreach { config =>
     it should s"pass test with config ${config.getClass.getName}" in {
       implicit val p: Parameters = config
-      test(new ChiselTester).withAnnotations(Seq(VerilatorBackendAnnotation))
+      test(gen(p)).withAnnotations(Seq(VerilatorBackendAnnotation))
         .runUntilStop(timeout = 1000 * 1000)
     }
   }
 }
 
+abstract class NoCTest(configs: Seq[Config]) extends BaseNoCTest(p => new NoCChiselTester()(p), configs)
+abstract class TLNoCTest(configs: Seq[Config]) extends BaseNoCTest(p => new TLNoCChiselTester()(p), configs)
+
 
 
 // these tests allow you to run an infividual config
-class NocTest00 extends NocTest(Seq(new TestConfig00))
-class NocTest01 extends NocTest(Seq(new TestConfig01))
-class NocTest02 extends NocTest(Seq(new TestConfig02))
-class NocTest03 extends NocTest(Seq(new TestConfig03))
-class NocTest04 extends NocTest(Seq(new TestConfig04))
-class NocTest05 extends NocTest(Seq(new TestConfig05))
-class NocTest06 extends NocTest(Seq(new TestConfig06))
-class NocTest07 extends NocTest(Seq(new TestConfig07))
-class NocTest08 extends NocTest(Seq(new TestConfig08))
-class NocTest09 extends NocTest(Seq(new TestConfig09))
-class NocTest10 extends NocTest(Seq(new TestConfig10))
-class NocTest11 extends NocTest(Seq(new TestConfig11))
-class NocTest12 extends NocTest(Seq(new TestConfig12))
-class NocTest13 extends NocTest(Seq(new TestConfig13))
-class NocTest14 extends NocTest(Seq(new TestConfig14))
-class NocTest15 extends NocTest(Seq(new TestConfig15))
-class NocTest16 extends NocTest(Seq(new TestConfig16))
-class NocTest17 extends NocTest(Seq(new TestConfig17))
-class NocTest18 extends NocTest(Seq(new TestConfig18))
-class NocTest19 extends NocTest(Seq(new TestConfig19))
-class NocTest20 extends NocTest(Seq(new TestConfig20))
-class NocTest21 extends NocTest(Seq(new TestConfig21))
-class NocTest22 extends NocTest(Seq(new TestConfig22))
-class NocTest23 extends NocTest(Seq(new TestConfig23))
-class NocTest24 extends NocTest(Seq(new TestConfig24))
-class NocTest25 extends NocTest(Seq(new TestConfig25))
-class NocTest26 extends NocTest(Seq(new TestConfig26))
-class NocTest27 extends NocTest(Seq(new TestConfig27))
-class NocTest28 extends NocTest(Seq(new TestConfig28))
-class NocTest29 extends NocTest(Seq(new TestConfig29))
-class NocTest30 extends NocTest(Seq(new TestConfig30))
-class NocTest31 extends NocTest(Seq(new TestConfig31))
-class NocTest32 extends NocTest(Seq(new TestConfig32))
-class NocTest33 extends NocTest(Seq(new TestConfig33))
-class NocTest34 extends NocTest(Seq(new TestConfig34))
-class NocTest35 extends NocTest(Seq(new TestConfig35))
-class NocTest36 extends NocTest(Seq(new TestConfig36))
-class NocTest37 extends NocTest(Seq(new TestConfig37))
-class NocTest38 extends NocTest(Seq(new TestConfig38))
-class NocTest39 extends NocTest(Seq(new TestConfig39))
-class NocTest40 extends NocTest(Seq(new TestConfig40))
-class NocTest41 extends NocTest(Seq(new TestConfig41))
-class NocTest42 extends NocTest(Seq(new TestConfig42))
-class NocTest43 extends NocTest(Seq(new TestConfig43))
-class NocTest44 extends NocTest(Seq(new TestConfig44))
-class NocTest45 extends NocTest(Seq(new TestConfig45))
+class NoCTest00 extends NoCTest(Seq(new TestConfig00))
+class NoCTest01 extends NoCTest(Seq(new TestConfig01))
+class NoCTest02 extends NoCTest(Seq(new TestConfig02))
+class NoCTest03 extends NoCTest(Seq(new TestConfig03))
+class NoCTest04 extends NoCTest(Seq(new TestConfig04))
+class NoCTest05 extends NoCTest(Seq(new TestConfig05))
+class NoCTest06 extends NoCTest(Seq(new TestConfig06))
+class NoCTest07 extends NoCTest(Seq(new TestConfig07))
+class NoCTest08 extends NoCTest(Seq(new TestConfig08))
+class NoCTest09 extends NoCTest(Seq(new TestConfig09))
+class NoCTest10 extends NoCTest(Seq(new TestConfig10))
+class NoCTest11 extends NoCTest(Seq(new TestConfig11))
+class NoCTest12 extends NoCTest(Seq(new TestConfig12))
+class NoCTest13 extends NoCTest(Seq(new TestConfig13))
+class NoCTest14 extends NoCTest(Seq(new TestConfig14))
+class NoCTest15 extends NoCTest(Seq(new TestConfig15))
+class NoCTest16 extends NoCTest(Seq(new TestConfig16))
+class NoCTest17 extends NoCTest(Seq(new TestConfig17))
+class NoCTest18 extends NoCTest(Seq(new TestConfig18))
+class NoCTest19 extends NoCTest(Seq(new TestConfig19))
+class NoCTest20 extends NoCTest(Seq(new TestConfig20))
+class NoCTest21 extends NoCTest(Seq(new TestConfig21))
+class NoCTest22 extends NoCTest(Seq(new TestConfig22))
+class NoCTest23 extends NoCTest(Seq(new TestConfig23))
+class NoCTest24 extends NoCTest(Seq(new TestConfig24))
+class NoCTest25 extends NoCTest(Seq(new TestConfig25))
+class NoCTest26 extends NoCTest(Seq(new TestConfig26))
+class NoCTest27 extends NoCTest(Seq(new TestConfig27))
+class NoCTest28 extends NoCTest(Seq(new TestConfig28))
+class NoCTest29 extends NoCTest(Seq(new TestConfig29))
+class NoCTest30 extends NoCTest(Seq(new TestConfig30))
+class NoCTest31 extends NoCTest(Seq(new TestConfig31))
+class NoCTest32 extends NoCTest(Seq(new TestConfig32))
+class NoCTest33 extends NoCTest(Seq(new TestConfig33))
+class NoCTest34 extends NoCTest(Seq(new TestConfig34))
+class NoCTest35 extends NoCTest(Seq(new TestConfig35))
+class NoCTest36 extends NoCTest(Seq(new TestConfig36))
+class NoCTest37 extends NoCTest(Seq(new TestConfig37))
+class NoCTest38 extends NoCTest(Seq(new TestConfig38))
+class NoCTest39 extends NoCTest(Seq(new TestConfig39))
+class NoCTest40 extends NoCTest(Seq(new TestConfig40))
+class NoCTest41 extends NoCTest(Seq(new TestConfig41))
+class NoCTest42 extends NoCTest(Seq(new TestConfig42))
+class NoCTest43 extends NoCTest(Seq(new TestConfig43))
+class NoCTest44 extends NoCTest(Seq(new TestConfig44))
+class NoCTest45 extends NoCTest(Seq(new TestConfig45))
+
+class NoCTestTL00 extends TLNoCTest(Seq(new TLTestConfig00))
+class NoCTestTL01 extends TLNoCTest(Seq(new TLTestConfig01))
 

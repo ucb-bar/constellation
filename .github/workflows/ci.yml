@@ -36,7 +36,8 @@ jobs:
             "20", "21",
             "23", "24", "25",
             "30", "31", "32", "33", "34", "35", "36", "37", "38", "39",
-	    "40", "41", "42", "43", "44", "45"
+	    "40", "41", "42", "43", "44", "45",
+	    "TL00", "TL01"
         ]
     env:
       CONSTELLATION_CI: 1
@@ -58,4 +59,4 @@ jobs:
       run: sbt compile
 
     - name: Unit Tests
-      run: sbt "testOnly constellation.NocTest${{ matrix.config }}"
+      run: sbt "testOnly constellation.NoCTest${{ matrix.config }}"
