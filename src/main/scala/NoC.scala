@@ -20,7 +20,7 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   // Tracks the set of every possible packet that might occupy each virtual channel
   val possiblePacketMap = scala.collection.mutable.Map[Pos, Set[PacketRoutingInfo]]().withDefaultValue(Set())
 
-  def checkConnectivity(vNetId: Int, f: MasterAllocTable) = {
+  def checkConnectivity(vNetId: Int, allocTable: MasterAllocTable) = {
     // Loop through accessible ingress/egress pairs
     globalIngressParams.filter(_.vNetId == vNetId).zipWithIndex.map { case (iP,iIdx) =>
       val iId = iP.destId
@@ -37,7 +37,7 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
           positions = positions.filter(_._3 != oId).map { case (srcId, srcV, nodeId) =>
             val nexts = fullChannelParams.filter(_.srcId == nodeId).map { nxtC =>
               (0 until nxtC.nVirtualChannels).map { nxtV =>
-                val can_transition = f(nodeId)(AllocParams(srcId, srcV, nxtC.destId, nxtV, oId, vNetId))
+                val can_transition = allocTable(nodeId)(AllocParams(srcId, srcV, nxtC.destId, nxtV, oId, vNetId))
                 if (can_transition) Some((nodeId, nxtV, nxtC.destId)) else None
               }.flatten
             }.flatten
@@ -65,11 +65,11 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
     // For each subset of blockers for this virtual network, recheck connectivity assuming
     // every virtual channel accessible to each blocker is locked
     for (b <- blockeeSets) {
-      checkConnectivity(vNetId, (nodeId: Int) => (p: AllocParams) => {
+      checkConnectivity(vNetId, new MasterAllocTable((nodeId, p) => {
         (masterAllocTable(nodeId)(p) &&
           !(b.map { v => possiblePacketMap((nodeId, p.nxtV, p.nxtId)).map(_.vNetId == v) }.flatten.fold(false)(_||_))
         )
-      })
+      }))
     }
   }
 

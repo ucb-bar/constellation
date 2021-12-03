@@ -325,37 +325,43 @@ class TestConfig33 extends Config(
   new WithCombineRCVA ++
   new WithUniformVirtualChannels(2, VirtualChannelParams(2)) ++
   new Mesh2DConfig(3, 3, MasterAllocTables.mesh2DDimensionOrderedHighest))
-
-
 class TestConfig34 extends Config(
-  new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
-  new Mesh2DConfig(5, 5))
+  new WithCombineSAST ++
+  new WithCombineRCVA ++
+  new WithUniformVirtualChannels(2, VirtualChannelParams(2)) ++
+  new Mesh2DConfig(3, 3, MasterAllocTables.mesh2DBestRouter))
+
+
+
 class TestConfig35 extends Config(
   new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
-  new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DWestFirst))
+  new Mesh2DConfig(5, 5))
 class TestConfig36 extends Config(
   new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
-  new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DNorthLast))
-
+  new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DWestFirst))
 class TestConfig37 extends Config(
-  new constellation.WithIngressVNets((i: Int) => i % 4) ++
-  new constellation.WithNBlockingVirtualNetworks(4) ++
-  new constellation.WithUniformVirtualChannels(4, VirtualChannelParams(3)) ++
-  new constellation.Mesh2DConfig(3, 3, MasterAllocTables.mesh2DDimensionOrderedHighest))
+  new WithUniformVirtualChannels(1, VirtualChannelParams(1)) ++
+  new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DNorthLast))
 
 class TestConfig38 extends Config(
   new constellation.WithIngressVNets((i: Int) => i % 4) ++
   new constellation.WithNBlockingVirtualNetworks(4) ++
   new constellation.WithUniformVirtualChannels(4, VirtualChannelParams(3)) ++
-  new constellation.Mesh2DConfig(3, 3, MasterAllocTables.mesh2DAlternatingDimensionOrdered))
+  new constellation.Mesh2DConfig(3, 3, MasterAllocTables.mesh2DDimensionOrderedHighest))
 
 class TestConfig39 extends Config(
+  new constellation.WithIngressVNets((i: Int) => i % 4) ++
+  new constellation.WithNBlockingVirtualNetworks(4) ++
+  new constellation.WithUniformVirtualChannels(4, VirtualChannelParams(3)) ++
+  new constellation.Mesh2DConfig(3, 3, MasterAllocTables.mesh2DAlternatingDimensionOrdered))
+
+class TestConfig40 extends Config(
   new constellation.WithIngressVNets((i: Int) => i % 4) ++
   new constellation.WithNNonblockingVirtualNetworks(4) ++
   new constellation.WithUniformVirtualChannels(4, VirtualChannelParams(3)) ++
   new constellation.Mesh2DConfig(3, 3, MasterAllocTables.mesh2DDimensionOrderedHighest))
 
-class TestConfig40 extends Config(
+class TestConfig41 extends Config(
   new constellation.WithIngressVNets((i: Int) => i % 4) ++
   new constellation.WithNNonblockingVirtualNetworksWithSharing(4) ++
   new constellation.WithUniformVirtualChannels(4, VirtualChannelParams(3)) ++
@@ -363,17 +369,17 @@ class TestConfig40 extends Config(
 
 
 // 2D Torus
-class TestConfig41 extends Config(
+class TestConfig42 extends Config(
   new WithUniformVirtualChannels(2, VirtualChannelParams(1)) ++
   new UnidirectionalTorus2DConfig(3, 3))
-class TestConfig42 extends Config(
+class TestConfig43 extends Config(
   new WithUniformVirtualChannels(3, VirtualChannelParams(3)) ++
   new UnidirectionalTorus2DConfig(3, 3))
-class TestConfig43 extends Config(
+class TestConfig44 extends Config(
   new WithUniformVirtualChannels(4, VirtualChannelParams(4)) ++
   new UnidirectionalTorus2DConfig(5, 5))
 
-class TestConfig44 extends Config(
+class TestConfig45 extends Config(
   new WithUniformVirtualChannels(2, VirtualChannelParams(1)) ++
   new BidirectionalTorus2DConfig(3, 3))
 
