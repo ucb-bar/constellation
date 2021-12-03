@@ -29,7 +29,7 @@ for idx, datum in enumerate(data):
     # all inputs are active
     s.add(And([dup_edges[i] for i in datum[2]]))
 
-# subgraph synthesis without considering indirect connection
+# subgraph synthesis
 while True:
     # solve
     r = s.check()
@@ -41,12 +41,21 @@ while True:
     m = s.model()
     # verify
     v = Solver()
-    # an edge can be active only if at least one of its receivers is active
+    # dup edges as many as data
+    dup_edges = [[Bool(f'x{i}_{j}') for i in range(nedges)] for j in range(len(data))]
+    # direct dependency
     for sender, receivers in enumerate(coms):
         if receivers:
-            v.add(Implies(edges[sender], Or([edges[i] for i in receivers])))
+            v.add(Implies(edges[sender], Or([edges[i] for i in receivers] + [dup_edges[j][sender] for j in range(len(data))])))
         else:
             v.add(Not(edges[sender]))
+    # indirect dependency
+    for j, datum in enumerate(data):
+        for sender, receivers in enumerate(datum[4]):
+            if receivers:
+                v.add(Implies(dup_edges[j][sender], Or([edges[i] for i in receivers] + [dup_edges[j][i] for i in receivers])))
+            else:
+                v.add(Not(dup_edges[j][sender]))
     # unselected edges are inactive
     for edge in edges:
         if not m[edge]:
