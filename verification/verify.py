@@ -144,7 +144,7 @@ if __name__ == "__main__":
     parser.add_argument("-b", help="prove deadlock-free property by searching a loop", action="store_true")
     parser.add_argument("-c", type=str, help="prove deadlock-free property by verifying the given escape channels")
     parser.add_argument("-d", help="prove deadlock-free property by searching a valid subrelation", action="store_true")
-    parser.add_argument("files", nargs='+')
+    parser.add_argument("graph", nargs='+')
     args = parser.parse_args()
     
     def read_files(filenames):
@@ -162,7 +162,7 @@ if __name__ == "__main__":
                     coms[line[0]] += line[1:]
                 graphs.append([filename, num_channels, inputs, outputs, coms])
         return graphs
-    graphs = read_files(args.files)
+    graphs = read_files(args.graph)
 
     if args.a:
         for graph in graphs:
