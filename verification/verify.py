@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from z3 import *
 
 # prove liveness property for the given inputs and outputs
