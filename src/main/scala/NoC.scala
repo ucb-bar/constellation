@@ -8,12 +8,34 @@ import constellation.router.{Router, RouterParams}
 import constellation.topology.{MasterAllocTable, AllocParams}
 
 class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
+  var uniqueChannelId = 0
+  def getUniqueChannelId(): Int = {
+    val r = uniqueChannelId
+    uniqueChannelId = uniqueChannelId + 1
+    r
+  }
+
   val fullChannelParams: Seq[ChannelParams] = Seq.tabulate(nNodes, nNodes) { case (i,j) =>
-    topologyFunction(i, j)
+    topologyFunction(i, j).map { cP => cP.copy(virtualChannelParams=cP.virtualChannelParams.map { vP =>
+      vP.copy(uniqueId=getUniqueChannelId())
+    })}
   }.flatten.flatten
 
-  // Check sanity of masterAllocTable, all inputs can route to all outputs
+  val globalIngressParams = p(NoCKey).ingresses.zipWithIndex.map { case (u,i) => u.copy(
+    ingressId=i, uniqueId=getUniqueChannelId()
+  ) }
+  val globalEgressParams = p(NoCKey).egresses.zipWithIndex.map { case (u,e) => u.copy(
+    egressId=e,
+    uniqueId=getUniqueChannelId(),
+    possiblePackets=globalIngressParams.map { i =>
+      (i.possibleEgresses.contains(e), PacketRoutingInfo(e, i.vNetId))
+    }.filter(_._1).map(_._2).toSet
+  ) }
 
+  globalIngressParams.foreach(_.possibleEgresses.foreach(e => require(e < globalEgressParams.size)))
+
+
+  // Check sanity of masterAllocTable, all inputs can route to all outputs
   // srcId, vId, dstId
   type Pos = (Int, Int, Int)
 
@@ -60,7 +82,7 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   println("Constellation: Checking virtual subnet connectivity")
   for (vNetId <- 0 until nVirtualNetworks) {
     // blockees are vNets which the current vNet can block without affecting its own forwards progress
-    val blockees = (0 until nVirtualNetworks).filter(v => v != vNetId && params.vNetBlocking(vNetId, v))
+    val blockees = (0 until nVirtualNetworks).filter(v => v != vNetId && p(NoCKey).vNetBlocking(vNetId, v))
     val blockeeSets = blockees.toSet.subsets
     // For each subset of blockers for this virtual network, recheck connectivity assuming
     // every virtual channel accessible to each blocker is locked
@@ -123,4 +145,8 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   val debug_any_stall_ctr = debug_va_stall_ctr + debug_sa_stall_ctr
   debug_va_stall_ctr := debug_va_stall_ctr + router_nodes.map(_.io.debug.va_stall.reduce(_+_)).reduce(_+_)
   debug_sa_stall_ctr := debug_sa_stall_ctr + router_nodes.map(_.io.debug.sa_stall.reduce(_+_)).reduce(_+_)
+
+  dontTouch(debug_va_stall_ctr)
+  dontTouch(debug_sa_stall_ctr)
+  dontTouch(debug_any_stall_ctr)
 }

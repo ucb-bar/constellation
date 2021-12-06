@@ -8,6 +8,7 @@ import freechips.rocketchip.config.{Field, Parameters}
 case class VirtualChannelParams(
   bufferSize: Int = 1,
   possiblePackets: Set[PacketRoutingInfo] = Set(),
+  uniqueId: Int = -1
 ) {
   val traversable = possiblePackets.size > 0
 }
@@ -39,6 +40,7 @@ case class IngressChannelParams(
   possibleEgresses: Set[Int],
   vNetId: Int = 0,
   ingressId: Int = -1,
+  uniqueId: Int = -1
 ) extends BaseChannelParams {
   def srcId = -1
   def nVirtualChannels = 1
@@ -49,7 +51,8 @@ case class IngressChannelParams(
 case class EgressChannelParams(
   srcId: Int,
   egressId: Int = -1,
-  possiblePackets: Set[PacketRoutingInfo] = Set()
+  possiblePackets: Set[PacketRoutingInfo] = Set(),
+  uniqueId: Int = -1
 ) extends BaseChannelParams {
   def destId = -1
   def nVirtualChannels = 1
@@ -75,8 +78,8 @@ class Channel(val cParam: ChannelParams)(implicit val p: Parameters) extends Bun
 
 class TerminalChannel(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   require(cParam match {
-    case IngressChannelParams(_,_,_,_) => true
-    case EgressChannelParams(_,_,_) => true
+    case IngressChannelParams(_,_,_,_,_) => true
+    case EgressChannelParams(_,_,_,_) => true
     case _ => false
   })
 

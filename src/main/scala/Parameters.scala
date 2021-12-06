@@ -28,16 +28,7 @@ case object NoCKey extends Field[NoCConfig](NoCConfig())
 
 trait HasNoCParams {
   implicit val p: Parameters
-  val params = p(NoCKey)
-
-  val globalIngressParams = params.ingresses.zipWithIndex.map { case (u,i) => u.copy(ingressId=i) }
-  val globalEgressParams = params.egresses.zipWithIndex.map { case (u,e) => u.copy(egressId=e,
-    possiblePackets=globalIngressParams.map { i =>
-      (i.possibleEgresses.contains(e), PacketRoutingInfo(e, i.vNetId))
-    }.filter(_._1).map(_._2).toSet
-  ) }
-
-  globalIngressParams.foreach(_.possibleEgresses.foreach(e => require(e < globalEgressParams.size)))
+  private val params = p(NoCKey)
 
   val nNodes = params.nNodes
   val maxFlits = params.maxFlits
@@ -47,7 +38,9 @@ trait HasNoCParams {
   val nodeIdBits = log2Ceil(params.nNodes)
   val flitIdBits = log2Up(params.maxFlits+1)
   val vNetBits = log2Up(params.nVirtualNetworks)
-  val egressIdBits = log2Up(globalEgressParams.size)
+  val nEgresses = params.egresses.size
+  val egressIdBits = log2Up(params.egresses.size)
+  val egressSrcIds = params.egresses.map(_.srcId)
 
   val topologyFunction = params.topology
   val masterAllocTable = params.masterAllocTable

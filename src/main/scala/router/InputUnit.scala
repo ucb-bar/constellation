@@ -49,7 +49,7 @@ abstract class AbstractInputUnit(
       outParams.zipWithIndex.map { case (oP, oI) =>
         (0 until oP.nVirtualChannels).map { oV =>
           val allow = virtualChannelParams(srcV).possiblePackets.map { case PacketRoutingInfo(egressId,vNetId) =>
-            allocTable(srcV, oP.destId, oV, globalEgressParams(egressId).srcId, vNetId)
+            allocTable(srcV, oP.destId, oV, egressSrcIds(egressId), vNetId)
           }.reduce(_||_)
           if (!allow)
             out(oI)(oV) := false.B
@@ -60,7 +60,7 @@ abstract class AbstractInputUnit(
   }
 
   def egressIdToNodeId(egressId: UInt): UInt = MuxLookup(egressId, 0.U(nodeIdBits.W),
-    cParam.possiblePackets.toSeq.map(u => u.egressId.U -> globalEgressParams(u.egressId).srcId.U)
+    cParam.possiblePackets.toSeq.map(u => u.egressId.U -> egressSrcIds(u.egressId).U)
   )
 
 }

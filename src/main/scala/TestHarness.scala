@@ -45,7 +45,7 @@ class InputGen(idx: Int, cParams: IngressChannelParams, inputStallProbability: D
   io.out.valid := !random_delay && flits_left === 0.U && io.rob_ready
   io.out.bits.head := true.B
   io.out.bits.tail := packet_remaining === 0.U
-  io.out.bits.egress_id := LFSR(20) % globalEgressParams.size.U
+  io.out.bits.egress_id := LFSR(20) % nEgresses.U
   io.out.bits.payload := (io.tsc << 16) | (io.rob_idx << 8)
 
   io.n_flits := packet_remaining + 1.U
