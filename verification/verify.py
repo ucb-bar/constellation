@@ -99,6 +99,11 @@ def prove_deadlock_free_property_by_subrelation(num_channels, coms, graphs):
     channels = [Bool(str(i)) for i in range(num_channels)]
     # create a synthesis problem instance
     s = Solver()
+    # each channel must be active or connect to an active channel in each graph
+    for graph_id, graph in enumerate(graphs):
+        for sender, receivers in enumerate(graph[4]):
+            if receivers:
+                s.add(Or([channels[sender]] + [channels[i] for i in receivers]))
     # each input must connect to outputs in at least one way in each graph
     for graph_id, graph in enumerate(graphs):
         # duplicate channels for each graph
