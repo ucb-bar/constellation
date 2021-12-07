@@ -271,15 +271,7 @@ if __name__ == "__main__":
         else:
             print('deadlock-free property failed')
 
-    if args.e:
-        loop = find_loop(num_channels, coms)
-        if loop:
-            print('deadlock-free property failed with a loop:')
-            print(*loop)
-        else:
-            print('deadlock-free property verified')
-
-    if args.f or args.g:
+    if args.e or args.f or args.g:
         max_hop = 0
         for graph in graphs:
             hop = get_max_hop(*graph[1:])
@@ -288,6 +280,14 @@ if __name__ == "__main__":
                 exit(0)
             if hop > max_hop:
                 max_hop = hop
+
+    if args.e:
+        loop = find_loop(num_channels, coms)
+        if loop:
+            print('deadlock-free property failed with a loop:')
+            print(*loop)
+        else:
+            print('deadlock-free property verified')
 
     if args.f:
         with open(args.f, 'r') as fp:
