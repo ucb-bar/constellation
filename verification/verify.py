@@ -197,9 +197,8 @@ if __name__ == "__main__":
     parser.add_argument("-b", help="prove deadlock-free property by searching a loop assuming liveness property", action="store_true")
     parser.add_argument("-c", type=str, help="prove deadlock-free property by verifying the given escape channels assuming liveness property")
     parser.add_argument("-d", help="prove deadlock-free property by searching a valid escape assuming liveness property", action="store_true")
-    parser.add_argument("-e", help="prove deadlock-free property by searching a loop", action="store_true")
-    parser.add_argument("-f", type=str, help="prove deadlock-free property by verifying the given escape channels")
-    parser.add_argument("-g", help="prove deadlock-free property by searching a valid escape", action="store_true")
+    parser.add_argument("-e", type=str, help="prove deadlock-free property by verifying the given escape channels")
+    parser.add_argument("-f", help="prove deadlock-free property by searching a valid escape", action="store_true")
     parser.add_argument("graph", nargs='+')
     args = parser.parse_args()
     
@@ -229,7 +228,7 @@ if __name__ == "__main__":
             else:
                 print(f'liveness property verified for {graph[0]}')
 
-    if args.b or args.c or args.d or args.e or args.f or args.g:
+    if args.b or args.c or args.d or args.e or args.f:
         num_channels = max(graphs, key=lambda x: x[1])[1]
         com_sets = [set() for i in range(num_channels)]
         input_set = set()
@@ -271,7 +270,7 @@ if __name__ == "__main__":
         else:
             print('deadlock-free property failed')
 
-    if args.e or args.f or args.g:
+    if args.e or args.f:
         max_hop = 0
         for graph in graphs:
             hop = get_max_hop(*graph[1:])
@@ -282,15 +281,7 @@ if __name__ == "__main__":
                 max_hop = hop
 
     if args.e:
-        loop = find_loop(num_channels, coms)
-        if loop:
-            print('deadlock-free property failed with a loop:')
-            print(*loop)
-        else:
-            print('deadlock-free property verified')
-
-    if args.f:
-        with open(args.f, 'r') as fp:
+        with open(args.e, 'r') as fp:
             escape_channels = list(map(lambda x: int(x), fp.readline().split()))
             loop = find_loop_eg(num_channels, coms, graphs, escape_channels, max_hop)
             if loop:
@@ -299,7 +290,7 @@ if __name__ == "__main__":
             else:
                 print('deadlock-free property verified')
 
-    if args.g:
+    if args.f:
         escape_channels = find_escape(num_channels, coms, graphs, False, max_hop)
         if escape_channels:
             print('deadlock-free property verified with escape channels:')
