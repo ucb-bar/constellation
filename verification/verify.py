@@ -136,26 +136,11 @@ def find_escape(num_channels, coms, graphs, live, max_hop = 0):
     channels = [Bool(str(i)) for i in range(num_channels)]
     # create a synthesis problem instance
     s = Solver()
-    # each channel must be active or connect to an active channel in each graph
+    # each channel must directly connect to an escape channel in each graph
     for graph_id, graph in enumerate(graphs):
         for sender, receivers in enumerate(graph[4]):
             if receivers:
-                s.add(Or([channels[sender]] + [channels[i] for i in receivers]))
-    # each input must connect to outputs in at least one way in each graph (probably unnecessary)
-    for graph_id, graph in enumerate(graphs):
-        # duplicate channels for each graph
-        dup_channels = [Bool(f'{i}_{graph_id}') for i in range(num_channels)]
-        # a duplicated channel can be active only if the original one is active
-        for i in range(num_channels):
-            s.add(Implies(dup_channels[i], channels[i]))
-        # a duplicated channel can be active only if at least one of its receivers is active or if it is an output
-        for sender, receivers in enumerate(graph[4]):
-            if receivers:
-                s.add(Implies(dup_channels[sender], Or([dup_channels[i] for i in receivers])))
-            elif sender not in graph[3]:
-                s.add(Not(dup_channels[sender]))
-        # all inputs are active
-        s.add(And([dup_channels[i] for i in graph[2]]))
+                s.add(Or([channels[i] for i in receivers]))
     # escape synthesis
     while True:
         # solve the synthesis problem
@@ -183,7 +168,7 @@ def find_escape(num_channels, coms, graphs, live, max_hop = 0):
     # return the valid escape channels
     return escape_channels
 
-def get_max_hop(num_channels, inputs, coms):
+def get_max_hop(num_channels, inputs, outputs, coms):
     max_hop = 0
     for k in inputs:
         done = [False for i in range(num_channels)]
@@ -193,6 +178,8 @@ def get_max_hop(num_channels, inputs, coms):
         while queue:
             next_queue = []
             for i in queue:
+                if not coms[i] and i not in outputs:
+                    return -1
                 for j in coms[i]:
                     if not done[j]:
                         done[j] = True
@@ -295,7 +282,10 @@ if __name__ == "__main__":
     if args.f or args.g:
         max_hop = 0
         for graph in graphs:
-            hop = get_max_hop(graph[1], graph[2], graph[4])
+            hop = get_max_hop(*graph[1:])
+            if hop < 0:
+                print('packet unreachable')
+                exit(0)
             if hop > max_hop:
                 max_hop = hop
 
