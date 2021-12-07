@@ -212,10 +212,20 @@ object MasterAllocTables {
   })
 
   def escapeChannels(escapeRouter: MasterAllocTable, normalRouter: MasterAllocTable, nEscapeChannels: Int = 1) = new MasterAllocTable((nodeId, p) => {
-    if (p.nxtV < nEscapeChannels) {
+    if (p.srcId == -1) {
+      if (p.nxtV >= nEscapeChannels) {
+        normalRouter(nodeId)(p.copy(nxtV=p.nxtV-nEscapeChannels))
+      } else {
+        escapeRouter(nodeId)(p)
+      }
+    } else if (p.srcV < nEscapeChannels && p.nxtV < nEscapeChannels) {
       escapeRouter(nodeId)(p)
-    } else {
+    } else if (p.srcV >= nEscapeChannels && p.nxtV >= nEscapeChannels) {
       normalRouter(nodeId)(p.copy(srcV=p.srcV-nEscapeChannels, nxtV=p.nxtV-nEscapeChannels))
+    } else if (p.srcV >= nEscapeChannels && p.nxtV < nEscapeChannels) {
+      normalRouter(nodeId)(p.copy(srcV=p.srcV-nEscapeChannels, nxtV=0))
+    } else {
+      false
     }
   })
 
