@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
-
+import constellation.topology.ChannelInfoForAlloc
 
 // User-facing params, for adjusting config options
 case class UserVirtualChannelParams(
@@ -30,11 +30,15 @@ case class UserEgressParams(
 
 // Internal-facing params
 case class VirtualChannelParams(
+  src: Int,
+  dst: Int,
+  vc: Int,
   bufferSize: Int,
   possiblePackets: Set[PacketRoutingInfo],
-  uniqueId: Int
+  uniqueId: Int,
 ) {
   val traversable = possiblePackets.size > 0
+  def asChannelInfoForAlloc: ChannelInfoForAlloc = ChannelInfoForAlloc(src, vc, dst)
 }
 
 trait BaseChannelParams {
@@ -42,7 +46,7 @@ trait BaseChannelParams {
   def destId: Int
   def possiblePackets: Set[PacketRoutingInfo]
   def nVirtualChannels: Int
-  def virtualChannelParams: Seq[VirtualChannelParams]
+  def channelInfosForAlloc: Seq[ChannelInfoForAlloc]
 }
 
 case class ChannelParams(
@@ -57,6 +61,7 @@ case class ChannelParams(
   def possiblePackets = virtualChannelParams.map(_.possiblePackets).reduce(_++_)
   val traversable = virtualChannelParams.map(_.traversable).reduce(_||_)
 
+  def channelInfosForAlloc = virtualChannelParams.map(_.asChannelInfoForAlloc)
 }
 
 case class IngressChannelParams(
@@ -68,8 +73,8 @@ case class IngressChannelParams(
 ) extends BaseChannelParams {
   def srcId = -1
   def nVirtualChannels = 1
-  def virtualChannelParams = { require(false); Nil }
   def possiblePackets = possibleEgresses.map { e => PacketRoutingInfo(e, vNetId) }
+  def channelInfosForAlloc = Seq(ChannelInfoForAlloc(-1, 0, destId))
 }
 
 case class EgressChannelParams(
@@ -80,7 +85,7 @@ case class EgressChannelParams(
 ) extends BaseChannelParams {
   def destId = -1
   def nVirtualChannels = 1
-  def virtualChannelParams = { require(false); Nil }
+  def channelInfosForAlloc = Seq(ChannelInfoForAlloc(srcId, 0, -1))
 }
 
 
@@ -90,7 +95,11 @@ trait HasChannelParams extends HasNoCParams {
 
   val nVirtualChannels = cParam.nVirtualChannels
   val virtualChannelBits = log2Up(nVirtualChannels)
-  def virtualChannelParams = cParam.virtualChannelParams
+  def virtualChannelParams = cParam match {
+    case ChannelParams(_,_,_,v) => v
+    case IngressChannelParams(_,_,_,_,_) => require(false); Nil;
+    case EgressChannelParams(_,_,_,_) => require(false); Nil;
+  }
   def maxBufferSize = virtualChannelParams.map(_.bufferSize).max
 }
 

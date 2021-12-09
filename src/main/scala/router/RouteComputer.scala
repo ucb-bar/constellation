@@ -8,7 +8,7 @@ import freechips.rocketchip.util._
 import freechips.rocketchip.rocket.DecodeLogic
 
 import constellation._
-import constellation.topology.{AllocParams, ChannelInfo, PacketInfo}
+import constellation.topology._
 
 class RouteComputerReq(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   val src_virt_id = UInt(virtualChannelBits.W)
@@ -47,13 +47,13 @@ class RouteComputer(val rP: RouterParams)(implicit val p: Parameters) extends Mo
             val table = allInParams(i).possiblePackets.toSeq.map {
               case PacketRoutingInfo(egressId, vNetId) => (egressSrcIds(egressId), vNetId)
             } .distinct.map { case (dest, vNetId) =>
-                Seq.tabulate(allInParams(i).nVirtualChannels) { inVId =>
+                allInParams(i).channelInfosForAlloc.map { ci =>
                   val v = rP.nodeAllocTable(AllocParams(
-                    ChannelInfo(allInParams(i).srcId, inVId, nodeId),
-                    ChannelInfo(nodeId, outVId, outParams(o).destId),
-                    PacketInfo(dest, vNetId)
+                    ci,
+                    outParams(o).virtualChannelParams(outVId).asChannelInfoForAlloc,
+                    PacketInfoForAlloc(dest, vNetId)
                   ))
-                  ((((inVId << vNetBits) + vNetId) << nodeIdBits) + dest, v)
+                  ((((ci.vc << vNetBits) + vNetId) << nodeIdBits) + dest, v)
                 }
             }.flatten
             val trues = table.filter(_._2).map(_._1.U)

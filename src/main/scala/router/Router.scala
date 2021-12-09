@@ -6,7 +6,7 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 
 import constellation._
-import constellation.topology.{NodeAllocTable, AllocParams, ChannelInfo, PacketInfo}
+import constellation.topology._
 
 case class UserRouterParams(
   combineSAST: Boolean = false,
@@ -54,28 +54,6 @@ trait HasRouterParams extends HasRouterOutputParams with HasRouterInputParams
   val outParams = rP.outParams
   val ingressParams = rP.ingressParams
   val egressParams = rP.egressParams
-
-  def possibleTransition(inParam: BaseChannelParams, outParam: BaseChannelParams): Boolean = {
-
-    // Always allow transition to output if the packet has reached
-    // its destination
-    if (outParam.destId == -1)
-      return true
-
-    val legalVirtualTransition = Seq.tabulate(
-      inParam.nVirtualChannels,
-      outParam.nVirtualChannels,
-      nNodes,
-      nVirtualNetworks) { case (inV, outV, destId, vNetId) =>
-        rP.nodeAllocTable(AllocParams(
-          ChannelInfo(inParam.srcId, inV, nodeId),
-          ChannelInfo(nodeId, outV, outParam.destId),
-          PacketInfo(destId, vNetId)
-        ))
-    }.flatten.flatten.flatten.reduce(_||_)
-
-    legalVirtualTransition
-  }
 }
 
 class Router(val rP: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
@@ -100,25 +78,11 @@ class Router(val rP: RouterParams)(implicit val p: Parameters) extends Module wi
   require(nodeId < (1 << nodeIdBits))
 
   val input_units = inParams.zipWithIndex.map { case (u,i) =>
-    Module(new InputUnit(u, outParams, egressParams, rP.combineRCVA, rP.combineSAST,
-      (srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) => {
-        rP.nodeAllocTable(AllocParams(
-          ChannelInfo(u.srcId, srcV, nodeId),
-          ChannelInfo(nodeId, nxtV, nxtId),
-          PacketInfo(dstId, vNetId)
-        ))
-      }
-    )).suggestName(s"input_unit_${i}_from_${u.srcId}") }
+    Module(new InputUnit(u, outParams, egressParams, rP.combineRCVA, rP.combineSAST, rP.nodeAllocTable))
+      .suggestName(s"input_unit_${i}_from_${u.srcId}") }
   val ingress_units = ingressParams.zipWithIndex.map { case (u,i) =>
-    Module(new IngressUnit(u, outParams, egressParams, rP.combineRCVA, rP.combineSAST,
-      (srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) => {
-        rP.nodeAllocTable(AllocParams(
-          ChannelInfo(u.srcId, srcV, nodeId),
-          ChannelInfo(nodeId, nxtV, nxtId),
-          PacketInfo(dstId, vNetId)
-        ))
-      }
-    )).suggestName(s"ingress_unit_${i+nInputs}_from_${u.ingressId}") }
+    Module(new IngressUnit(u, outParams, egressParams, rP.combineRCVA, rP.combineSAST, rP.nodeAllocTable))
+      .suggestName(s"ingress_unit_${i+nInputs}_from_${u.ingressId}") }
   val all_input_units = input_units ++ ingress_units
 
   val output_units = outParams.zipWithIndex.map { case (u,i) =>
@@ -160,12 +124,7 @@ class Router(val rP: RouterParams)(implicit val p: Parameters) extends Module wi
     case (a,u) => a := u.io.channel_available }
 
   all_input_units.foreach(in => all_output_units.zipWithIndex.foreach { case (out,outIdx) =>
-    if (possibleTransition(in.cParam, out.cParam)) {
-      in.io.out_credit_available(outIdx) := out.io.credit_available
-    } else {
-      in.io.out_credit_available(outIdx).foreach(_ := false.B)
-    }
-    dontTouch(in.io.out_credit_available)
+    in.io.out_credit_available(outIdx) := out.io.credit_available
   })
   (all_input_units zip switch_allocator.io.req).foreach {
     case (u,r) => r <> u.io.salloc_req }

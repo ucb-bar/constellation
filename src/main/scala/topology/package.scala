@@ -5,16 +5,16 @@ package object topology {
   type PhysicalTopology = (Int, Int) => Boolean
 
 
-  case class ChannelInfo(
+  case class ChannelInfoForAlloc(
     src: Int, vc: Int, dst: Int
   )
 
-  case class PacketInfo(
+  case class PacketInfoForAlloc(
     dst: Int, vNet: Int
   )
 
   case class AllocParams(
-    srcC: ChannelInfo, nxtC: ChannelInfo, pInfo: PacketInfo
+    srcC: ChannelInfoForAlloc, nxtC: ChannelInfoForAlloc, pInfo: PacketInfoForAlloc
   ) {
     require (srcC.dst == nxtC.src)
   }

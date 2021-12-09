@@ -7,6 +7,7 @@ import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
 import constellation._
+import constellation.topology.NodeAllocTable
 
 class IngressUnit(
   cParam: IngressChannelParams,
@@ -14,7 +15,7 @@ class IngressUnit(
   egressParams: Seq[EgressChannelParams],
   combineRCVA: Boolean,
   combineSAST: Boolean,
-  allocTable: (Int, Int, Int, Int, Int) => Boolean,
+  allocTable: NodeAllocTable
 )
   (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, egressParams, allocTable)(p) {
 

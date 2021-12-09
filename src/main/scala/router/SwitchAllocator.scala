@@ -43,15 +43,9 @@ class SwitchAllocator(val rP: RouterParams)(implicit val p: Parameters) extends 
   in_arbs.zipWithIndex.foreach { case (o,j) =>
     val fires = Wire(Vec(arbs.size, Bool()))
     arbs.zipWithIndex.foreach { case (a,i) =>
-      if (possibleTransition(allInParams(j), allOutParams(i))) {
-        a.io.in(j).valid := o.io.out.valid && o.io.out.bits.vc_sel(i).reduce(_||_)
-        a.io.in(j).bits := o.io.out.bits
-        fires(i) := a.io.in(j).fire()
-      } else {
-        a.io.in(j).valid := false.B
-        a.io.in(j).bits := DontCare
-        fires(i) := false.B
-      }
+      a.io.in(j).valid := o.io.out.valid && o.io.out.bits.vc_sel(i).reduce(_||_)
+      a.io.in(j).bits := o.io.out.bits
+      fires(i) := a.io.in(j).fire()
     }
     o.io.out.ready := fires.reduce(_||_)
   }

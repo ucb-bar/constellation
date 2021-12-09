@@ -17,8 +17,8 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
 
   val fullChannelParams: Seq[ChannelParams] = Seq.tabulate(nNodes, nNodes) { case (i,j) =>
     topologyFunction(i, j).map { cP =>
-      ChannelParams(i, j, cP.depth, cP.virtualChannelParams.map { vP =>
-        VirtualChannelParams(vP.bufferSize, Set[PacketRoutingInfo](), getUniqueChannelId())
+      ChannelParams(i, j, cP.depth, cP.virtualChannelParams.zipWithIndex.map { case (vP, vc) =>
+        VirtualChannelParams(i, j, vc, vP.bufferSize, Set[PacketRoutingInfo](), getUniqueChannelId())
       })
     }
   }.flatten.flatten
@@ -62,9 +62,9 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
             val nexts = fullChannelParams.filter(_.srcId == nodeId).map { nxtC =>
               (0 until nxtC.nVirtualChannels).map { nxtV =>
                 val can_transition = allocTable(nodeId)(AllocParams(
-                  ChannelInfo(srcId, srcV, nodeId),
-                  ChannelInfo(nodeId, nxtV, nxtC.destId),
-                  PacketInfo(oId, vNetId)
+                  ChannelInfoForAlloc(srcId, srcV, nodeId),
+                  nxtC.virtualChannelParams(nxtV).asChannelInfoForAlloc,
+                  PacketInfoForAlloc(oId, vNetId)
                 ))
                 if (can_transition) Some((nodeId, nxtV, nxtC.destId)) else None
               }.flatten
