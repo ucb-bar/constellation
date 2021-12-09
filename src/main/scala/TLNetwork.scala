@@ -269,13 +269,13 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
           flitPayloadBits = payloadWidth + (if (debugPrintLatencies) 64 else 0),
           ingresses = ((Seq.tabulate (in.size) { i => Seq.fill(3) { inNodeMapping(i) } } ++
             Seq.tabulate(out.size) { i => Seq.fill(2) { outNodeMapping(i) } }).flatten
-          ).zipWithIndex.map { case (i,iId) => IngressChannelParams(i,
+          ).zipWithIndex.map { case (i,iId) => UserIngressParams(i,
             (0 until nEgresses).filter(e => connectivity(iId, e, ingressVNets(iId))).toSet,
             ingressVNets(iId)
           )},
           egresses = ((Seq.tabulate (in.size) { i => Seq.fill(2) { inNodeMapping(i) } } ++
             Seq.tabulate(out.size) { i => Seq.fill(3) { outNodeMapping(i) } }).flatten
-          ).zipWithIndex.map { case (e,eId) => EgressChannelParams(e)},
+          ).zipWithIndex.map { case (e,eId) => UserEgressParams(e)},
         )
     })))
 

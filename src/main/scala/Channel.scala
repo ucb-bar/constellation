@@ -5,10 +5,34 @@ import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 
+
+// User-facing params, for adjusting config options
+case class UserVirtualChannelParams(
+  bufferSize: Int = 1
+)
+
+case class UserChannelParams(
+  virtualChannelParams: Seq[UserVirtualChannelParams] = Seq(UserVirtualChannelParams()),
+  depth: Int = 0
+) {
+  val nVirtualChannels = virtualChannelParams.size
+}
+
+case class UserIngressParams(
+  destId: Int,
+  possibleEgresses: Set[Int],
+  vNetId: Int
+)
+
+case class UserEgressParams(
+  srcId: Int
+)
+
+// Internal-facing params
 case class VirtualChannelParams(
-  bufferSize: Int = 1,
-  possiblePackets: Set[PacketRoutingInfo] = Set(),
-  uniqueId: Int = -1
+  bufferSize: Int,
+  possiblePackets: Set[PacketRoutingInfo],
+  uniqueId: Int
 ) {
   val traversable = possiblePackets.size > 0
 }
@@ -24,8 +48,8 @@ trait BaseChannelParams {
 case class ChannelParams(
   srcId: Int,
   destId: Int,
-  virtualChannelParams: Seq[VirtualChannelParams] = Seq(VirtualChannelParams()),
-  depth: Int = 0
+  depth: Int,
+  virtualChannelParams: Seq[VirtualChannelParams],
 ) extends BaseChannelParams {
   def nVirtualChannels = virtualChannelParams.size
   val maxBufferSize = virtualChannelParams.map(_.bufferSize).max
@@ -38,9 +62,9 @@ case class ChannelParams(
 case class IngressChannelParams(
   destId: Int,
   possibleEgresses: Set[Int],
-  vNetId: Int = 0,
-  ingressId: Int = -1,
-  uniqueId: Int = -1
+  vNetId: Int,
+  ingressId: Int,
+  uniqueId: Int
 ) extends BaseChannelParams {
   def srcId = -1
   def nVirtualChannels = 1
@@ -50,9 +74,9 @@ case class IngressChannelParams(
 
 case class EgressChannelParams(
   srcId: Int,
-  egressId: Int = -1,
-  possiblePackets: Set[PacketRoutingInfo] = Set(),
-  uniqueId: Int = -1
+  egressId: Int,
+  uniqueId: Int,
+  possiblePackets: Set[PacketRoutingInfo],
 ) extends BaseChannelParams {
   def destId = -1
   def nVirtualChannels = 1

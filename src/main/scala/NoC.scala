@@ -16,21 +16,23 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   }
 
   val fullChannelParams: Seq[ChannelParams] = Seq.tabulate(nNodes, nNodes) { case (i,j) =>
-    topologyFunction(i, j).map { cP => cP.copy(virtualChannelParams=cP.virtualChannelParams.map { vP =>
-      vP.copy(uniqueId=getUniqueChannelId())
-    })}
+    topologyFunction(i, j).map { cP =>
+      ChannelParams(i, j, cP.depth, cP.virtualChannelParams.map { vP =>
+        VirtualChannelParams(vP.bufferSize, Set[PacketRoutingInfo](), getUniqueChannelId())
+      })
+    }
   }.flatten.flatten
 
-  val globalIngressParams = p(NoCKey).ingresses.zipWithIndex.map { case (u,i) => u.copy(
-    ingressId=i, uniqueId=getUniqueChannelId()
-  ) }
-  val globalEgressParams = p(NoCKey).egresses.zipWithIndex.map { case (u,e) => u.copy(
-    egressId=e,
-    uniqueId=getUniqueChannelId(),
-    possiblePackets=globalIngressParams.map { i =>
-      (i.possibleEgresses.contains(e), PacketRoutingInfo(e, i.vNetId))
-    }.filter(_._1).map(_._2).toSet
-  ) }
+  val globalIngressParams = p(NoCKey).ingresses.zipWithIndex.map { case (u,i) =>
+    IngressChannelParams(u.destId, u.possibleEgresses, u.vNetId, i, getUniqueChannelId())
+  }
+  val globalEgressParams = p(NoCKey).egresses.zipWithIndex.map { case (u,e) =>
+    EgressChannelParams(u.srcId, e, getUniqueChannelId(),
+      globalIngressParams.filter(_.possibleEgresses.contains(e)).map { i =>
+        PacketRoutingInfo(e, i.vNetId)
+      }.toSet
+    )
+  }
 
   globalIngressParams.foreach(_.possibleEgresses.foreach(e => require(e < globalEgressParams.size)))
 
@@ -116,13 +118,15 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
     val egress = MixedVec(globalEgressParams.map { u => new TerminalChannel(u) })
   })
 
-  val router_nodes = Seq.tabulate(nNodes) { i => Module(new Router(routerParams(i).copy(
+  val router_nodes = Seq.tabulate(nNodes) { i => Module(new Router(RouterParams(
     nodeId = i,
     inParams = channelParams.filter(_.destId == i),
     outParams = channelParams.filter(_.srcId == i),
     ingressParams = globalIngressParams.filter(_.destId == i),
     egressParams = globalEgressParams.filter(_.srcId == i),
     nodeAllocTable = masterAllocTable(i),
+    combineSAST = routerParams(i).combineSAST,
+    combineRCVA = routerParams(i).combineRCVA
   ))) }
 
   router_nodes.zipWithIndex.map { case (dst,dstId) =>

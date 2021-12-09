@@ -8,6 +8,11 @@ import freechips.rocketchip.config.{Field, Parameters}
 import constellation._
 import constellation.topology.{NodeAllocTable, AllocParams}
 
+case class UserRouterParams(
+  combineSAST: Boolean = false,
+  combineRCVA: Boolean = false
+)
+
 case class RouterParams(
   nodeId: Int,
   inParams: Seq[ChannelParams],

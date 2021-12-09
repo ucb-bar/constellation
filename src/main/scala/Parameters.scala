@@ -15,12 +15,11 @@ case class NoCConfig(
   nVirtualNetworks: Int = 1,
 
   // srcNodeId, destNodeId => virtualChannelParams
-  topology: (Int, Int) => Option[ChannelParams] = (a: Int, b: Int) => None,
-  ingresses: Seq[IngressChannelParams] = Nil,
-  egresses: Seq[EgressChannelParams] = Nil,
+  topology: (Int, Int) => Option[UserChannelParams] = (a: Int, b: Int) => None,
+  ingresses: Seq[UserIngressParams] = Nil,
+  egresses: Seq[UserEgressParams] = Nil,
   masterAllocTable: MasterAllocTable = MasterAllocTables.allLegal,
-  routerParams: Int => RouterParams =
-    (i: Int) => RouterParams(i, Nil, Nil, Nil, Nil, (_: AllocParams) => false, false, false),
+  routerParams: Int => UserRouterParams = (i: Int) => UserRouterParams(),
   // blocker, blocked => bool
   vNetBlocking: (Int, Int) => Boolean = (_: Int, _: Int) => false,
 )
