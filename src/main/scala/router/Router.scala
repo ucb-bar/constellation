@@ -6,7 +6,7 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 
 import constellation._
-import constellation.topology.{NodeAllocTable, AllocParams}
+import constellation.topology.{NodeAllocTable, AllocParams, ChannelInfo, PacketInfo}
 
 case class UserRouterParams(
   combineSAST: Boolean = false,
@@ -67,7 +67,11 @@ trait HasRouterParams extends HasRouterOutputParams with HasRouterInputParams
       outParam.nVirtualChannels,
       nNodes,
       nVirtualNetworks) { case (inV, outV, destId, vNetId) =>
-        rP.nodeAllocTable(AllocParams(inParam.srcId, inV, outParam.destId, outV, destId, vNetId))
+        rP.nodeAllocTable(AllocParams(
+          ChannelInfo(inParam.srcId, inV, nodeId),
+          ChannelInfo(nodeId, outV, outParam.destId),
+          PacketInfo(destId, vNetId)
+        ))
     }.flatten.flatten.flatten.reduce(_||_)
 
     legalVirtualTransition
@@ -98,13 +102,21 @@ class Router(val rP: RouterParams)(implicit val p: Parameters) extends Module wi
   val input_units = inParams.zipWithIndex.map { case (u,i) =>
     Module(new InputUnit(u, outParams, egressParams, rP.combineRCVA, rP.combineSAST,
       (srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) => {
-        rP.nodeAllocTable(AllocParams(u.srcId, srcV, nxtId, nxtV, dstId, vNetId))
+        rP.nodeAllocTable(AllocParams(
+          ChannelInfo(u.srcId, srcV, nodeId),
+          ChannelInfo(nodeId, nxtV, nxtId),
+          PacketInfo(dstId, vNetId)
+        ))
       }
     )).suggestName(s"input_unit_${i}_from_${u.srcId}") }
   val ingress_units = ingressParams.zipWithIndex.map { case (u,i) =>
     Module(new IngressUnit(u, outParams, egressParams, rP.combineRCVA, rP.combineSAST,
       (srcV: Int, nxtId: Int, nxtV: Int, dstId: Int, vNetId: Int) => {
-        rP.nodeAllocTable(AllocParams(u.srcId, srcV, nxtId, nxtV, dstId, vNetId))
+        rP.nodeAllocTable(AllocParams(
+          ChannelInfo(u.srcId, srcV, nodeId),
+          ChannelInfo(nodeId, nxtV, nxtId),
+          PacketInfo(dstId, vNetId)
+        ))
       }
     )).suggestName(s"ingress_unit_${i+nInputs}_from_${u.ingressId}") }
   val all_input_units = input_units ++ ingress_units

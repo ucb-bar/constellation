@@ -5,17 +5,17 @@ import scala.math.pow
 object MasterAllocTables {
 
   // Utility functions
-  val srcIsIngress = new MasterAllocTable((_, p) => p.srcId == -1)
-  val nxtIsVC0     = new MasterAllocTable((_, p) => p.nxtV == 0)
-  val srcIsVC0     = new MasterAllocTable((_, p) => p.srcV == 0)
-  val nxtVLTSrcV   = new MasterAllocTable((_, p) => p.nxtV < p.srcV)
-  val nxtVLESrcV   = new MasterAllocTable((_, p) => p.nxtV <= p.srcV)
+  val srcIsIngress = new MasterAllocTable((_, p) => p.srcC.src == -1)
+  val nxtIsVC0     = new MasterAllocTable((_, p) => p.nxtC.vc == 0)
+  val srcIsVC0     = new MasterAllocTable((_, p) => p.srcC.vc == 0)
+  val nxtVLTSrcV   = new MasterAllocTable((_, p) => p.nxtC.vc < p.srcC.vc)
+  val nxtVLESrcV   = new MasterAllocTable((_, p) => p.nxtC.vc <= p.srcC.vc)
 
   // Usable policies
   val allLegal = new MasterAllocTable((_, _) => true)
 
   val bidirectionalLine = new MasterAllocTable((nodeId, p) => {
-    if (nodeId < p.nxtId) p.destId >= p.nxtId else p.destId <= p.nxtId
+    if (nodeId < p.nxtC.dst) p.pInfo.dst >= p.nxtC.dst else p.pInfo.dst <= p.nxtC.dst
   })
 
   def unidirectionalTorus1DDateline(nNodes: Int) = new MasterAllocTable((nodeId, p) => {
@@ -29,35 +29,35 @@ object MasterAllocTables {
     //   nxtVLESrcV && !nxtIsVC0
     // })(nodeId)(p)
 
-    if (p.srcId == -1)  {
-      p.nxtV != 0
-    } else if (p.srcV == 0) {
-      p.nxtV == 0
+    if (p.srcC.src == -1)  {
+      p.nxtC.vc != 0
+    } else if (p.srcC.vc == 0) {
+      p.nxtC.vc == 0
     } else if (nodeId == nNodes - 1) {
-      p.nxtV < p.srcV
+      p.nxtC.vc < p.srcC.vc
     } else {
-      p.nxtV <= p.srcV && p.nxtV != 0
+      p.nxtC.vc <= p.srcC.vc && p.nxtC.vc != 0
     }
   })
 
 
 
   def bidirectionalTorus1DDateline(nNodes: Int) = new MasterAllocTable((nodeId, p) => {
-    if (p.srcId == -1)  {
-      p.nxtV != 0
-    } else if (p.srcV == 0) {
-      p.nxtV == 0
-    } else if ((p.nxtId + nNodes - nodeId) % nNodes == 1) {
+    if (p.srcC.src == -1)  {
+      p.nxtC.vc != 0
+    } else if (p.srcC.vc == 0) {
+      p.nxtC.vc == 0
+    } else if ((p.nxtC.dst + nNodes - nodeId) % nNodes == 1) {
       if (nodeId == nNodes - 1) {
-        p.nxtV < p.srcV
+        p.nxtC.vc < p.srcC.vc
       } else {
-        p.nxtV <= p.srcV && p.nxtV != 0
+        p.nxtC.vc <= p.srcC.vc && p.nxtC.vc != 0
       }
-    } else if ((nodeId + nNodes - p.nxtId) % nNodes == 1) {
+    } else if ((nodeId + nNodes - p.nxtC.dst) % nNodes == 1) {
       if (nodeId == 0) {
-        p.nxtV < p.srcV
+        p.nxtC.vc < p.srcC.vc
       } else {
-        p.nxtV <= p.srcV && p.nxtV != 0
+        p.nxtC.vc <= p.srcC.vc && p.nxtC.vc != 0
       }
     } else {
       false
@@ -65,12 +65,12 @@ object MasterAllocTables {
   })
 
   def bidirectionalTorus1DShortest(nNodes: Int) = new MasterAllocTable((nodeId, p) => {
-    val cwDist = (p.destId + nNodes - nodeId) % nNodes
-    val ccwDist = (nodeId + nNodes - p.destId) % nNodes
+    val cwDist = (p.pInfo.dst + nNodes - nodeId) % nNodes
+    val ccwDist = (nodeId + nNodes - p.pInfo.dst) % nNodes
     val distSel = if (cwDist < ccwDist) {
-      (p.nxtId + nNodes - nodeId) % nNodes == 1
+      (p.nxtC.dst + nNodes - nodeId) % nNodes == 1
     } else if (cwDist > ccwDist) {
-      (nodeId + nNodes - p.nxtId) % nNodes == 1
+      (nodeId + nNodes - p.nxtC.dst) % nNodes == 1
     } else {
       true
     }
@@ -78,12 +78,12 @@ object MasterAllocTables {
   })
 
   def bidirectionalTorus1DRandom(nNodes: Int) = new MasterAllocTable((nodeId, p) => {
-    val sel = if (p.srcId == -1) {
+    val sel = if (p.srcC.src == -1) {
       true
-    } else if ((nodeId + nNodes - p.srcId) % nNodes == 1) {
-      (p.nxtId + nNodes - nodeId) % nNodes == 1
+    } else if ((nodeId + nNodes - p.srcC.src) % nNodes == 1) {
+      (p.nxtC.dst + nNodes - nodeId) % nNodes == 1
     } else {
-      (nodeId + nNodes - p.nxtId) % nNodes == 1
+      (nodeId + nNodes - p.nxtC.dst) % nNodes == 1
     }
     sel && bidirectionalTorus1DDateline(nNodes)(nodeId)(p)
   })
@@ -100,9 +100,9 @@ object MasterAllocTables {
     }
 
     new MasterAllocTable((nodeId, p) => {
-      val (nxtX, nxtY) = (p.nxtId / height, p.nxtId % height)
+      val (nxtX, nxtY) = (p.nxtC.dst / height, p.nxtC.dst % height)
       val (nodeX, nodeY) = (nodeId / height, nodeId % height)
-      val (dstX, dstY) = (p.destId / height, p.destId % height)
+      val (dstX, dstY) = (p.pInfo.dst / height, p.pInfo.dst % height)
       if (dstX <= nodeX) {
         false
       } else if (nodeX == nFly-1) {
@@ -113,17 +113,16 @@ object MasterAllocTables {
             l(d)
           }.flatten }
         }
-        dsts(nxtY).contains(p.destId % height)
+        dsts(nxtY).contains(p.pInfo.dst % height)
       }
     })
   }
 
 
   def mesh2DDimensionOrdered(firstDim: Int = 0)(nX: Int, nY: Int) = new MasterAllocTable((nodeId, p) => {
-    val (nxtX, nxtY)   = (p.nxtId % nX , p.nxtId / nX)
+    val (nxtX, nxtY)   = (p.nxtC.dst % nX , p.nxtC.dst / nX)
     val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
-    val (dstX, dstY)   = (p.destId % nX , p.destId / nX)
-    val (srcX, srcY)   = (p.srcId % nX , p.srcId / nX)
+    val (dstX, dstY)   = (p.pInfo.dst % nX , p.pInfo.dst / nX)
 
     if (firstDim == 0) {
       if (dstX != nodeX) {
@@ -142,10 +141,9 @@ object MasterAllocTables {
 
   // WARNING: Not deadlock free
   def mesh2DMinimal(nX: Int, nY: Int) = new MasterAllocTable((nodeId, p) => {
-    val (nxtX, nxtY)   = (p.nxtId % nX , p.nxtId / nX)
+    val (nxtX, nxtY)   = (p.nxtC.dst % nX , p.nxtC.dst / nX)
     val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
-    val (dstX, dstY)   = (p.destId % nX, p.destId / nX)
-    val (srcX, srcY)   = (p.srcId % nX , p.srcId / nX)
+    val (dstX, dstY)   = (p.pInfo.dst % nX, p.pInfo.dst / nX)
 
     val xR = (if (nodeX < nxtX) dstX >= nxtX else if (nodeX > nxtX) dstX <= nxtX else nodeX == nxtX)
     val yR = (if (nodeY < nxtY) dstY >= nxtY else if (nodeY > nxtY) dstY <= nxtY else nodeY == nxtY)
@@ -154,10 +152,9 @@ object MasterAllocTables {
 
 
   def mesh2DWestFirst(nX: Int, nY: Int) = new MasterAllocTable((nodeId, p) => {
-    val (nxtX, nxtY)   = (p.nxtId % nX , p.nxtId / nX)
+    val (nxtX, nxtY)   = (p.nxtC.dst % nX , p.nxtC.dst / nX)
     val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
-    val (dstX, dstY)   = (p.destId % nX , p.destId / nX)
-    val (srcX, srcY)   = (p.srcId % nX , p.srcId / nX)
+    val (dstX, dstY)   = (p.pInfo.dst % nX , p.pInfo.dst / nX)
 
     (if (dstX < nodeX) {
       new MasterAllocTable((nodeId, p) => nxtX == nodeX - 1)
@@ -167,10 +164,9 @@ object MasterAllocTables {
   })
 
   def mesh2DNorthLast(nX: Int, nY: Int) = new MasterAllocTable((nodeId, p) => {
-    val (nxtX, nxtY)   = (p.nxtId % nX , p.nxtId / nX)
+    val (nxtX, nxtY)   = (p.nxtC.dst % nX , p.nxtC.dst / nX)
     val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
-    val (dstX, dstY)   = (p.destId % nX , p.destId / nX)
-    val (srcX, srcY)   = (p.srcId % nX , p.srcId / nX)
+    val (dstX, dstY)   = (p.pInfo.dst % nX , p.pInfo.dst / nX)
 
     (if (dstY > nodeY && dstX != nodeX) {
       mesh2DMinimal(nX, nY) && nxtY != nodeY + 1
@@ -184,27 +180,27 @@ object MasterAllocTables {
 
 
   def mesh2DAlternatingDimensionOrdered(nX: Int, nY: Int) = new MasterAllocTable((nodeId, p) => {
-    val (nxtX, nxtY)   = (p.nxtId % nX , p.nxtId / nX)
+    val (nxtX, nxtY)   = (p.nxtC.dst % nX , p.nxtC.dst / nX)
     val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
-    val (dstX, dstY)   = (p.destId % nX , p.destId / nX)
-    val (srcX, srcY)   = (p.srcId % nX , p.srcId / nX)
+    val (dstX, dstY)   = (p.pInfo.dst % nX , p.pInfo.dst / nX)
+    val (srcX, srcY)   = (p.srcC.src % nX , p.srcC.src / nX)
 
     val turn = nxtX != srcX && nxtY != srcY
-    val canRouteThis = mesh2DDimensionOrdered(p.srcV % 2)(nX, nY)
-    val canRouteNext = mesh2DDimensionOrdered(p.nxtV % 2)(nX, nY)
+    val canRouteThis = mesh2DDimensionOrdered(p.srcC.vc % 2)(nX, nY)
+    val canRouteNext = mesh2DDimensionOrdered(p.nxtC.vc % 2)(nX, nY)
 
-    val sel = if (p.srcId == -1) {
+    val sel = if (p.srcC.src == -1) {
       canRouteNext
     } else {
-      (canRouteThis && p.nxtV % 2 == p.srcV % 2 && p.nxtV <= p.srcV) || (canRouteNext && p.nxtV % 2 != p.srcV % 2 && p.nxtV <= p.srcV)
+      (canRouteThis && p.nxtC.vc % 2 == p.srcC.vc % 2 && p.nxtC.vc <= p.srcC.vc) || (canRouteNext && p.nxtC.vc % 2 != p.srcC.vc % 2 && p.nxtC.vc <= p.srcC.vc)
     }
     (mesh2DMinimal(nX, nY) && sel)(nodeId)(p)
   })
 
   def mesh2DDimensionOrderedHighest(nX: Int, nY: Int) = new MasterAllocTable((nodeId, p) => {
-    (if (p.nxtV == 0) {
+    (if (p.nxtC.vc == 0) {
       mesh2DDimensionOrdered()(nX, nY)
-    } else if (p.srcId == -1) {
+    } else if (p.srcC.src == -1) {
       !nxtIsVC0 && mesh2DMinimal(nX, nY)
     } else {
       nxtVLESrcV && mesh2DMinimal(nX, nY)
@@ -212,18 +208,18 @@ object MasterAllocTables {
   })
 
   def escapeChannels(escapeRouter: MasterAllocTable, normalRouter: MasterAllocTable, nEscapeChannels: Int = 1) = new MasterAllocTable((nodeId, p) => {
-    if (p.srcId == -1) {
-      if (p.nxtV >= nEscapeChannels) {
-        normalRouter(nodeId)(p.copy(nxtV=p.nxtV-nEscapeChannels))
+    if (p.srcC.src == -1) {
+      if (p.nxtC.vc >= nEscapeChannels) {
+        normalRouter(nodeId)(p.copy(nxtC=p.nxtC.copy(vc=p.nxtC.vc-nEscapeChannels)))
       } else {
         escapeRouter(nodeId)(p)
       }
-    } else if (p.srcV < nEscapeChannels && p.nxtV < nEscapeChannels) {
+    } else if (p.srcC.vc < nEscapeChannels && p.nxtC.vc < nEscapeChannels) {
       escapeRouter(nodeId)(p)
-    } else if (p.srcV >= nEscapeChannels && p.nxtV >= nEscapeChannels) {
-      normalRouter(nodeId)(p.copy(srcV=p.srcV-nEscapeChannels, nxtV=p.nxtV-nEscapeChannels))
-    } else if (p.srcV >= nEscapeChannels && p.nxtV < nEscapeChannels) {
-      normalRouter(nodeId)(p.copy(srcV=p.srcV-nEscapeChannels, nxtV=0))
+    } else if (p.srcC.vc >= nEscapeChannels && p.nxtC.vc >= nEscapeChannels) {
+      normalRouter(nodeId)(p.copy(srcC=p.srcC.copy(vc=p.srcC.vc-nEscapeChannels), nxtC=p.nxtC.copy(vc=p.nxtC.vc-nEscapeChannels)))
+    } else if (p.srcC.vc >= nEscapeChannels && p.nxtC.vc < nEscapeChannels) {
+      normalRouter(nodeId)(p.copy(srcC=p.srcC.copy(vc=p.srcC.vc-nEscapeChannels), nxtC=p.nxtC.copy(vc=0)))
     } else {
       false
     }
@@ -232,35 +228,51 @@ object MasterAllocTables {
   def mesh2DBestRouter(nX: Int, nY: Int) = escapeChannels(mesh2DDimensionOrdered()(nX, nY), mesh2DMinimal(nX, nY))
 
   def unidirectionalTorus2DDateline(nX: Int, nY: Int) = new MasterAllocTable((nodeId, p) => {
-    val (nxtX, nxtY)   = (p.nxtId % nX , p.nxtId / nX)
+    val (nxtX, nxtY)   = (p.nxtC.dst % nX , p.nxtC.dst / nX)
     val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
-    val (dstX, dstY)   = (p.destId % nX , p.destId / nX)
-    val (srcX, srcY)   = (p.srcId % nX , p.srcId / nX)
+    val (dstX, dstY)   = (p.pInfo.dst % nX , p.pInfo.dst / nX)
+    val (srcX, srcY)   = (p.srcC.src % nX , p.srcC.src / nX)
 
     val turn = nxtX != srcX && nxtY != srcY
-    if (p.srcId == -1 || turn) {
-      p.nxtV != 0
+    if (p.srcC.src == -1 || turn) {
+      p.nxtC.vc != 0
     } else if (srcX == nxtX) {
-      unidirectionalTorus1DDateline(nY)(nodeY)(p.copy(srcId=srcY, nxtId=nxtY, destId=dstY))
+      unidirectionalTorus1DDateline(nY)(nodeY)(p.copy(
+        srcC=p.srcC.copy(src=srcY, dst=nodeY),
+        nxtC=p.nxtC.copy(src=nodeY, dst=nxtY),
+        pInfo=p.pInfo.copy(dst=dstY)
+      ))
     } else if (srcY == nxtY) {
-      unidirectionalTorus1DDateline(nX)(nodeX)(p.copy(srcId=srcX, nxtId=nxtX, destId=dstX))
+      unidirectionalTorus1DDateline(nX)(nodeX)(p.copy(
+        srcC=p.srcC.copy(src=srcX, dst=nodeX),
+        nxtC=p.nxtC.copy(src=nodeX, dst=nxtX),
+        pInfo=p.pInfo.copy(dst=dstX)
+      ))
     } else {
       false
     }
   })
 
   def bidirectionalTorus2DDateline(nX: Int, nY: Int) = new MasterAllocTable((nodeId, p) => {
-    val (nxtX, nxtY)   = (p.nxtId % nX , p.nxtId / nX)
+    val (nxtX, nxtY)   = (p.nxtC.dst % nX , p.nxtC.dst / nX)
     val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
-    val (dstX, dstY)   = (p.destId % nX , p.destId / nX)
-    val (srcX, srcY)   = (p.srcId % nX , p.srcId / nX)
+    val (dstX, dstY)   = (p.pInfo.dst % nX , p.pInfo.dst / nX)
+    val (srcX, srcY)   = (p.srcC.src % nX , p.srcC.src / nX)
 
-    if (p.srcId == -1) {
-      p.nxtV != 0
+    if (p.srcC.src == -1) {
+      p.nxtC.vc != 0
     } else if (nodeX == nxtX) {
-      bidirectionalTorus1DDateline(nY)(nodeY)(p.copy(srcId=srcY, nxtId=nxtY, destId=dstY))
+      bidirectionalTorus1DDateline(nY)(nodeY)(p.copy(
+        srcC=p.srcC.copy(src=srcY, dst=nodeY),
+        nxtC=p.nxtC.copy(src=nodeY, dst=nxtY),
+        pInfo=p.pInfo.copy(dst=dstY)
+      ))
     } else if (nodeY == nxtY) {
-      bidirectionalTorus1DDateline(nX)(nodeX)(p.copy(srcId=srcX, nxtId=nxtX, destId=dstX))
+      bidirectionalTorus1DDateline(nX)(nodeX)(p.copy(
+        srcC=p.srcC.copy(src=srcX, dst=nodeX),
+        nxtC=p.nxtC.copy(src=nodeX, dst=nxtX),
+        pInfo=p.pInfo.copy(dst=dstX)
+      ))
     } else {
       false
     }
@@ -269,10 +281,10 @@ object MasterAllocTables {
 
 
   def dimensionOrderedUnidirectionalTorus2DDateline(nX: Int, nY: Int) = new MasterAllocTable((nodeId, p) => {
-    val (nxtX, nxtY)   = (p.nxtId % nX , p.nxtId / nX)
+    val (nxtX, nxtY)   = (p.nxtC.dst % nX , p.nxtC.dst / nX)
     val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
-    val (dstX, dstY)   = (p.destId % nX , p.destId / nX)
-    val (srcX, srcY)   = (p.srcId % nX , p.srcId / nX)
+    val (dstX, dstY)   = (p.pInfo.dst % nX , p.pInfo.dst / nX)
+    val (srcX, srcY)   = (p.srcC.src % nX , p.srcC.src / nX)
 
     def sel = if (dstX != nodeX) {
       nxtY == nodeY
@@ -283,13 +295,22 @@ object MasterAllocTables {
   })
 
   def dimensionOrderedBidirectionalTorus2DDateline(nX: Int, nY: Int) = new MasterAllocTable((nodeId, p) => {
-    val (nxtX, nxtY)   = (p.nxtId % nX , p.nxtId / nX)
+    val (nxtX, nxtY)   = (p.nxtC.dst % nX , p.nxtC.dst / nX)
     val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
-    val (dstX, dstY)   = (p.destId % nX , p.destId / nX)
-    val (srcX, srcY)   = (p.srcId % nX , p.srcId / nX)
+    val (dstX, dstY)   = (p.pInfo.dst % nX , p.pInfo.dst / nX)
+    val (srcX, srcY)   = (p.srcC.src % nX , p.srcC.src / nX)
 
-    val xdir = bidirectionalTorus1DShortest(nX)(nodeX)(p.copy(srcId=(if (p.srcId == -1) -1 else srcX), nxtId=nxtX, destId=dstX))
-    val ydir = bidirectionalTorus1DShortest(nY)(nodeY)(p.copy(srcId=(if (p.srcId == -1) -1 else srcY), nxtId=nxtY, destId=dstY))
+    val xdir = bidirectionalTorus1DShortest(nX)(nodeX)(p.copy(
+      srcC=p.srcC.copy(src=(if (p.srcC.src == -1) -1 else srcX), dst=nodeX),
+      nxtC=p.nxtC.copy(src=nodeX, dst=nxtX),
+      pInfo=p.pInfo.copy(dst=dstX)
+    ))
+    val ydir = bidirectionalTorus1DShortest(nY)(nodeY)(p.copy(
+      srcC=p.srcC.copy(src=(if (p.srcC.src == -1) -1 else srcY), dst=nodeY),
+      nxtC=p.nxtC.copy(src=nodeY, dst=nxtY),
+      pInfo=p.pInfo.copy(dst=dstY)
+    ))
+
     val base = bidirectionalTorus2DDateline(nX, nY)(nodeId)(p)
     val sel = if (dstX != nodeX) xdir else ydir
 
@@ -303,21 +324,29 @@ object MasterAllocTables {
 
   // Independent virtual subnets with no resource sharing
   def nonblockingVirtualSubnetworks(f: MasterAllocTable, n: Int) = new MasterAllocTable((nodeId, p) => {
-    (p.nxtV % n == p.vNetId) && f(nodeId)(p.copy(srcV=p.srcV / n, nxtV=p.nxtV / n, vNetId=0))
+    (p.nxtC.vc % n == p.pInfo.vNet) && f(nodeId)(p.copy(
+      srcC=p.srcC.copy(vc=p.srcC.vc / n),
+      nxtC=p.nxtC.copy(vc=p.nxtC.vc / n),
+      pInfo=p.pInfo.copy(vNet=0)
+    ))
   })
 
   // Virtual subnets with 1 dedicated virtual channel each, and some number of shared channels
   def sharedNonblockingVirtualSubnetworks(f: MasterAllocTable, n: Int, nSharedChannels: Int) = new MasterAllocTable((nodeId, p) => {
     def trueVIdToVirtualVId(vId: Int) = if (vId < n) 0 else vId - n
-    f(nodeId)(p.copy(srcV=trueVIdToVirtualVId(p.srcV), nxtV=trueVIdToVirtualVId(p.nxtV), vNetId=0))
+    f(nodeId)(p.copy(
+      srcC=p.srcC.copy(vc=trueVIdToVirtualVId(p.srcC.vc)),
+      nxtC=p.nxtC.copy(vc=trueVIdToVirtualVId(p.nxtC.vc)),
+      pInfo=p.pInfo.copy(vNet=0)
+    ))
   })
 
   def blockingVirtualSubnetworks(f: MasterAllocTable, n: Int) = new MasterAllocTable((nodeId, p) => {
-    val lNxtV = p.nxtV - p.vNetId
+    val lNxtV = p.nxtC.vc - p.pInfo.vNet
     if (lNxtV < 0) {
       false
     } else {
-      f(nodeId)(p.copy(nxtV=lNxtV, vNetId=0))
+      f(nodeId)(p.copy(nxtC=p.nxtC.copy(vc=lNxtV), pInfo=p.pInfo.copy(vNet=0)))
     }
   })
 }
