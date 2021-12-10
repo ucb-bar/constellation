@@ -7,7 +7,7 @@ import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
 import constellation._
-import constellation.routing.{AllocParams, PacketInfoForRouting, NodeRoutingRelation}
+import constellation.routing.{PacketInfoForRouting, NodeRoutingRelation}
 
 class AbstractInputUnitIO(
   val cParam: BaseChannelParams,
@@ -50,11 +50,11 @@ abstract class AbstractInputUnit(
       outParams.zipWithIndex.map { case (oP, oI) =>
         (0 until oP.nVirtualChannels).map { oV =>
           val allow = virtualChannelParams(srcV).possiblePackets.map { case PacketRoutingInfo(egressId,vNetId) =>
-            routingRelation(AllocParams(
+            routingRelation(
               virtualChannelParams(srcV).asChannelInfoForRouting,
               oP.virtualChannelParams(oV).asChannelInfoForRouting,
               PacketInfoForRouting(egressSrcIds(egressId), vNetId)
-            ))
+            )
           }.reduce(_||_)
           if (!allow)
             out(oI)(oV) := false.B

@@ -61,11 +61,11 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
           positions = positions.filter(_._3 != oId).map { case (srcId, srcV, nodeId) =>
             val nexts = fullChannelParams.filter(_.srcId == nodeId).map { nxtC =>
               (0 until nxtC.nVirtualChannels).map { nxtV =>
-                val can_transition = routingRel(nodeId)(AllocParams(
+                val can_transition = routingRel(nodeId)(
                   ChannelInfoForRouting(srcId, srcV, nodeId),
                   nxtC.virtualChannelParams(nxtV).asChannelInfoForRouting,
                   PacketInfoForRouting(oId, vNetId)
-                ))
+                )
                 if (can_transition) Some((nodeId, nxtV, nxtC.destId)) else None
               }.flatten
             }.flatten
@@ -94,11 +94,9 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
     // every virtual channel accessible to each blocker is locked
     for (b <- blockeeSets) {
       val routingRel = p(NoCKey).routingRelation
-      checkConnectivity(vNetId, new RoutingRelation((nodeId, p) => {
-        (routingRel(nodeId)(p) &&
-          !(b.map { v => possiblePacketMap((nodeId, p.nxtC.vc, p.nxtC.dst)).map(_.vNetId == v) }.flatten.fold(false)(_||_))
-        )
-      }))
+      checkConnectivity(vNetId, routingRel && !(new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
+        b.map { v => possiblePacketMap((nodeId, nxtC.vc, nxtC.dst)).map(_.vNetId == v) }.flatten.fold(false)(_||_)
+      })))
     }
   }
 
