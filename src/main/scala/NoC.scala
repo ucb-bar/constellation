@@ -18,7 +18,7 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   val fullChannelParams: Seq[ChannelParams] = Seq.tabulate(nNodes, nNodes) { case (i,j) =>
     topologyFunction(i, j).map { cP =>
       ChannelParams(i, j, cP.depth, cP.virtualChannelParams.zipWithIndex.map { case (vP, vc) =>
-        VirtualChannelParams(i, j, vc, vP.bufferSize, Set[PacketRoutingInfo](), getUniqueChannelId())
+        VirtualChannelParams(i, j, vc, vP.bufferSize, Set[PacketInfo](), getUniqueChannelId())
       })
     }
   }.flatten.flatten
@@ -29,7 +29,7 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   val globalEgressParams = p(NoCKey).egresses.zipWithIndex.map { case (u,e) =>
     EgressChannelParams(u.srcId, e, getUniqueChannelId(),
       globalIngressParams.filter(_.possibleEgresses.contains(e)).map { i =>
-        PacketRoutingInfo(e, i.vNetId)
+        PacketInfo(e, i.vNetId)
       }.toSet
     )
   }
@@ -42,7 +42,7 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   type Pos = (Int, Int, Int)
 
   // Tracks the set of every possible packet that might occupy each virtual channel
-  val possiblePacketMap = scala.collection.mutable.Map[Pos, Set[PacketRoutingInfo]]().withDefaultValue(Set())
+  val possiblePacketMap = scala.collection.mutable.Map[Pos, Set[PacketInfo]]().withDefaultValue(Set())
 
   def checkConnectivity(vNetId: Int, routingRel: RoutingRelation) = {
     // Loop through accessible ingress/egress pairs
@@ -55,7 +55,7 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
         // Track the positions a packet performing ingress->egress might occupy
         var positions: Set[Pos] = Set((-1, 0, iId))
         while (positions.size != 0) {
-          positions.foreach { pos => possiblePacketMap(pos) += (PacketRoutingInfo(oIdx, vNetId)) }
+          positions.foreach { pos => possiblePacketMap(pos) += (PacketInfo(oIdx, vNetId)) }
           // Determine next possible positions based on current possible positions
           // and connectivity function
           positions = positions.filter(_._3 != oId).map { case (srcId, srcV, nodeId) =>

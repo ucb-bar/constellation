@@ -49,11 +49,11 @@ abstract class AbstractInputUnit(
     if (virtualChannelParams(srcV).traversable) {
       outParams.zipWithIndex.map { case (oP, oI) =>
         (0 until oP.nVirtualChannels).map { oV =>
-          val allow = virtualChannelParams(srcV).possiblePackets.map { case PacketRoutingInfo(egressId,vNetId) =>
+          val allow = virtualChannelParams(srcV).possiblePackets.map { pI =>
             routingRelation(
               virtualChannelParams(srcV).asChannelInfoForRouting,
               oP.virtualChannelParams(oV).asChannelInfoForRouting,
-              PacketInfoForRouting(egressSrcIds(egressId), vNetId)
+              pI.asPacketInfoForRouting
             )
           }.reduce(_||_)
           if (!allow)

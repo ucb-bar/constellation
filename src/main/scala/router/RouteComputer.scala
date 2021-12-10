@@ -44,16 +44,15 @@ class RouteComputer(val rP: RouterParams)(implicit val p: Parameters) extends Mo
       (0 until nAllOutputs).map { o =>
         if (o < nOutputs) {
           (0 until outParams(o).nVirtualChannels).map { outVId =>
-            val table = allInParams(i).possiblePackets.toSeq.map {
-              case PacketRoutingInfo(egressId, vNetId) => (egressSrcIds(egressId), vNetId)
-            } .distinct.map { case (dest, vNetId) =>
-                allInParams(i).channelInfosForRouting.map { ci =>
+            val table = allInParams(i).possiblePackets.toSeq.map { pI => pI.asPacketInfoForRouting }
+              .distinct.map { pI =>
+                allInParams(i).channelInfosForRouting.map { cI =>
                   val v = rP.nodeRoutingRelation(
-                    ci,
+                    cI,
                     outParams(o).virtualChannelParams(outVId).asChannelInfoForRouting,
-                    PacketInfoForRouting(dest, vNetId)
+                    pI
                   )
-                  ((((ci.vc << vNetBits) + vNetId) << nodeIdBits) + dest, v)
+                  ((((cI.vc << vNetBits) + pI.vNet) << nodeIdBits) + pI.dst, v)
                 }
             }.flatten
             val trues = table.filter(_._2).map(_._1.U)
