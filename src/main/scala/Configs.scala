@@ -9,6 +9,7 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters, Config}
 
 import constellation.topology._
+import constellation.routing._
 
 object TopologyConverter {
   implicit def apply(topo: PhysicalTopology): ((Int, Int) => Option[UserChannelParams]) = {
@@ -46,8 +47,8 @@ class WithUniformVirtualChannelBufferSize(size: Int) extends Config((site, here,
 
 class WithNNonblockingVirtualNetworks(n: Int) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
-    masterAllocTable = MasterAllocTables.nonblockingVirtualSubnetworks(
-      up(NoCKey, site).masterAllocTable, n),
+    routingRelation = RoutingRelations.nonblockingVirtualSubnetworks(
+      up(NoCKey, site).routingRelation, n),
     topology = (src: Int, dst: Int) => up(NoCKey, site).topology(src, dst).map(u => u.copy(
       virtualChannelParams = u.virtualChannelParams.map(c => Seq.fill(n) { c }).flatten
     )),
@@ -57,8 +58,8 @@ class WithNNonblockingVirtualNetworks(n: Int) extends Config((site, here, up) =>
 
 class WithNBlockingVirtualNetworks(n: Int) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
-    masterAllocTable = MasterAllocTables.blockingVirtualSubnetworks(
-      up(NoCKey, site).masterAllocTable, n),
+    routingRelation = RoutingRelations.blockingVirtualSubnetworks(
+      up(NoCKey, site).routingRelation, n),
     nVirtualNetworks = n,
     vNetBlocking = (blocker: Int, blockee: Int) => blocker < blockee
   )
@@ -66,7 +67,7 @@ class WithNBlockingVirtualNetworks(n: Int) extends Config((site, here, up) => {
 
 class WithNNonblockingVirtualNetworksWithSharing(n: Int, nSharedChannels: Int = 1) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
-    masterAllocTable = MasterAllocTables.sharedNonblockingVirtualSubnetworks(up(NoCKey, site).masterAllocTable, n, nSharedChannels),
+    routingRelation = RoutingRelations.sharedNonblockingVirtualSubnetworks(up(NoCKey, site).routingRelation, n, nSharedChannels),
     topology = (src: Int, dst: Int) => up(NoCKey, site).topology(src, dst).map(u => u.copy(
       virtualChannelParams = Seq.fill(n) { u.virtualChannelParams(0) } ++ u.virtualChannelParams,
     )),
@@ -110,7 +111,7 @@ class BidirectionalLineConfig(
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
     topology = Topologies.bidirectionalLine,
-    masterAllocTable = MasterAllocTables.bidirectionalLine,
+    routingRelation = RoutingRelations.bidirectionalLine,
     ingresses = ingressNodes.map(i => UserIngressParams(i, (0 until egressNodes.size).toSet, 0)),
     egresses = egressNodes.map(i => UserEgressParams(i))
   )
@@ -124,7 +125,7 @@ class UnidirectionalTorus1DConfig(
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
     topology = Topologies.unidirectionalTorus1D(nNodes),
-    masterAllocTable = MasterAllocTables.unidirectionalTorus1DDateline(nNodes),
+    routingRelation = RoutingRelations.unidirectionalTorus1DDateline(nNodes),
     ingresses = ingressNodes.map(i => UserIngressParams(i, (0 until egressNodes.size).toSet, 0)),
     egresses = egressNodes.map(i => UserEgressParams(i))
   )
@@ -139,10 +140,10 @@ class BidirectionalTorus1DConfig(
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
     topology = Topologies.bidirectionalTorus1D(nNodes),
-    masterAllocTable = if (randomRoute) {
-      MasterAllocTables.bidirectionalTorus1DRandom(nNodes)
+    routingRelation = if (randomRoute) {
+      RoutingRelations.bidirectionalTorus1DRandom(nNodes)
     } else {
-      MasterAllocTables.bidirectionalTorus1DShortest(nNodes)
+      RoutingRelations.bidirectionalTorus1DShortest(nNodes)
     },
     ingresses = ingressNodes.map(i => UserIngressParams(i, (0 until egressNodes.size).toSet, 0)),
     egresses = egressNodes.map(i => UserEgressParams(i))
@@ -158,7 +159,7 @@ class ButterflyConfig(
     up(NoCKey, site).copy(
       nNodes = height * nFly,
       topology = Topologies.butterfly(kAry, nFly),
-      masterAllocTable = MasterAllocTables.butterfly(kAry, nFly),
+      routingRelation = RoutingRelations.butterfly(kAry, nFly),
       ingresses = ((0 until height) ++ (0 until height)).map(
         i => UserIngressParams(i, (0 until 2*height).toSet, 0)),
       egresses = ((0 until height) ++ (0 until height)).map(
@@ -170,12 +171,12 @@ class ButterflyConfig(
 class Mesh2DConfig(
   nX: Int = 3,
   nY: Int = 3,
-  masterAllocTable: (Int, Int) => MasterAllocTable = MasterAllocTables.mesh2DDimensionOrdered()
+  routingRelation: (Int, Int) => RoutingRelation = RoutingRelations.mesh2DDimensionOrdered()
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nX * nY,
     topology = Topologies.mesh2D(nX, nY),
-    masterAllocTable = masterAllocTable(nX, nY),
+    routingRelation = routingRelation(nX, nY),
     ingresses = (0 until nX * nY).map(i => UserIngressParams(i, (0 until nX * nY).toSet, 0)),
     egresses = (0 until nX * nY).map(i => UserEgressParams(i))
   )
@@ -188,7 +189,7 @@ class UnidirectionalTorus2DConfig(
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nX * nY,
     topology = Topologies.unidirectionalTorus2D(nX, nY),
-    masterAllocTable = MasterAllocTables.dimensionOrderedUnidirectionalTorus2DDateline(nX, nY),
+    routingRelation = RoutingRelations.dimensionOrderedUnidirectionalTorus2DDateline(nX, nY),
     ingresses = (0 until nX * nY).map(i => UserIngressParams(i, (0 until nX * nY).toSet, 0)),
     egresses = (0 until nX * nY).map(i => UserEgressParams(i))
   )
@@ -202,7 +203,7 @@ class BidirectionalTorus2DConfig(
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nX * nY,
     topology = Topologies.bidirectionalTorus2D(nX, nY),
-    masterAllocTable = MasterAllocTables.dimensionOrderedBidirectionalTorus2DDateline(nX, nY),
+    routingRelation = RoutingRelations.dimensionOrderedBidirectionalTorus2DDateline(nX, nY),
     ingresses = (0 until nX * nY).map(i => UserIngressParams(i, (0 until nX * nY).toSet, 0)),
     egresses = (0 until nX * nY).map(i => UserEgressParams(i))
   )
@@ -306,32 +307,32 @@ class TestConfig27 extends Config(
   new Mesh2DConfig(5, 5))
 class TestConfig28 extends Config(
   new WithUniformVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DAlternatingDimensionOrdered))
+  new Mesh2DConfig(5, 5, RoutingRelations.mesh2DAlternatingDimensionOrdered))
 class TestConfig29 extends Config(
   new WithUniformVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DDimensionOrderedHighest))
+  new Mesh2DConfig(5, 5, RoutingRelations.mesh2DDimensionOrderedHighest))
 
 class TestConfig30 extends Config(
   new WithUniformVirtualChannels(2, UserVirtualChannelParams(2)) ++
-  new Mesh2DConfig(3, 3, MasterAllocTables.mesh2DDimensionOrderedHighest))
+  new Mesh2DConfig(3, 3, RoutingRelations.mesh2DDimensionOrderedHighest))
 class TestConfig31 extends Config(
   new WithCombineRCVA ++
   new WithUniformVirtualChannels(2, UserVirtualChannelParams(2)) ++
-  new Mesh2DConfig(3, 3, MasterAllocTables.mesh2DDimensionOrderedHighest))
+  new Mesh2DConfig(3, 3, RoutingRelations.mesh2DDimensionOrderedHighest))
 class TestConfig32 extends Config(
   new WithCombineSAST ++
   new WithUniformVirtualChannels(2, UserVirtualChannelParams(2)) ++
-  new Mesh2DConfig(3, 3, MasterAllocTables.mesh2DDimensionOrderedHighest))
+  new Mesh2DConfig(3, 3, RoutingRelations.mesh2DDimensionOrderedHighest))
 class TestConfig33 extends Config(
   new WithCombineSAST ++
   new WithCombineRCVA ++
   new WithUniformVirtualChannels(2, UserVirtualChannelParams(2)) ++
-  new Mesh2DConfig(3, 3, MasterAllocTables.mesh2DDimensionOrderedHighest))
+  new Mesh2DConfig(3, 3, RoutingRelations.mesh2DDimensionOrderedHighest))
 class TestConfig34 extends Config(
   new WithCombineSAST ++
   new WithCombineRCVA ++
   new WithUniformVirtualChannels(2, UserVirtualChannelParams(2)) ++
-  new Mesh2DConfig(3, 3, MasterAllocTables.mesh2DBestRouter))
+  new Mesh2DConfig(3, 3, RoutingRelations.mesh2DBestRouter))
 
 
 
@@ -340,34 +341,34 @@ class TestConfig35 extends Config(
   new Mesh2DConfig(5, 5))
 class TestConfig36 extends Config(
   new WithUniformVirtualChannels(1, UserVirtualChannelParams(1)) ++
-  new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DWestFirst))
+  new Mesh2DConfig(5, 5, RoutingRelations.mesh2DWestFirst))
 class TestConfig37 extends Config(
   new WithUniformVirtualChannels(1, UserVirtualChannelParams(1)) ++
-  new Mesh2DConfig(5, 5, MasterAllocTables.mesh2DNorthLast))
+  new Mesh2DConfig(5, 5, RoutingRelations.mesh2DNorthLast))
 
 class TestConfig38 extends Config(
   new constellation.WithIngressVNets((i: Int) => i % 4) ++
   new constellation.WithNBlockingVirtualNetworks(4) ++
   new constellation.WithUniformVirtualChannels(4, UserVirtualChannelParams(3)) ++
-  new constellation.Mesh2DConfig(3, 3, MasterAllocTables.mesh2DDimensionOrderedHighest))
+  new constellation.Mesh2DConfig(3, 3, RoutingRelations.mesh2DDimensionOrderedHighest))
 
 class TestConfig39 extends Config(
   new constellation.WithIngressVNets((i: Int) => i % 4) ++
   new constellation.WithNBlockingVirtualNetworks(4) ++
   new constellation.WithUniformVirtualChannels(4, UserVirtualChannelParams(3)) ++
-  new constellation.Mesh2DConfig(3, 3, MasterAllocTables.mesh2DAlternatingDimensionOrdered))
+  new constellation.Mesh2DConfig(3, 3, RoutingRelations.mesh2DAlternatingDimensionOrdered))
 
 class TestConfig40 extends Config(
   new constellation.WithIngressVNets((i: Int) => i % 4) ++
   new constellation.WithNNonblockingVirtualNetworks(4) ++
   new constellation.WithUniformVirtualChannels(4, UserVirtualChannelParams(3)) ++
-  new constellation.Mesh2DConfig(3, 3, MasterAllocTables.mesh2DDimensionOrderedHighest))
+  new constellation.Mesh2DConfig(3, 3, RoutingRelations.mesh2DDimensionOrderedHighest))
 
 class TestConfig41 extends Config(
   new constellation.WithIngressVNets((i: Int) => i % 4) ++
   new constellation.WithNNonblockingVirtualNetworksWithSharing(4) ++
   new constellation.WithUniformVirtualChannels(4, UserVirtualChannelParams(3)) ++
-  new constellation.Mesh2DConfig(3, 3, MasterAllocTables.mesh2DDimensionOrderedHighest))
+  new constellation.Mesh2DConfig(3, 3, RoutingRelations.mesh2DDimensionOrderedHighest))
 
 
 // 2D Torus
@@ -389,10 +390,10 @@ class TLTestConfig00 extends Config(
   new WithTLNoCTesterParams(TLNoCTesterParams(Seq(4, 0, 2, 5, 6, 9, 11), Seq(7, 1, 3, 8, 10))) ++
   new WithNNonblockingVirtualNetworksWithSharing(5, 2) ++
   new WithUniformVirtualChannels(2, UserVirtualChannelParams(3)) ++
-  new Mesh2DConfig(4, 3, MasterAllocTables.mesh2DAlternatingDimensionOrdered))
+  new Mesh2DConfig(4, 3, RoutingRelations.mesh2DAlternatingDimensionOrdered))
 
 class TLTestConfig01 extends Config(
   new WithTLNoCTesterParams(TLNoCTesterParams(Seq(4, 0, 2, 5, 6, 9, 11), Seq(7, 1, 3, 8, 10))) ++
   new WithNBlockingVirtualNetworks(5) ++
   new WithUniformVirtualChannels(6, UserVirtualChannelParams(3)) ++
-  new Mesh2DConfig(4, 3, MasterAllocTables.mesh2DAlternatingDimensionOrdered))
+  new Mesh2DConfig(4, 3, RoutingRelations.mesh2DAlternatingDimensionOrdered))

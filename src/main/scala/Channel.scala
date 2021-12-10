@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
-import constellation.topology.ChannelInfoForAlloc
+import constellation.routing.ChannelInfoForRouting
 
 // User-facing params, for adjusting config options
 case class UserVirtualChannelParams(
@@ -38,7 +38,7 @@ case class VirtualChannelParams(
   uniqueId: Int,
 ) {
   val traversable = possiblePackets.size > 0
-  def asChannelInfoForAlloc: ChannelInfoForAlloc = ChannelInfoForAlloc(src, vc, dst)
+  def asChannelInfoForRouting: ChannelInfoForRouting = ChannelInfoForRouting(src, vc, dst)
 }
 
 trait BaseChannelParams {
@@ -46,7 +46,7 @@ trait BaseChannelParams {
   def destId: Int
   def possiblePackets: Set[PacketRoutingInfo]
   def nVirtualChannels: Int
-  def channelInfosForAlloc: Seq[ChannelInfoForAlloc]
+  def channelInfosForRouting: Seq[ChannelInfoForRouting]
 }
 
 case class ChannelParams(
@@ -61,7 +61,7 @@ case class ChannelParams(
   def possiblePackets = virtualChannelParams.map(_.possiblePackets).reduce(_++_)
   val traversable = virtualChannelParams.map(_.traversable).reduce(_||_)
 
-  def channelInfosForAlloc = virtualChannelParams.map(_.asChannelInfoForAlloc)
+  def channelInfosForRouting = virtualChannelParams.map(_.asChannelInfoForRouting)
 }
 
 case class IngressChannelParams(
@@ -74,7 +74,7 @@ case class IngressChannelParams(
   def srcId = -1
   def nVirtualChannels = 1
   def possiblePackets = possibleEgresses.map { e => PacketRoutingInfo(e, vNetId) }
-  def channelInfosForAlloc = Seq(ChannelInfoForAlloc(-1, 0, destId))
+  def channelInfosForRouting = Seq(ChannelInfoForRouting(-1, 0, destId))
 }
 
 case class EgressChannelParams(
@@ -85,7 +85,7 @@ case class EgressChannelParams(
 ) extends BaseChannelParams {
   def destId = -1
   def nVirtualChannels = 1
-  def channelInfosForAlloc = Seq(ChannelInfoForAlloc(srcId, 0, -1))
+  def channelInfosForRouting = Seq(ChannelInfoForRouting(srcId, 0, -1))
 }
 
 

@@ -6,7 +6,7 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 
 import constellation._
-import constellation.topology._
+import constellation.routing._
 
 case class UserRouterParams(
   combineSAST: Boolean = false,
@@ -19,7 +19,7 @@ case class RouterParams(
   outParams: Seq[ChannelParams],
   ingressParams: Seq[IngressChannelParams],
   egressParams: Seq[EgressChannelParams],
-  nodeAllocTable: NodeAllocTable,
+  nodeRoutingRelation: NodeRoutingRelation,
   combineSAST: Boolean = false,
   combineRCVA: Boolean = false,
 )
@@ -78,10 +78,10 @@ class Router(val rP: RouterParams)(implicit val p: Parameters) extends Module wi
   require(nodeId < (1 << nodeIdBits))
 
   val input_units = inParams.zipWithIndex.map { case (u,i) =>
-    Module(new InputUnit(u, outParams, egressParams, rP.combineRCVA, rP.combineSAST, rP.nodeAllocTable))
+    Module(new InputUnit(u, outParams, egressParams, rP.combineRCVA, rP.combineSAST, rP.nodeRoutingRelation))
       .suggestName(s"input_unit_${i}_from_${u.srcId}") }
   val ingress_units = ingressParams.zipWithIndex.map { case (u,i) =>
-    Module(new IngressUnit(u, outParams, egressParams, rP.combineRCVA, rP.combineSAST, rP.nodeAllocTable))
+    Module(new IngressUnit(u, outParams, egressParams, rP.combineRCVA, rP.combineSAST, rP.nodeRoutingRelation))
       .suggestName(s"ingress_unit_${i+nInputs}_from_${u.ingressId}") }
   val all_input_units = input_units ++ ingress_units
 

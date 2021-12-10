@@ -7,7 +7,7 @@ import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
 import constellation._
-import constellation.topology.{AllocParams, PacketInfoForAlloc, NodeAllocTable}
+import constellation.routing.{AllocParams, PacketInfoForRouting, NodeRoutingRelation}
 
 class AbstractInputUnitIO(
   val cParam: BaseChannelParams,
@@ -38,7 +38,7 @@ abstract class AbstractInputUnit(
   val cParam: BaseChannelParams,
   val outParams: Seq[ChannelParams],
   val egressParams: Seq[EgressChannelParams],
-  allocTable: NodeAllocTable
+  routingRelation: NodeRoutingRelation
 )(implicit val p: Parameters) extends Module with HasRouterOutputParams with HasChannelParams {
   val nodeId = cParam.destId
 
@@ -50,10 +50,10 @@ abstract class AbstractInputUnit(
       outParams.zipWithIndex.map { case (oP, oI) =>
         (0 until oP.nVirtualChannels).map { oV =>
           val allow = virtualChannelParams(srcV).possiblePackets.map { case PacketRoutingInfo(egressId,vNetId) =>
-            allocTable(AllocParams(
-              virtualChannelParams(srcV).asChannelInfoForAlloc,
-              oP.virtualChannelParams(oV).asChannelInfoForAlloc,
-              PacketInfoForAlloc(egressSrcIds(egressId), vNetId)
+            routingRelation(AllocParams(
+              virtualChannelParams(srcV).asChannelInfoForRouting,
+              oP.virtualChannelParams(oV).asChannelInfoForRouting,
+              PacketInfoForRouting(egressSrcIds(egressId), vNetId)
             ))
           }.reduce(_||_)
           if (!allow)
@@ -73,9 +73,9 @@ abstract class AbstractInputUnit(
 class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   egressParams: Seq[EgressChannelParams],
   combineRCVA: Boolean, combineSAST: Boolean,
-  allocTable: NodeAllocTable
+  routingRel: NodeRoutingRelation
 )
-  (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, egressParams, allocTable)(p) {
+  (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, egressParams, routingRel)(p) {
 
   val io = IO(new AbstractInputUnitIO(cParam, outParams, egressParams) {
     val in = Flipped(new Channel(cParam.asInstanceOf[ChannelParams]))

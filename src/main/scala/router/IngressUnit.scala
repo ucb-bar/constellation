@@ -7,7 +7,7 @@ import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
 import constellation._
-import constellation.topology.NodeAllocTable
+import constellation.routing.NodeRoutingRelation
 
 class IngressUnit(
   cParam: IngressChannelParams,
@@ -15,9 +15,9 @@ class IngressUnit(
   egressParams: Seq[EgressChannelParams],
   combineRCVA: Boolean,
   combineSAST: Boolean,
-  allocTable: NodeAllocTable
+  routingRel: NodeRoutingRelation
 )
-  (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, egressParams, allocTable)(p) {
+  (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, egressParams, routingRel)(p) {
 
   val io = IO(new AbstractInputUnitIO(cParam, outParams, egressParams) {
     val in = Flipped(Decoupled(new IOFlit(cParam)))

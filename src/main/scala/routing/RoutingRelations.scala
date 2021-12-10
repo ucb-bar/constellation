@@ -1,24 +1,24 @@
-package constellation.topology
+package constellation.routing
 
 import scala.math.pow
 
-object MasterAllocTables {
+object RoutingRelations {
 
   // Utility functions
-  val srcIsIngress = new MasterAllocTable((_, p) => p.srcC.src == -1)
-  val nxtIsVC0     = new MasterAllocTable((_, p) => p.nxtC.vc == 0)
-  val srcIsVC0     = new MasterAllocTable((_, p) => p.srcC.vc == 0)
-  val nxtVLTSrcV   = new MasterAllocTable((_, p) => p.nxtC.vc < p.srcC.vc)
-  val nxtVLESrcV   = new MasterAllocTable((_, p) => p.nxtC.vc <= p.srcC.vc)
+  val srcIsIngress = new RoutingRelation((_, p) => p.srcC.src == -1)
+  val nxtIsVC0     = new RoutingRelation((_, p) => p.nxtC.vc == 0)
+  val srcIsVC0     = new RoutingRelation((_, p) => p.srcC.vc == 0)
+  val nxtVLTSrcV   = new RoutingRelation((_, p) => p.nxtC.vc < p.srcC.vc)
+  val nxtVLESrcV   = new RoutingRelation((_, p) => p.nxtC.vc <= p.srcC.vc)
 
   // Usable policies
-  val allLegal = new MasterAllocTable((_, _) => true)
+  val allLegal = new RoutingRelation((_, _) => true)
 
-  val bidirectionalLine = new MasterAllocTable((nodeId, p) => {
+  val bidirectionalLine = new RoutingRelation((nodeId, p) => {
     if (nodeId < p.nxtC.dst) p.pInfo.dst >= p.nxtC.dst else p.pInfo.dst <= p.nxtC.dst
   })
 
-  def unidirectionalTorus1DDateline(nNodes: Int) = new MasterAllocTable((nodeId, p) => {
+  def unidirectionalTorus1DDateline(nNodes: Int) = new RoutingRelation((nodeId, p) => {
     // (if (srcIsIngress(nodeId)(p)) {
     //   !nxtIsVC0
     // } else if (srcIsVC0(nodeId)(p)) {
@@ -42,7 +42,7 @@ object MasterAllocTables {
 
 
 
-  def bidirectionalTorus1DDateline(nNodes: Int) = new MasterAllocTable((nodeId, p) => {
+  def bidirectionalTorus1DDateline(nNodes: Int) = new RoutingRelation((nodeId, p) => {
     if (p.srcC.src == -1)  {
       p.nxtC.vc != 0
     } else if (p.srcC.vc == 0) {
@@ -64,7 +64,7 @@ object MasterAllocTables {
     }
   })
 
-  def bidirectionalTorus1DShortest(nNodes: Int) = new MasterAllocTable((nodeId, p) => {
+  def bidirectionalTorus1DShortest(nNodes: Int) = new RoutingRelation((nodeId, p) => {
     val cwDist = (p.pInfo.dst + nNodes - nodeId) % nNodes
     val ccwDist = (nodeId + nNodes - p.pInfo.dst) % nNodes
     val distSel = if (cwDist < ccwDist) {
@@ -77,7 +77,7 @@ object MasterAllocTables {
     distSel && bidirectionalTorus1DDateline(nNodes)(nodeId)(p)
   })
 
-  def bidirectionalTorus1DRandom(nNodes: Int) = new MasterAllocTable((nodeId, p) => {
+  def bidirectionalTorus1DRandom(nNodes: Int) = new RoutingRelation((nodeId, p) => {
     val sel = if (p.srcC.src == -1) {
       true
     } else if ((nodeId + nNodes - p.srcC.src) % nNodes == 1) {
@@ -99,7 +99,7 @@ object MasterAllocTables {
       table.map { e => (digitsToNum(e.drop(1)), digitsToNum(e.updated(i, e(0)).drop(1))) }
     }
 
-    new MasterAllocTable((nodeId, p) => {
+    new RoutingRelation((nodeId, p) => {
       val (nxtX, nxtY) = (p.nxtC.dst / height, p.nxtC.dst % height)
       val (nodeX, nodeY) = (nodeId / height, nodeId % height)
       val (dstX, dstY) = (p.pInfo.dst / height, p.pInfo.dst % height)
@@ -119,7 +119,7 @@ object MasterAllocTables {
   }
 
 
-  def mesh2DDimensionOrdered(firstDim: Int = 0)(nX: Int, nY: Int) = new MasterAllocTable((nodeId, p) => {
+  def mesh2DDimensionOrdered(firstDim: Int = 0)(nX: Int, nY: Int) = new RoutingRelation((nodeId, p) => {
     val (nxtX, nxtY)   = (p.nxtC.dst % nX , p.nxtC.dst / nX)
     val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
     val (dstX, dstY)   = (p.pInfo.dst % nX , p.pInfo.dst / nX)
@@ -140,7 +140,7 @@ object MasterAllocTables {
   })
 
   // WARNING: Not deadlock free
-  def mesh2DMinimal(nX: Int, nY: Int) = new MasterAllocTable((nodeId, p) => {
+  def mesh2DMinimal(nX: Int, nY: Int) = new RoutingRelation((nodeId, p) => {
     val (nxtX, nxtY)   = (p.nxtC.dst % nX , p.nxtC.dst / nX)
     val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
     val (dstX, dstY)   = (p.pInfo.dst % nX, p.pInfo.dst / nX)
@@ -151,19 +151,19 @@ object MasterAllocTables {
   })
 
 
-  def mesh2DWestFirst(nX: Int, nY: Int) = new MasterAllocTable((nodeId, p) => {
+  def mesh2DWestFirst(nX: Int, nY: Int) = new RoutingRelation((nodeId, p) => {
     val (nxtX, nxtY)   = (p.nxtC.dst % nX , p.nxtC.dst / nX)
     val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
     val (dstX, dstY)   = (p.pInfo.dst % nX , p.pInfo.dst / nX)
 
     (if (dstX < nodeX) {
-      new MasterAllocTable((nodeId, p) => nxtX == nodeX - 1)
+      new RoutingRelation((nodeId, p) => nxtX == nodeX - 1)
     } else {
       mesh2DMinimal(nX, nY)
     })(nodeId)(p)
   })
 
-  def mesh2DNorthLast(nX: Int, nY: Int) = new MasterAllocTable((nodeId, p) => {
+  def mesh2DNorthLast(nX: Int, nY: Int) = new RoutingRelation((nodeId, p) => {
     val (nxtX, nxtY)   = (p.nxtC.dst % nX , p.nxtC.dst / nX)
     val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
     val (dstX, dstY)   = (p.pInfo.dst % nX , p.pInfo.dst / nX)
@@ -171,7 +171,7 @@ object MasterAllocTables {
     (if (dstY > nodeY && dstX != nodeX) {
       mesh2DMinimal(nX, nY) && nxtY != nodeY + 1
     } else if (dstY > nodeY) {
-      new MasterAllocTable((nodeId, p) => nxtY == nodeY + 1)
+      new RoutingRelation((nodeId, p) => nxtY == nodeY + 1)
     } else {
       mesh2DMinimal(nX, nY)
     })(nodeId)(p)
@@ -179,7 +179,7 @@ object MasterAllocTables {
 
 
 
-  def mesh2DAlternatingDimensionOrdered(nX: Int, nY: Int) = new MasterAllocTable((nodeId, p) => {
+  def mesh2DAlternatingDimensionOrdered(nX: Int, nY: Int) = new RoutingRelation((nodeId, p) => {
     val (nxtX, nxtY)   = (p.nxtC.dst % nX , p.nxtC.dst / nX)
     val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
     val (dstX, dstY)   = (p.pInfo.dst % nX , p.pInfo.dst / nX)
@@ -197,7 +197,7 @@ object MasterAllocTables {
     (mesh2DMinimal(nX, nY) && sel)(nodeId)(p)
   })
 
-  def mesh2DDimensionOrderedHighest(nX: Int, nY: Int) = new MasterAllocTable((nodeId, p) => {
+  def mesh2DDimensionOrderedHighest(nX: Int, nY: Int) = new RoutingRelation((nodeId, p) => {
     (if (p.nxtC.vc == 0) {
       mesh2DDimensionOrdered()(nX, nY)
     } else if (p.srcC.src == -1) {
@@ -207,7 +207,7 @@ object MasterAllocTables {
     })(nodeId)(p)
   })
 
-  def escapeChannels(escapeRouter: MasterAllocTable, normalRouter: MasterAllocTable, nEscapeChannels: Int = 1) = new MasterAllocTable((nodeId, p) => {
+  def escapeChannels(escapeRouter: RoutingRelation, normalRouter: RoutingRelation, nEscapeChannels: Int = 1) = new RoutingRelation((nodeId, p) => {
     if (p.srcC.src == -1) {
       if (p.nxtC.vc >= nEscapeChannels) {
         normalRouter(nodeId)(p.copy(nxtC=p.nxtC.copy(vc=p.nxtC.vc-nEscapeChannels)))
@@ -227,7 +227,7 @@ object MasterAllocTables {
 
   def mesh2DBestRouter(nX: Int, nY: Int) = escapeChannels(mesh2DDimensionOrdered()(nX, nY), mesh2DMinimal(nX, nY))
 
-  def unidirectionalTorus2DDateline(nX: Int, nY: Int) = new MasterAllocTable((nodeId, p) => {
+  def unidirectionalTorus2DDateline(nX: Int, nY: Int) = new RoutingRelation((nodeId, p) => {
     val (nxtX, nxtY)   = (p.nxtC.dst % nX , p.nxtC.dst / nX)
     val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
     val (dstX, dstY)   = (p.pInfo.dst % nX , p.pInfo.dst / nX)
@@ -253,7 +253,7 @@ object MasterAllocTables {
     }
   })
 
-  def bidirectionalTorus2DDateline(nX: Int, nY: Int) = new MasterAllocTable((nodeId, p) => {
+  def bidirectionalTorus2DDateline(nX: Int, nY: Int) = new RoutingRelation((nodeId, p) => {
     val (nxtX, nxtY)   = (p.nxtC.dst % nX , p.nxtC.dst / nX)
     val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
     val (dstX, dstY)   = (p.pInfo.dst % nX , p.pInfo.dst / nX)
@@ -280,7 +280,7 @@ object MasterAllocTables {
 
 
 
-  def dimensionOrderedUnidirectionalTorus2DDateline(nX: Int, nY: Int) = new MasterAllocTable((nodeId, p) => {
+  def dimensionOrderedUnidirectionalTorus2DDateline(nX: Int, nY: Int) = new RoutingRelation((nodeId, p) => {
     val (nxtX, nxtY)   = (p.nxtC.dst % nX , p.nxtC.dst / nX)
     val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
     val (dstX, dstY)   = (p.pInfo.dst % nX , p.pInfo.dst / nX)
@@ -294,7 +294,7 @@ object MasterAllocTables {
     (unidirectionalTorus2DDateline(nX, nY) && sel)(nodeId)(p)
   })
 
-  def dimensionOrderedBidirectionalTorus2DDateline(nX: Int, nY: Int) = new MasterAllocTable((nodeId, p) => {
+  def dimensionOrderedBidirectionalTorus2DDateline(nX: Int, nY: Int) = new RoutingRelation((nodeId, p) => {
     val (nxtX, nxtY)   = (p.nxtC.dst % nX , p.nxtC.dst / nX)
     val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
     val (dstX, dstY)   = (p.pInfo.dst % nX , p.pInfo.dst / nX)
@@ -323,7 +323,7 @@ object MasterAllocTables {
   // TODO: Write assertions to check this
 
   // Independent virtual subnets with no resource sharing
-  def nonblockingVirtualSubnetworks(f: MasterAllocTable, n: Int) = new MasterAllocTable((nodeId, p) => {
+  def nonblockingVirtualSubnetworks(f: RoutingRelation, n: Int) = new RoutingRelation((nodeId, p) => {
     (p.nxtC.vc % n == p.pInfo.vNet) && f(nodeId)(p.copy(
       srcC=p.srcC.copy(vc=p.srcC.vc / n),
       nxtC=p.nxtC.copy(vc=p.nxtC.vc / n),
@@ -332,7 +332,7 @@ object MasterAllocTables {
   })
 
   // Virtual subnets with 1 dedicated virtual channel each, and some number of shared channels
-  def sharedNonblockingVirtualSubnetworks(f: MasterAllocTable, n: Int, nSharedChannels: Int) = new MasterAllocTable((nodeId, p) => {
+  def sharedNonblockingVirtualSubnetworks(f: RoutingRelation, n: Int, nSharedChannels: Int) = new RoutingRelation((nodeId, p) => {
     def trueVIdToVirtualVId(vId: Int) = if (vId < n) 0 else vId - n
     f(nodeId)(p.copy(
       srcC=p.srcC.copy(vc=trueVIdToVirtualVId(p.srcC.vc)),
@@ -341,7 +341,7 @@ object MasterAllocTables {
     ))
   })
 
-  def blockingVirtualSubnetworks(f: MasterAllocTable, n: Int) = new MasterAllocTable((nodeId, p) => {
+  def blockingVirtualSubnetworks(f: RoutingRelation, n: Int) = new RoutingRelation((nodeId, p) => {
     val lNxtV = p.nxtC.vc - p.pInfo.vNet
     if (lNxtV < 0) {
       false

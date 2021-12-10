@@ -8,8 +8,6 @@ import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.subsystem._
 import freechips.rocketchip.util._
-import constellation.topology.MasterAllocTables
-
 
 class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Parameters) extends TLXbar {
   override lazy val module = new LazyModuleImp(this) {

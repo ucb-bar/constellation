@@ -5,7 +5,7 @@ import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 
-import constellation.topology._
+import constellation.routing._
 import constellation.router._
 
 case class NoCConfig(
@@ -18,7 +18,7 @@ case class NoCConfig(
   topology: (Int, Int) => Option[UserChannelParams] = (a: Int, b: Int) => None,
   ingresses: Seq[UserIngressParams] = Nil,
   egresses: Seq[UserEgressParams] = Nil,
-  masterAllocTable: MasterAllocTable = MasterAllocTables.allLegal,
+  routingRelation: RoutingRelation = RoutingRelations.allLegal,
   routerParams: Int => UserRouterParams = (i: Int) => UserRouterParams(),
   // blocker, blocked => bool
   vNetBlocking: (Int, Int) => Boolean = (_: Int, _: Int) => false,
@@ -42,7 +42,6 @@ trait HasNoCParams {
   val egressSrcIds = params.egresses.map(_.srcId)
 
   val topologyFunction = params.topology
-  val masterAllocTable = params.masterAllocTable
   val routerParams = params.routerParams
 }
 
