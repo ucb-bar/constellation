@@ -38,11 +38,9 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
 
 
   // Check sanity of routingRelation, all inputs can route to all outputs
-  // srcId, vId, dstId
-  type Pos = (Int, Int, Int)
 
   // Tracks the set of every possible packet that might occupy each virtual channel
-  val possiblePacketMap = scala.collection.mutable.Map[Pos, Set[PacketInfo]]().withDefaultValue(Set())
+  val possiblePacketMap = scala.collection.mutable.Map[ChannelInfoForRouting, Set[PacketInfo]]().withDefaultValue(Set())
 
   def checkConnectivity(vNetId: Int, routingRel: RoutingRelation) = {
     // Loop through accessible ingress/egress pairs
@@ -53,24 +51,24 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
         val oId = oP.srcId
 
         // Track the positions a packet performing ingress->egress might occupy
-        var positions: Set[Pos] = Set((-1, 0, iId))
+        var positions: Set[ChannelInfoForRouting] = iP.channelInfosForRouting.toSet
         while (positions.size != 0) {
           positions.foreach { pos => possiblePacketMap(pos) += (PacketInfo(oIdx, vNetId)) }
           // Determine next possible positions based on current possible positions
           // and connectivity function
-          positions = positions.filter(_._3 != oId).map { case (srcId, srcV, nodeId) =>
-            val nexts = fullChannelParams.filter(_.srcId == nodeId).map { nxtC =>
+          positions = positions.filter(_.dst != oId).map { cI =>
+            val nexts = fullChannelParams.filter(_.srcId == cI.dst).map { nxtC =>
               (0 until nxtC.nVirtualChannels).map { nxtV =>
-                val can_transition = routingRel(nodeId)(
-                  ChannelInfoForRouting(srcId, srcV, nodeId),
+                val can_transition = routingRel(cI.dst)(
+                  cI,
                   nxtC.virtualChannelParams(nxtV).asChannelInfoForRouting,
                   PacketInfoForRouting(oId, vNetId)
                 )
-                if (can_transition) Some((nodeId, nxtV, nxtC.destId)) else None
+                if (can_transition) Some(nxtC.virtualChannelParams(nxtV).asChannelInfoForRouting) else None
               }.flatten
             }.flatten
             require(nexts.size > 0,
-              s"Failed to route from $iId to $oId at $srcId, $srcV, $nodeId")
+              s"Failed to route from $iId to $oId at $cI")
             nexts
           }.flatten.toSet
         }
@@ -95,7 +93,7 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
     for (b <- blockeeSets) {
       val routingRel = p(NoCKey).routingRelation
       checkConnectivity(vNetId, routingRel && !(new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
-        b.map { v => possiblePacketMap((nodeId, nxtC.vc, nxtC.dst)).map(_.vNetId == v) }.flatten.fold(false)(_||_)
+        b.map { v => possiblePacketMap(nxtC).map(_.vNetId == v) }.flatten.fold(false)(_||_)
       })))
     }
   }
