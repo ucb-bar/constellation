@@ -184,8 +184,8 @@ def get_max_hop(num_channels, inputs, outputs, coms):
                     if not done[j]:
                         done[j] = True
                         next_queue.append(j)
+                        hop += 1
             queue = next_queue
-            hop += 1
         if hop > max_hop:
             max_hop = hop
     return max_hop
