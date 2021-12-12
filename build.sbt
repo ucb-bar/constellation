@@ -9,7 +9,8 @@ scalacOptions ++= Seq(
   "-feature"
 )
 
-val constellation_ci = sys.env.get("CONSTELLATION_CI").isDefined
+// val constellation_ci = sys.env.get("CONSTELLATION_CI").isDefined
+val constellation_ci = true
 
 // SNAPSHOT repositories
 resolvers += Resolver.sonatypeRepo("snapshots")
