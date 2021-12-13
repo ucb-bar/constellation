@@ -75,6 +75,38 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
       }
     }
   }
+  def checkAcyclic(vNetId: Int, routingRel: RoutingRelation): Option[Seq[ChannelInfoForRouting]] = {
+    var visited = Set[ChannelInfoForRouting]()
+    var stack = Seq[ChannelInfoForRouting]()
+
+    def checkAcyclicUtil(cI: ChannelInfoForRouting): Boolean = {
+      visited = visited + cI
+      stack = stack ++ Seq(cI)
+
+      val neighbors = fullChannelParams.filter(_.srcId == cI.dst).map(_.channelInfosForRouting).flatten.filter { nI =>
+        possiblePacketMap(cI).filter(_.vNetId == vNetId).map { pI =>
+          routingRel(cI.dst)(cI, nI, pI.asPacketInfoForRouting)
+        }.fold(false)(_||_)
+      }
+
+      neighbors.foreach { nI =>
+        if (!visited.contains(nI)) {
+          if (!checkAcyclicUtil(nI)) return false
+        } else if (stack.contains(nI)) {
+          return false
+        }
+      }
+      stack = stack.dropRight(1)
+      return true
+    }
+
+    globalIngressParams.filter(_.vNetId == vNetId).zipWithIndex.map { case (iP,iIdx) =>
+      if (!checkAcyclicUtil(iP.channelInfosForRouting(0))) {
+        return Some(stack)
+      }
+    }
+    return None
+  }
 
   // Check connectivity, ignoring blocking properties of virtual subnets
   println("Constellation: Checking full connectivity")
@@ -98,15 +130,36 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
     }
   }
 
+  // Check for deadlock in escape channels
+  println("Constellation: Checking for possibility of deadlock")
+  for (vNetId <- 0 until nVirtualNetworks) {
+    // blockees are vNets which the current vNet can block without affecting its own forwards progress
+    val blockees = (0 until nVirtualNetworks).filter(v => v != vNetId && p(NoCKey).vNetBlocking(vNetId, v))
+    val blockeeSets = blockees.toSet.subsets
+    // For each subset of blockers for this virtual network, recheck connectivity assuming
+    // every virtual channel accessible to each blocker is locked
+    for (b <- blockeeSets) {
+      val routingRel = p(NoCKey).routingRelation
+      val acyclicPath = checkAcyclic(vNetId, routingRel
+        && !(new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {b.map { v => possiblePacketMap(nxtC).map(_.vNetId == v) }.flatten.fold(false)(_||_)}))
+        && new RoutingRelation((nodeId, srcC, nxtC, pInfo) => routingRel.isEscape(nxtC, vNetId))
+      )
+      acyclicPath.foreach { path =>
+        println(s"Constellation WARNING: cyclic path on virtual network $vNetId may cause deadlock: ${acyclicPath.get}")
+      }
+    }
+  }
+
+
   // Tie off inpossible virtual channels
   // Also set possible nodes for each channel
   val channelParams = fullChannelParams.map { cP => cP.copy(
     virtualChannelParams=cP.virtualChannelParams.zipWithIndex.map { case (vP,vId) =>
-      val traversable = possiblePacketMap((cP.srcId, vId, cP.destId)).size != 0
+      val traversable = possiblePacketMap(vP.asChannelInfoForRouting).size != 0
       if (!traversable) {
         println(s"Constellation WARNING: virtual channel $vId from ${cP.srcId} to ${cP.destId} appears to be untraversable")
       }
-      vP.copy(possiblePackets=possiblePacketMap((cP.srcId, vId, cP.destId)))
+      vP.copy(possiblePackets=possiblePacketMap(vP.asChannelInfoForRouting))
     }
   )}
   channelParams.map(cP => if (!cP.traversable)

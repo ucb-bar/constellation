@@ -310,79 +310,67 @@ class TestConfig28 extends Config(
   new Mesh2DConfig(5, 5, RoutingRelations.mesh2DAlternatingDimensionOrdered))
 class TestConfig29 extends Config(
   new WithUniformVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new Mesh2DConfig(5, 5, RoutingRelations.mesh2DDimensionOrderedHighest))
+  new Mesh2DConfig(5, 5, RoutingRelations.mesh2DEscapeRouter))
 
 class TestConfig30 extends Config(
   new WithUniformVirtualChannels(2, UserVirtualChannelParams(2)) ++
-  new Mesh2DConfig(3, 3, RoutingRelations.mesh2DDimensionOrderedHighest))
+  new Mesh2DConfig(3, 3, RoutingRelations.mesh2DEscapeRouter))
 class TestConfig31 extends Config(
   new WithCombineRCVA ++
   new WithUniformVirtualChannels(2, UserVirtualChannelParams(2)) ++
-  new Mesh2DConfig(3, 3, RoutingRelations.mesh2DDimensionOrderedHighest))
+  new Mesh2DConfig(3, 3, RoutingRelations.mesh2DEscapeRouter))
 class TestConfig32 extends Config(
   new WithCombineSAST ++
   new WithUniformVirtualChannels(2, UserVirtualChannelParams(2)) ++
-  new Mesh2DConfig(3, 3, RoutingRelations.mesh2DDimensionOrderedHighest))
+  new Mesh2DConfig(3, 3, RoutingRelations.mesh2DEscapeRouter))
 class TestConfig33 extends Config(
   new WithCombineSAST ++
   new WithCombineRCVA ++
   new WithUniformVirtualChannels(2, UserVirtualChannelParams(2)) ++
-  new Mesh2DConfig(3, 3, RoutingRelations.mesh2DDimensionOrderedHighest))
+  new Mesh2DConfig(3, 3, RoutingRelations.mesh2DEscapeRouter))
+
+
 class TestConfig34 extends Config(
-  new WithCombineSAST ++
-  new WithCombineRCVA ++
-  new WithUniformVirtualChannels(2, UserVirtualChannelParams(2)) ++
-  new Mesh2DConfig(3, 3, RoutingRelations.mesh2DBestRouter))
-
-
-
-class TestConfig35 extends Config(
   new WithUniformVirtualChannels(1, UserVirtualChannelParams(1)) ++
   new Mesh2DConfig(5, 5))
-class TestConfig36 extends Config(
+class TestConfig35 extends Config(
   new WithUniformVirtualChannels(1, UserVirtualChannelParams(1)) ++
   new Mesh2DConfig(5, 5, RoutingRelations.mesh2DWestFirst))
-class TestConfig37 extends Config(
+class TestConfig36 extends Config(
   new WithUniformVirtualChannels(1, UserVirtualChannelParams(1)) ++
   new Mesh2DConfig(5, 5, RoutingRelations.mesh2DNorthLast))
+
+class TestConfig37 extends Config(
+  new constellation.WithIngressVNets((i: Int) => i % 4) ++
+  new constellation.WithNBlockingVirtualNetworks(4) ++
+  new constellation.WithUniformVirtualChannels(4, UserVirtualChannelParams(3)) ++
+  new constellation.Mesh2DConfig(3, 3, RoutingRelations.mesh2DEscapeRouter))
 
 class TestConfig38 extends Config(
   new constellation.WithIngressVNets((i: Int) => i % 4) ++
   new constellation.WithNBlockingVirtualNetworks(4) ++
   new constellation.WithUniformVirtualChannels(4, UserVirtualChannelParams(3)) ++
-  new constellation.Mesh2DConfig(3, 3, RoutingRelations.mesh2DDimensionOrderedHighest))
+  new constellation.Mesh2DConfig(3, 3, RoutingRelations.mesh2DAlternatingDimensionOrdered))
 
 class TestConfig39 extends Config(
   new constellation.WithIngressVNets((i: Int) => i % 4) ++
-  new constellation.WithNBlockingVirtualNetworks(4) ++
-  new constellation.WithUniformVirtualChannels(4, UserVirtualChannelParams(3)) ++
-  new constellation.Mesh2DConfig(3, 3, RoutingRelations.mesh2DAlternatingDimensionOrdered))
-
-class TestConfig40 extends Config(
-  new constellation.WithIngressVNets((i: Int) => i % 4) ++
   new constellation.WithNNonblockingVirtualNetworks(4) ++
   new constellation.WithUniformVirtualChannels(4, UserVirtualChannelParams(3)) ++
-  new constellation.Mesh2DConfig(3, 3, RoutingRelations.mesh2DDimensionOrderedHighest))
-
-class TestConfig41 extends Config(
-  new constellation.WithIngressVNets((i: Int) => i % 4) ++
-  new constellation.WithNNonblockingVirtualNetworksWithSharing(4) ++
-  new constellation.WithUniformVirtualChannels(4, UserVirtualChannelParams(3)) ++
-  new constellation.Mesh2DConfig(3, 3, RoutingRelations.mesh2DDimensionOrderedHighest))
+  new constellation.Mesh2DConfig(3, 3, RoutingRelations.mesh2DEscapeRouter))
 
 
 // 2D Torus
-class TestConfig42 extends Config(
+class TestConfig40 extends Config(
   new WithUniformVirtualChannels(2, UserVirtualChannelParams(1)) ++
   new UnidirectionalTorus2DConfig(3, 3))
-class TestConfig43 extends Config(
+class TestConfig41 extends Config(
   new WithUniformVirtualChannels(3, UserVirtualChannelParams(3)) ++
   new UnidirectionalTorus2DConfig(3, 3))
-class TestConfig44 extends Config(
+class TestConfig42 extends Config(
   new WithUniformVirtualChannels(4, UserVirtualChannelParams(4)) ++
   new UnidirectionalTorus2DConfig(5, 5))
 
-class TestConfig45 extends Config(
+class TestConfig43 extends Config(
   new WithUniformVirtualChannels(2, UserVirtualChannelParams(1)) ++
   new BidirectionalTorus2DConfig(3, 3))
 
@@ -390,10 +378,10 @@ class TLTestConfig00 extends Config(
   new WithTLNoCTesterParams(TLNoCTesterParams(Seq(4, 0, 2, 5, 6, 9, 11), Seq(7, 1, 3, 8, 10))) ++
   new WithNNonblockingVirtualNetworksWithSharing(5, 2) ++
   new WithUniformVirtualChannels(2, UserVirtualChannelParams(3)) ++
-  new Mesh2DConfig(4, 3, RoutingRelations.mesh2DAlternatingDimensionOrdered))
+  new Mesh2DConfig(4, 3, RoutingRelations.mesh2DEscapeRouter))
 
 class TLTestConfig01 extends Config(
   new WithTLNoCTesterParams(TLNoCTesterParams(Seq(4, 0, 2, 5, 6, 9, 11), Seq(7, 1, 3, 8, 10))) ++
   new WithNBlockingVirtualNetworks(5) ++
   new WithUniformVirtualChannels(6, UserVirtualChannelParams(3)) ++
-  new Mesh2DConfig(4, 3, RoutingRelations.mesh2DAlternatingDimensionOrdered))
+  new Mesh2DConfig(4, 3, RoutingRelations.mesh2DEscapeRouter))
