@@ -119,7 +119,7 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   for (vNetId <- 0 until nVirtualNetworks) {
     // blockees are vNets which the current vNet can block without affecting its own forwards progress
     val blockees = (0 until nVirtualNetworks).filter(v => v != vNetId && p(NoCKey).vNetBlocking(vNetId, v))
-    val blockeeSets = blockees.toSet.subsets
+    val blockeeSets = blockees.toSet.subsets.filter(_.size > 0)
     // For each subset of blockers for this virtual network, recheck connectivity assuming
     // every virtual channel accessible to each blocker is locked
     for (b <- blockeeSets) {

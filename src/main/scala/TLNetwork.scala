@@ -294,6 +294,7 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       val inC  = noc.io.ingress (i*3+1)
       val outD = noc.io.egress  (i*2+1)
       val inE  = noc.io.ingress (i*3+2)
+      println(s"Constellation TLNoC: in  $i @ ${inNodeMapping(i)}: ingress (${i*3} ${i*3+1} ${i*3+2}) egress (${i*2} ${i*2+1})")
 
       inA.flit.valid := in(i).a.valid
       in(i).a.ready := inA.flit.ready
@@ -336,6 +337,7 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       val outC  = noc.io.egress  (in.size*2+i*3+1)
       val inD   = noc.io.ingress (in.size*3+i*2+1)
       val outE  = noc.io.egress  (in.size*2+i*3+2)
+      println(s"Constellation TLNoC: out $i @ ${outNodeMapping(i)}: ingress (${in.size*3+i*2} ${in.size*3+i*2+1}) egress (${in.size*2+i*3} ${in.size*2+i*3+1} ${in.size*2+i*3+2})")
 
       out(i).a.valid := outA.flit.valid
       outA.flit.ready := out(i).a.ready

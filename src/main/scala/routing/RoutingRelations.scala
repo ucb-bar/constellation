@@ -332,11 +332,19 @@ object RoutingRelations {
   // Virtual subnets with 1 dedicated virtual channel each, and some number of shared channels
   def sharedNonblockingVirtualSubnetworks(f: RoutingRelation, n: Int, nSharedChannels: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
     def trueVIdToVirtualVId(vId: Int) = if (vId < n) 0 else vId - n
-    f(nodeId)(
-      srcC.copy(vc=trueVIdToVirtualVId(srcC.vc)),
-      nxtC.copy(vc=trueVIdToVirtualVId(nxtC.vc)),
-      pInfo.copy(vNet=0)
-    )
+    if (nxtC.vc < n) {
+      nxtC.vc == pInfo.vNet && f(nodeId)(
+        srcC.copy(vc=trueVIdToVirtualVId(srcC.vc)),
+        nxtC.copy(vc=0),
+        pInfo.copy(vNet=0)
+      )
+    } else {
+      f(nodeId)(
+        srcC.copy(vc=trueVIdToVirtualVId(srcC.vc)),
+        nxtC.copy(vc=trueVIdToVirtualVId(nxtC.vc)),
+        pInfo.copy(vNet=0)
+      )
+    }
   }, (c, v) => {
     def trueVIdToVirtualVId(vId: Int) = if (vId < n) 0 else vId - n
     f.isEscape(c.copy(vc=trueVIdToVirtualVId(c.vc)), 0)

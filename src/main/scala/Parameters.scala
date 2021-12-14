@@ -20,8 +20,9 @@ case class NoCConfig(
   egresses: Seq[UserEgressParams] = Nil,
   routingRelation: RoutingRelation = RoutingRelations.allLegal,
   routerParams: Int => UserRouterParams = (i: Int) => UserRouterParams(),
-  // blocker, blocked => bool
-  vNetBlocking: (Int, Int) => Boolean = (_: Int, _: Int) => false,
+  // (blocker, blockee) => bool
+  // If true, then blocker must be able to proceed when blockee is blocked
+  vNetBlocking: (Int, Int) => Boolean = (_: Int, _: Int) => true,
 )
 case object NoCKey extends Field[NoCConfig](NoCConfig())
 
