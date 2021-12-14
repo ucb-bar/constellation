@@ -316,7 +316,7 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
 
       in(i).d.valid := outD.flit.valid
       outD.flit.ready := in(i).d.ready
-      in(i).d.bits := outD.flit.bits.asTypeOf(new TLBundleD(wide_bundle))
+      in(i).d.bits := outD.flit.bits.payload.asTypeOf(new TLBundleD(wide_bundle))
 
       inE.flit.valid := in(i).e.valid
       in(i).e.ready := inE.flit.ready
