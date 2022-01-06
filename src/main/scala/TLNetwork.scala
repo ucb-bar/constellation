@@ -258,6 +258,7 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
     val debugPrintLatencies = false
     val wb = new TLBundle(wide_bundle)
     val payloadWidth = Seq(wb.a, wb.b, wb.c, wb.d, wb.e).map(_.bits.getWidth).max
+    val actualPayloadWidth = payloadWidth + (if (debugPrintLatencies) 64 else 0)
 
     val nIngresses = in.size * 3 + out.size * 2
     val nEgresses = out.size * 3 + in.size * 2
@@ -265,16 +266,21 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       case NoCKey =>
         p(NoCKey).copy(
           routerParams = (i: Int) => p(NoCKey).routerParams(i).copy(
-            payloadBits = payloadWidth + (if (debugPrintLatencies) 64 else 0)),
+            payloadBits = actualPayloadWidth),
           ingresses = ((Seq.tabulate (in.size) { i => Seq.fill(3) { inNodeMapping(i) } } ++
             Seq.tabulate(out.size) { i => Seq.fill(2) { outNodeMapping(i) } }).flatten
-          ).zipWithIndex.map { case (i,iId) => UserIngressParams(i,
-            (0 until nEgresses).filter(e => connectivity(iId, e, ingressVNets(iId))).toSet,
-            ingressVNets(iId)
+          ).zipWithIndex.map { case (i,iId) => UserIngressParams(
+            destId = i,
+            possibleEgresses = (0 until nEgresses).filter(e => connectivity(iId, e, ingressVNets(iId))).toSet,
+            vNetId = ingressVNets(iId),
+            payloadBits = actualPayloadWidth
           )},
           egresses = ((Seq.tabulate (in.size) { i => Seq.fill(2) { inNodeMapping(i) } } ++
             Seq.tabulate(out.size) { i => Seq.fill(3) { outNodeMapping(i) } }).flatten
-          ).zipWithIndex.map { case (e,eId) => UserEgressParams(e)},
+          ).zipWithIndex.map { case (e,eId) => UserEgressParams(
+            srcId = e,
+            payloadBits = actualPayloadWidth
+          )},
         )
     }))).module)
 
@@ -317,7 +323,7 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
 
       in(i).d.valid := outD.flit.valid
       outD.flit.ready := in(i).d.ready
-      in(i).d.bits := outD.flit.bits.asTypeOf(new TLBundleD(wide_bundle))
+      in(i).d.bits := outD.flit.bits.payload.asTypeOf(new TLBundleD(wide_bundle))
 
       inE.flit.valid := in(i).e.valid
       in(i).e.ready := inE.flit.ready
