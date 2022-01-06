@@ -261,10 +261,11 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
 
     val nIngresses = in.size * 3 + out.size * 2
     val nEgresses = out.size * 3 + in.size * 2
-    val noc = Module(new NoC()(p.alterPartial({
+    val noc = Module(LazyModule(new NoC()(p.alterPartial({
       case NoCKey =>
         p(NoCKey).copy(
-          flitPayloadBits = payloadWidth + (if (debugPrintLatencies) 64 else 0),
+          routerParams = (i: Int) => p(NoCKey).routerParams(i).copy(
+            payloadBits = payloadWidth + (if (debugPrintLatencies) 64 else 0)),
           ingresses = ((Seq.tabulate (in.size) { i => Seq.fill(3) { inNodeMapping(i) } } ++
             Seq.tabulate(out.size) { i => Seq.fill(2) { outNodeMapping(i) } }).flatten
           ).zipWithIndex.map { case (i,iId) => UserIngressParams(i,
@@ -275,7 +276,7 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
             Seq.tabulate(out.size) { i => Seq.fill(3) { outNodeMapping(i) } }).flatten
           ).zipWithIndex.map { case (e,eId) => UserEgressParams(e)},
         )
-    })))
+    }))).module)
 
     val tsc = RegInit(0.U(32.W))
     tsc := tsc + 1.U

@@ -4,7 +4,9 @@ import chisel3._
 import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
+import freechips.rocketchip.diplomacy.{OutwardNodeHandle}
 import constellation.routing.ChannelInfoForRouting
+
 
 // User-facing params, for adjusting config options
 case class UserVirtualChannelParams(
@@ -13,7 +15,7 @@ case class UserVirtualChannelParams(
 
 case class UserChannelParams(
   virtualChannelParams: Seq[UserVirtualChannelParams] = Seq(UserVirtualChannelParams()),
-  depth: Int = 0
+  channel: Parameters => OutwardNodeHandle[ChannelParams, ChannelParams, ChannelEdgeParams, Channel] => OutwardNodeHandle[ChannelParams, ChannelParams, ChannelEdgeParams, Channel] = { p => u => u }
 ) {
   val nVirtualChannels = virtualChannelParams.size
 }
@@ -21,12 +23,15 @@ case class UserChannelParams(
 case class UserIngressParams(
   destId: Int,
   possibleEgresses: Set[Int],
-  vNetId: Int
+  vNetId: Int = 0,
+  payloadBits: Int = 64
 )
 
 case class UserEgressParams(
-  srcId: Int
+  srcId: Int,
+  payloadBits: Int = 64
 )
+
 
 // Internal-facing params
 case class VirtualChannelParams(
@@ -47,12 +52,13 @@ trait BaseChannelParams {
   def possiblePackets: Set[PacketInfo]
   def nVirtualChannels: Int
   def channelInfosForRouting: Seq[ChannelInfoForRouting]
+  def payloadBits: Int
 }
 
 case class ChannelParams(
   srcId: Int,
   destId: Int,
-  depth: Int,
+  payloadBits: Int,
   virtualChannelParams: Seq[VirtualChannelParams],
 ) extends BaseChannelParams {
   def nVirtualChannels = virtualChannelParams.size
@@ -65,27 +71,29 @@ case class ChannelParams(
 }
 
 case class IngressChannelParams(
-  destId: Int,
-  possibleEgresses: Set[Int],
-  vNetId: Int,
   ingressId: Int,
-  uniqueId: Int
+  uniqueId: Int,
+  user: UserIngressParams
 ) extends BaseChannelParams {
   def srcId = -1
+  def destId = user.destId
   def nVirtualChannels = 1
-  def possiblePackets = possibleEgresses.map { e => PacketInfo(e, vNetId) }
+  def possiblePackets = user.possibleEgresses.map { e => PacketInfo(e, user.vNetId) }
   def channelInfosForRouting = Seq(ChannelInfoForRouting(-1, 0, destId))
+  def payloadBits = user.payloadBits
 }
 
 case class EgressChannelParams(
-  srcId: Int,
   egressId: Int,
   uniqueId: Int,
   possiblePackets: Set[PacketInfo],
+  user: UserEgressParams
 ) extends BaseChannelParams {
+  def srcId = user.srcId
   def destId = -1
   def nVirtualChannels = 1
   def channelInfosForRouting = Seq(ChannelInfoForRouting(srcId, 0, -1))
+  def payloadBits = user.payloadBits
 }
 
 
@@ -93,12 +101,13 @@ case class EgressChannelParams(
 trait HasChannelParams extends HasNoCParams {
   val cParam: BaseChannelParams
 
+  val payloadBits = cParam.payloadBits
   val nVirtualChannels = cParam.nVirtualChannels
   val virtualChannelBits = log2Up(nVirtualChannels)
   def virtualChannelParams = cParam match {
-    case ChannelParams(_,_,_,v) => v
-    case IngressChannelParams(_,_,_,_,_) => require(false); Nil;
-    case EgressChannelParams(_,_,_,_) => require(false); Nil;
+    case c: ChannelParams        => c.virtualChannelParams
+    case c: IngressChannelParams => require(false); Nil;
+    case c: EgressChannelParams  => require(false); Nil;
   }
   def maxBufferSize = virtualChannelParams.map(_.bufferSize).max
 }
@@ -111,38 +120,11 @@ class Channel(val cParam: ChannelParams)(implicit val p: Parameters) extends Bun
 
 class TerminalChannel(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   require(cParam match {
-    case IngressChannelParams(_,_,_,_,_) => true
-    case EgressChannelParams(_,_,_,_) => true
+    case c: IngressChannelParams => true
+    case c: EgressChannelParams => true
     case _ => false
   })
 
   val flit = Decoupled(new IOFlit(cParam))
 }
 
-object ChannelBuffer {
-  def apply(in: Channel, cParam: ChannelParams)(implicit p: Parameters): Channel = {
-    val buffer = Module(new ChannelBuffer(cParam))
-    buffer.io.in <> in
-    buffer.io.out
-  }
-}
-
-class ChannelBuffer(val cParam: ChannelParams)(implicit val p: Parameters) extends Module with HasChannelParams {
-  val io = IO(new Bundle {
-    val in = Flipped(new Channel(cParam))
-    val out = new Channel(cParam)
-  })
-  if (cParam.traversable) {
-    io.out.flit := Pipe(io.in.flit, cParam.depth)
-    io.in.credit_return := Pipe(io.out.credit_return, cParam.depth)
-    io.in.vc_free := Pipe(io.out.vc_free, cParam.depth)
-  } else {
-    io.out.flit.valid := false.B
-    io.out.flit.bits := DontCare
-    io.in.credit_return.valid := false.B
-    io.in.credit_return.bits := DontCare
-    io.in.vc_free.valid := false.B
-    io.in.vc_free.bits := DontCare
-  }
-
-}

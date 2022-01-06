@@ -14,7 +14,13 @@ class SwitchAllocReq(val outParams: Seq[ChannelParams], val egressParams: Seq[Eg
   val tail = Bool()
 }
 
-class SwitchAllocator(val rP: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
+class SwitchAllocator(
+  val routerParams: RouterParams,
+  val inParams: Seq[ChannelParams],
+  val outParams: Seq[ChannelParams],
+  val ingressParams: Seq[IngressChannelParams],
+  val egressParams: Seq[EgressChannelParams]
+)(implicit val p: Parameters) extends Module with HasRouterParams {
   val io = IO(new Bundle {
     val req = MixedVec(allInParams.map(u =>
       Vec(u.nVirtualChannels, Flipped(Decoupled(new SwitchAllocReq(outParams, egressParams))))))

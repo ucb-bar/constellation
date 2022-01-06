@@ -71,7 +71,10 @@ class InputGen(idx: Int, cParams: IngressChannelParams, inputStallProbability: D
 }
 
 class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[EgressChannelParams])(implicit val p: Parameters) extends Module with HasNoCParams {
-  require(flitPayloadBits >= 64)
+  val allPayloadBits = (inputParams.map(_.user.payloadBits) ++ outputParams.map(_.user.payloadBits)).toSet
+  require(allPayloadBits.size == 1 && allPayloadBits.head >= 64)
+  val payloadBits = allPayloadBits.head
+
   val robSz = 128
   val totalTxs = 50000
   val inputStallProbability = 0.0
@@ -90,7 +93,7 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
   val flits = RegInit(0.U(32.W))
   dontTouch(flits)
 
-  val tsc = RegInit(0.U((flitPayloadBits-16).W))
+  val tsc = RegInit(0.U((payloadBits-16).W))
   tsc := tsc + 1.U
 
   val idle_counter = RegInit(0.U(11.W))
@@ -101,13 +104,13 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
 
 
   class RobEntry extends Bundle {
-    val payload = UInt(flitPayloadBits.W)
+    val payload = UInt(payloadBits.W)
     val egress_id = UInt(log2Ceil(nOutputs).W)
     val n_flits = UInt(flitIdBits.W)
     val flits_returned = UInt(flitIdBits.W)
   }
 
-  val rob_payload = Reg(Vec(robSz, UInt(flitPayloadBits.W)))
+  val rob_payload = Reg(Vec(robSz, UInt(payloadBits.W)))
   val rob_egress_id = Reg(Vec(robSz, UInt(log2Ceil(nOutputs).W)))
   val rob_ingress_id = Reg(Vec(robSz, UInt(log2Ceil(nInputs).W)))
   val rob_n_flits = Reg(Vec(robSz, UInt(flitIdBits.W)))
@@ -184,8 +187,9 @@ class TestHarness(implicit val p: Parameters) extends Module {
     val success = Output(Bool())
   })
 
-  val noc = Module(new NoC)
-  val noc_tester = Module(new NoCTester(noc.globalIngressParams, noc.globalEgressParams))
+  val lazyNoC = LazyModule(new NoC)
+  val noc = Module(lazyNoC.module)
+  val noc_tester = Module(new NoCTester(lazyNoC.globalIngressParams, lazyNoC.globalEgressParams))
   noc.io.ingress <> noc_tester.io.to_noc
   noc_tester.io.from_noc <> noc.io.egress
   io.success := noc_tester.io.success

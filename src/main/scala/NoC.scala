@@ -4,13 +4,13 @@ import chisel3._
 import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
+import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp}
 import constellation.router._
 import constellation.routing._
 
 
 case class NoCConfig(
   nNodes: Int = 3,
-  flitPayloadBits: Int = 64,
   maxFlits: Int = 8,
   nVirtualNetworks: Int = 1,
 
@@ -34,19 +34,15 @@ trait HasNoCParams {
   val maxFlits = params.maxFlits
   val nVirtualNetworks = params.nVirtualNetworks
 
-  val flitPayloadBits = params.flitPayloadBits
   val nodeIdBits = log2Ceil(params.nNodes)
   val flitIdBits = log2Up(params.maxFlits+1)
   val vNetBits = log2Up(params.nVirtualNetworks)
   val nEgresses = params.egresses.size
   val egressIdBits = log2Up(params.egresses.size)
   val egressSrcIds = params.egresses.map(_.srcId)
-
-  val topologyFunction = params.topology
-  val routerParams = params.routerParams
 }
 
-class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
+class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
   var uniqueChannelId = 0
   def getUniqueChannelId(): Int = {
     val r = uniqueChannelId
@@ -55,25 +51,38 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   }
 
   val fullChannelParams: Seq[ChannelParams] = Seq.tabulate(nNodes, nNodes) { case (i,j) =>
-    topologyFunction(i, j).map { cP =>
-      ChannelParams(i, j, cP.depth, cP.virtualChannelParams.zipWithIndex.map { case (vP, vc) =>
-        VirtualChannelParams(i, j, vc, vP.bufferSize, Set[PacketInfo](), getUniqueChannelId())
-      })
+    p(NoCKey).topology(i, j).map { cP =>
+      val payloadBits = p(NoCKey).routerParams(i).payloadBits
+      require(p(NoCKey).routerParams(i).payloadBits == p(NoCKey).routerParams(j).payloadBits)
+      ChannelParams(
+        srcId = i,
+        destId = j,
+        payloadBits = payloadBits,
+        virtualChannelParams = cP.virtualChannelParams.zipWithIndex.map { case (vP, vc) =>
+          VirtualChannelParams(i, j, vc, vP.bufferSize, Set[PacketInfo](), getUniqueChannelId())
+        }
+      )
     }
   }.flatten.flatten
 
   val globalIngressParams = p(NoCKey).ingresses.zipWithIndex.map { case (u,i) =>
-    IngressChannelParams(u.destId, u.possibleEgresses, u.vNetId, i, getUniqueChannelId())
+    IngressChannelParams(
+      user = u,
+      ingressId = i,
+      uniqueId = getUniqueChannelId())
   }
   val globalEgressParams = p(NoCKey).egresses.zipWithIndex.map { case (u,e) =>
-    EgressChannelParams(u.srcId, e, getUniqueChannelId(),
-      globalIngressParams.filter(_.possibleEgresses.contains(e)).map { i =>
-        PacketInfo(e, i.vNetId)
+    EgressChannelParams(
+      user = u,
+      egressId = e,
+      uniqueId = getUniqueChannelId(),
+      possiblePackets = globalIngressParams.filter(_.user.possibleEgresses.contains(e)).map { i =>
+        PacketInfo(e, i.user.vNetId)
       }.toSet
     )
   }
 
-  globalIngressParams.foreach(_.possibleEgresses.foreach(e => require(e < globalEgressParams.size)))
+  globalIngressParams.foreach(_.user.possibleEgresses.foreach(e => require(e < globalEgressParams.size)))
 
 
   // Check sanity of routingRelation, all inputs can route to all outputs
@@ -83,9 +92,9 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
 
   def checkConnectivity(vNetId: Int, routingRel: RoutingRelation) = {
     // Loop through accessible ingress/egress pairs
-    globalIngressParams.filter(_.vNetId == vNetId).zipWithIndex.map { case (iP,iIdx) =>
+    globalIngressParams.filter(_.user.vNetId == vNetId).zipWithIndex.map { case (iP,iIdx) =>
       val iId = iP.destId
-      iP.possibleEgresses.map { oIdx =>
+      iP.user.possibleEgresses.map { oIdx =>
         val oP = globalEgressParams(oIdx)
         val oId = oP.srcId
 
@@ -139,7 +148,7 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
       return true
     }
 
-    globalIngressParams.filter(_.vNetId == vNetId).zipWithIndex.map { case (iP,iIdx) =>
+    globalIngressParams.filter(_.user.vNetId == vNetId).zipWithIndex.map { case (iP,iIdx) =>
       if (!checkAcyclicUtil(iP.channelInfosForRouting(0))) {
         return Some(stack)
       }
@@ -204,46 +213,52 @@ class NoC(implicit val p: Parameters) extends Module with HasNoCParams{
   channelParams.map(cP => if (!cP.traversable)
     println(s"Constellation WARNING: physical channel from ${cP.srcId} to ${cP.destId} appears to be untraversable"))
 
-  println("Constellation: Starting NoC RTL generation")
-
-  val io = IO(new Bundle {
-    val ingress = MixedVec(globalIngressParams.map { u => Flipped(new TerminalChannel(u)) })
-    val egress = MixedVec(globalEgressParams.map { u => new TerminalChannel(u) })
-  })
-
-  val router_nodes = Seq.tabulate(nNodes) { i => Module(new Router(RouterParams(
-    nodeId = i,
+  val routers = Seq.tabulate(nNodes) { i => LazyModule(new Router(
+    routerParams = RouterParams(
+      nodeId = i,
+      nodeRoutingRelation = p(NoCKey).routingRelation(i),
+      user = p(NoCKey).routerParams(i)
+    ),
     inParams = channelParams.filter(_.destId == i),
     outParams = channelParams.filter(_.srcId == i),
     ingressParams = globalIngressParams.filter(_.destId == i),
-    egressParams = globalEgressParams.filter(_.srcId == i),
-    nodeRoutingRelation = p(NoCKey).routingRelation(i),
-    combineSAST = routerParams(i).combineSAST,
-    combineRCVA = routerParams(i).combineRCVA
-  ))) }
+    egressParams = globalEgressParams.filter(_.srcId == i)
+  )) }
 
-  router_nodes.zipWithIndex.map { case (dst,dstId) =>
-    dst.io.in.map { in =>
-      in <> ChannelBuffer(
-        router_nodes(in.cParam.srcId).io.out.filter(_.cParam.destId == dstId)(0),
-        in.cParam
-      )
+  Seq.tabulate(nNodes, nNodes) { case (i, j) => if (i != j) {
+    val sourceNodes = routers(i).sourceNodes.filter(_.sourceParams.destId == j)
+    val destNodes = routers(j).destNodes.filter(_.destParams.srcId == i)
+    require (sourceNodes.size == destNodes.size)
+      (sourceNodes zip destNodes).foreach { t => t._2 := p(NoCKey).topology(i, j).get.channel(p)(t._1) }
+  }}
+
+  lazy val module = new LazyModuleImp(this) {
+    println("Constellation: Starting NoC RTL generation")
+
+    val io = IO(new Bundle {
+      val ingress = MixedVec(globalIngressParams.map { u => Flipped(new TerminalChannel(u)) })
+      val egress = MixedVec(globalEgressParams.map { u => new TerminalChannel(u) })
+    })
+
+    val routerModules = routers.map(r => r.module)
+
+    routers.zipWithIndex.map { case (dst,dstId) =>
+      (dst.ingressParams zip routerModules(dstId).io.ingress) map { case (u,i) =>
+        i <> io.ingress(u.ingressId)
+      }
+      (dst.egressParams zip routerModules(dstId).io.egress) map { case (u,i) =>
+        io.egress(u.egressId) <> i
+      }
     }
-    (dst.ingressParams zip dst.io.ingress) map { case (u,i) =>
-      i <> io.ingress(u.ingressId)
-    }
-    (dst.egressParams zip dst.io.egress) map { case (u,i) =>
-      io.egress(u.egressId) <> i
-    }
+
+    val debug_va_stall_ctr = RegInit(0.U(64.W))
+    val debug_sa_stall_ctr = RegInit(0.U(64.W))
+    val debug_any_stall_ctr = debug_va_stall_ctr + debug_sa_stall_ctr
+    debug_va_stall_ctr := debug_va_stall_ctr + routerModules.map(_.io.debug.va_stall.reduce(_+_)).reduce(_+_)
+    debug_sa_stall_ctr := debug_sa_stall_ctr + routerModules.map(_.io.debug.sa_stall.reduce(_+_)).reduce(_+_)
+
+    dontTouch(debug_va_stall_ctr)
+    dontTouch(debug_sa_stall_ctr)
+    dontTouch(debug_any_stall_ctr)
   }
-
-  val debug_va_stall_ctr = RegInit(0.U(64.W))
-  val debug_sa_stall_ctr = RegInit(0.U(64.W))
-  val debug_any_stall_ctr = debug_va_stall_ctr + debug_sa_stall_ctr
-  debug_va_stall_ctr := debug_va_stall_ctr + router_nodes.map(_.io.debug.va_stall.reduce(_+_)).reduce(_+_)
-  debug_sa_stall_ctr := debug_sa_stall_ctr + router_nodes.map(_.io.debug.sa_stall.reduce(_+_)).reduce(_+_)
-
-  dontTouch(debug_va_stall_ctr)
-  dontTouch(debug_sa_stall_ctr)
-  dontTouch(debug_any_stall_ctr)
 }

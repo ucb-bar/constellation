@@ -20,7 +20,7 @@ class IOFlit(val cParam: BaseChannelParams)(implicit val p: Parameters) extends 
   val head = Bool()
   val tail = Bool()
   val egress_id = UInt(egressIdBits.W)
-  val payload = UInt(flitPayloadBits.W)
+  val payload = UInt(payloadBits.W)
 }
 
 class Flit(cParam: BaseChannelParams)(implicit p: Parameters) extends IOFlit(cParam)(p) {

@@ -32,9 +32,12 @@ class WithCombineSAST extends Config((site, here, up) => {
 
 
 class WithUniformChannelDepth(depth: Int) extends Config((site, here, up) => {
-  case NoCKey => up(NoCKey, site).copy(topology = (src: Int, dst: Int) =>
-    up(NoCKey, site).topology(src, dst).map(_.copy(depth = depth))
-  )
+  case NoCKey => up(NoCKey, site).copy(topology = (src: Int, dst: Int) => {
+    up(NoCKey, site).topology(src, dst).map(_.copy(channel = (u: Parameters) => {
+      implicit val p: Parameters = u
+      ChannelBuffer(depth) := _
+    }))
+  })
 })
 
 class WithUniformVirtualChannelBufferSize(size: Int) extends Config((site, here, up) => {
@@ -98,7 +101,7 @@ class UnidirectionalLineConfig(
   case NoCKey => up(NoCKey, site).copy(
     nNodes = nNodes,
     topology = Topologies.unidirectionalLine,
-    ingresses = ingressNodes.map(i => UserIngressParams(i, (0 until egressNodes.size).toSet, 0)),
+    ingresses = ingressNodes.map(i => UserIngressParams(i, (0 until egressNodes.size).toSet)),
     egresses = egressNodes.map(i => UserEgressParams(i))
   )
 })
@@ -112,7 +115,7 @@ class BidirectionalLineConfig(
     nNodes = nNodes,
     topology = Topologies.bidirectionalLine,
     routingRelation = RoutingRelations.bidirectionalLine,
-    ingresses = ingressNodes.map(i => UserIngressParams(i, (0 until egressNodes.size).toSet, 0)),
+    ingresses = ingressNodes.map(i => UserIngressParams(i, (0 until egressNodes.size).toSet)),
     egresses = egressNodes.map(i => UserEgressParams(i))
   )
 })
@@ -126,7 +129,7 @@ class UnidirectionalTorus1DConfig(
     nNodes = nNodes,
     topology = Topologies.unidirectionalTorus1D(nNodes),
     routingRelation = RoutingRelations.unidirectionalTorus1DDateline(nNodes),
-    ingresses = ingressNodes.map(i => UserIngressParams(i, (0 until egressNodes.size).toSet, 0)),
+    ingresses = ingressNodes.map(i => UserIngressParams(i, (0 until egressNodes.size).toSet)),
     egresses = egressNodes.map(i => UserEgressParams(i))
   )
 })
@@ -145,7 +148,7 @@ class BidirectionalTorus1DConfig(
     } else {
       RoutingRelations.bidirectionalTorus1DShortest(nNodes)
     },
-    ingresses = ingressNodes.map(i => UserIngressParams(i, (0 until egressNodes.size).toSet, 0)),
+    ingresses = ingressNodes.map(i => UserIngressParams(i, (0 until egressNodes.size).toSet)),
     egresses = egressNodes.map(i => UserEgressParams(i))
   )
 })
@@ -216,6 +219,7 @@ class TestConfig00 extends Config(
   new WithUniformVirtualChannels(3, UserVirtualChannelParams(3)) ++
   new UnidirectionalLineConfig(2, Seq(0), Seq(1)))
 class TestConfig01 extends Config(
+  new WithUniformChannelDepth(1) ++
   new WithUniformVirtualChannels(3, UserVirtualChannelParams(3)) ++
   new UnidirectionalLineConfig(2, Seq(0), Seq(1, 1)))
 class TestConfig02 extends Config(

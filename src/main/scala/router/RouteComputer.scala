@@ -27,7 +27,13 @@ class RouteComputerResp(val cParam: BaseChannelParams,
 
 
 
-class RouteComputer(val rP: RouterParams)(implicit val p: Parameters) extends Module with HasRouterParams {
+class RouteComputer(
+  val routerParams: RouterParams,
+  val inParams: Seq[ChannelParams],
+  val outParams: Seq[ChannelParams],
+  val ingressParams: Seq[IngressChannelParams],
+  val egressParams: Seq[EgressChannelParams]
+)(implicit val p: Parameters) extends Module with HasRouterParams {
   val io = IO(new Bundle {
     val req = MixedVec(allInParams.map { u => Flipped(Decoupled(new RouteComputerReq(u))) })
     val resp = MixedVec(allInParams.map { u => Valid(new RouteComputerResp(u, outParams, egressParams)) })
@@ -47,7 +53,7 @@ class RouteComputer(val rP: RouterParams)(implicit val p: Parameters) extends Mo
             val table = allInParams(i).possiblePackets.toSeq.map { pI => pI.asPacketInfoForRouting }
               .distinct.map { pI =>
                 allInParams(i).channelInfosForRouting.map { cI =>
-                  val v = rP.nodeRoutingRelation(
+                  val v = routerParams.nodeRoutingRelation(
                     cI,
                     outParams(o).virtualChannelParams(outVId).asChannelInfoForRouting,
                     pI

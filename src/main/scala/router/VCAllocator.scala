@@ -66,7 +66,13 @@ class Allocator(d0: Int, d1: Int,
     (0 until d0).map { y => io.in(y)(x).fire() }) <= 1.U }.reduce(_&&_))
 }
 
-class VCAllocator(val rP: RouterParams)(implicit val p: Parameters) extends Module
+class VCAllocator(
+  val routerParams: RouterParams,
+  val inParams: Seq[ChannelParams],
+  val outParams: Seq[ChannelParams],
+  val ingressParams: Seq[IngressChannelParams],
+  val egressParams: Seq[EgressChannelParams]
+)(implicit val p: Parameters) extends Module
     with HasRouterParams {
   val io = IO(new Bundle {
     val req = MixedVec(allInParams.map { u =>
