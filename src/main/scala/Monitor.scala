@@ -3,17 +3,29 @@ package constellation
 import chisel3._
 import chisel3.util._
 import freechips.rocketchip.diplomacy._
+import freechips.rocketchip.config.{Parameters}
+import freechips.rocketchip.util._
 
-class NoCMonitor(edge: ChannelEdgeParams) extends Module {
+class NoCMonitor(val cParam: ChannelParams)(implicit val p: Parameters) extends Module with HasChannelParams {
   val io = IO(new Bundle {
-    val in = Input(new Channel(edge.cp)(edge.p))
+    val in = Input(new Channel(cParam))
   })
-  println("instantiating monitor")
-  val in_flight = RegInit(false.B)
+
+  val in_flight = RegInit(0.U(nVirtualChannels.W))
   when (io.in.flit.valid) {
-    when (io.in.flit.bits.head) { in_flight := true.B }
-    when (io.in.flit.bits.tail) { in_flight := false.B }
-    assert (io.in.flit.bits.head ^ in_flight, "Flit head/tail sequencing is messed up")
+    when (io.in.flit.bits.head) {
+      in_flight := in_flight | (1.U << io.in.flit.bits.virt_channel_id)
+      assert (!in_flight(io.in.flit.bits.virt_channel_id), "Flit head/tail sequencing is broken")
+    }
+    when (io.in.flit.bits.tail) {
+      in_flight := in_flight & ~(1.U << io.in.flit.bits.virt_channel_id)
+    }
+  }
+
+  val possiblePackets = cParam.possiblePackets.map(p => Cat(p.egressId.U, p.vNetId.U(vNetBits-1,0)))
+  when (io.in.flit.valid && io.in.flit.bits.head) {
+    assert (Cat(io.in.flit.bits.egress_id, io.in.flit.bits.vnet_id).isOneOf(possiblePackets.toSeq),
+      "Illegal packet found")
   }
 
 }
