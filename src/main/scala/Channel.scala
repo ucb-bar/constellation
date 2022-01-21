@@ -55,6 +55,11 @@ trait BaseChannelParams {
   def payloadBits: Int
 }
 
+trait IOChannelParams extends BaseChannelParams {
+  def nVirtualChannels = 1
+}
+
+
 case class ChannelParams(
   srcId: Int,
   destId: Int,
@@ -73,27 +78,51 @@ case class ChannelParams(
 case class IngressChannelParams(
   ingressId: Int,
   uniqueId: Int,
-  user: UserIngressParams
-) extends BaseChannelParams {
+  destId: Int,
+  possibleEgresses: Set[Int],
+  vNetId: Int,
+  payloadBits: Int
+) extends IOChannelParams {
   def srcId = -1
-  def destId = user.destId
-  def nVirtualChannels = 1
-  def possiblePackets = user.possibleEgresses.map { e => PacketInfo(e, user.vNetId) }
+  def possiblePackets = possibleEgresses.map { e => PacketInfo(e, vNetId) }
   def channelInfosForRouting = Seq(ChannelInfoForRouting(-1, 0, destId))
-  def payloadBits = user.payloadBits
 }
+
+object IngressChannelParams {
+  def apply(ingressId: Int, uniqueId: Int, user: UserIngressParams): IngressChannelParams =
+    IngressChannelParams(
+      ingressId = ingressId,
+      uniqueId = uniqueId,
+      destId = user.destId,
+      possibleEgresses = user.possibleEgresses,
+      vNetId = user.vNetId,
+      payloadBits = user.payloadBits
+    )
+}
+
+
 
 case class EgressChannelParams(
   egressId: Int,
   uniqueId: Int,
   possiblePackets: Set[PacketInfo],
-  user: UserEgressParams
-) extends BaseChannelParams {
-  def srcId = user.srcId
+  srcId: Int,
+  payloadBits: Int
+) extends IOChannelParams {
   def destId = -1
-  def nVirtualChannels = 1
   def channelInfosForRouting = Seq(ChannelInfoForRouting(srcId, 0, -1))
-  def payloadBits = user.payloadBits
+}
+
+object EgressChannelParams {
+  def apply(
+    egressId: Int, uniqueId: Int, possiblePackets: Set[PacketInfo], user: UserEgressParams): EgressChannelParams =
+    EgressChannelParams(
+      egressId = egressId,
+      uniqueId = uniqueId,
+      possiblePackets = possiblePackets,
+      srcId = user.srcId,
+      payloadBits = user.payloadBits
+    )
 }
 
 

@@ -7,8 +7,8 @@ The Constellation NoC Generator
 
 ### Test
 
-`sbt "testOnly constellation.NocTest00"`
+`sbt "testOnly constellation.NoCTest00"`
 
-`sbt "testOnly constellation.NocTest01"`
+`sbt "testOnly constellation.NoCTest01"`
 
 etc.

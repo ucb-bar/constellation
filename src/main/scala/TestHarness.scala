@@ -71,7 +71,7 @@ class InputGen(idx: Int, cParams: IngressChannelParams, inputStallProbability: D
 }
 
 class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[EgressChannelParams])(implicit val p: Parameters) extends Module with HasNoCParams {
-  val allPayloadBits = (inputParams.map(_.user.payloadBits) ++ outputParams.map(_.user.payloadBits)).toSet
+  val allPayloadBits = (inputParams.map(_.payloadBits) ++ outputParams.map(_.payloadBits)).toSet
   require(allPayloadBits.size == 1 && allPayloadBits.head >= 64)
   val payloadBits = allPayloadBits.head
 

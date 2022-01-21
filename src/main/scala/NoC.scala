@@ -76,13 +76,13 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
       user = u,
       egressId = e,
       uniqueId = getUniqueChannelId(),
-      possiblePackets = globalIngressParams.filter(_.user.possibleEgresses.contains(e)).map { i =>
-        PacketInfo(e, i.user.vNetId)
+      possiblePackets = globalIngressParams.filter(_.possibleEgresses.contains(e)).map { i =>
+        PacketInfo(e, i.vNetId)
       }.toSet
     )
   }
 
-  globalIngressParams.foreach(_.user.possibleEgresses.foreach(e => require(e < globalEgressParams.size)))
+  globalIngressParams.foreach(_.possibleEgresses.foreach(e => require(e < globalEgressParams.size)))
 
 
   // Check sanity of routingRelation, all inputs can route to all outputs
@@ -92,9 +92,9 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
 
   def checkConnectivity(vNetId: Int, routingRel: RoutingRelation) = {
     // Loop through accessible ingress/egress pairs
-    globalIngressParams.filter(_.user.vNetId == vNetId).zipWithIndex.map { case (iP,iIdx) =>
+    globalIngressParams.filter(_.vNetId == vNetId).zipWithIndex.map { case (iP,iIdx) =>
       val iId = iP.destId
-      iP.user.possibleEgresses.map { oIdx =>
+      iP.possibleEgresses.map { oIdx =>
         val oP = globalEgressParams(oIdx)
         val oId = oP.srcId
 
@@ -148,7 +148,7 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
       return true
     }
 
-    globalIngressParams.filter(_.user.vNetId == vNetId).zipWithIndex.map { case (iP,iIdx) =>
+    globalIngressParams.filter(_.vNetId == vNetId).zipWithIndex.map { case (iP,iIdx) =>
       if (!checkAcyclicUtil(iP.channelInfosForRouting(0))) {
         return Some(stack)
       }

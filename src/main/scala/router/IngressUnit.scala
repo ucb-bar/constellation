@@ -29,7 +29,7 @@ class IngressUnit(
 
   route_buffer.io.enq.bits := io.in.bits
   io.router_req.bits.src_virt_id := 0.U
-  io.router_req.bits.src_vnet_id := cParam.user.vNetId.U
+  io.router_req.bits.src_vnet_id := cParam.vNetId.U
   io.router_req.bits.dest_id := egressIdToNodeId(io.in.bits.egress_id)
 
   val out_is_in = io.router_req.bits.dest_id === nodeId.U
@@ -102,7 +102,7 @@ class IngressUnit(
   out_bundle.bits.flit.tail := vcalloc_buffer.io.deq.bits.tail
   out_bundle.bits.flit.egress_id := vcalloc_buffer.io.deq.bits.egress_id
   out_bundle.bits.flit.payload := vcalloc_buffer.io.deq.bits.payload
-  out_bundle.bits.flit.vnet_id := cParam.user.vNetId.U
+  out_bundle.bits.flit.vnet_id := cParam.vNetId.U
   out_bundle.bits.flit.virt_channel_id := 0.U
   val out_channel_oh = vcalloc_q.io.deq.bits.vc_sel.map(_.reduce(_||_))
   out_bundle.bits.out_virt_channel := Mux1H(out_channel_oh, vcalloc_q.io.deq.bits.vc_sel.map(v => OHToUInt(v)))
