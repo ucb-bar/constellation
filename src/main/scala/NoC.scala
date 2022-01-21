@@ -5,6 +5,7 @@ import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp}
+import freechips.rocketchip.util.ElaborationArtefacts
 import constellation.router._
 import constellation.routing._
 
@@ -267,5 +268,7 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
     dontTouch(debug_va_stall_ctr)
     dontTouch(debug_sa_stall_ctr)
     dontTouch(debug_any_stall_ctr)
+
+    ElaborationArtefacts.add("noc.graphml", graphML)
   }
 }

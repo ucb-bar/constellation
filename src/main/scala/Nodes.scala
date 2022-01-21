@@ -13,7 +13,11 @@ object ChannelImp extends SimpleNodeImp[ChannelParams, ChannelParams, ChannelEdg
     ChannelEdgeParams(pd, p)
   }
   def bundle(e: ChannelEdgeParams) = new Channel(e.cp)(e.p)
-  def render(e: ChannelEdgeParams) = RenderedEdge(colour = "#ffff00", label = e.cp.payloadBits.toString)
+  def render(e: ChannelEdgeParams) = if (e.cp.possiblePackets.size == 0) {
+    RenderedEdge(colour = "ffffff", label = "X")
+  } else {
+    RenderedEdge(colour = "#0000ff", label = e.cp.payloadBits.toString)
+  }
 
   override def monitor(bundle: Channel, edge: ChannelEdgeParams): Unit = {
     val monitor = Module(new NoCMonitor(edge.cp)(edge.p))
@@ -38,10 +42,16 @@ object TerminalChannelImp extends SimpleNodeImp[TerminalChannelParams, TerminalC
     TerminalChannelEdgeParams(pd, p)
   }
   def bundle(e: TerminalChannelEdgeParams) = new TerminalChannel(e.cp)(e.p)
-  def render(e: TerminalChannelEdgeParams) = RenderedEdge(colour = e.cp match {
-    case e: IngressChannelParams => "#00ff00"
-    case e: EgressChannelParams => "#ff0000"
-  }, label = e.cp.payloadBits.toString)
+  def render(e: TerminalChannelEdgeParams) = if (e.cp.possiblePackets.size == 0) {
+    RenderedEdge(colour = "ffffff", label = "X")
+  } else {
+    RenderedEdge(colour = e.cp match {
+      case e: IngressChannelParams => "#00ff00"
+      case e: EgressChannelParams => "#ff0000"
+    },
+      label = e.cp.payloadBits.toString
+    )
+  }
 }
 
 case class TerminalChannelSourceNode(val sourceParams: TerminalChannelParams)(implicit valName: ValName) extends SourceNode(TerminalChannelImp)(Seq(sourceParams))
