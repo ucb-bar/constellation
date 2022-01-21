@@ -55,7 +55,7 @@ trait BaseChannelParams {
   def payloadBits: Int
 }
 
-trait IOChannelParams extends BaseChannelParams {
+trait TerminalChannelParams extends BaseChannelParams {
   def nVirtualChannels = 1
 }
 
@@ -82,7 +82,7 @@ case class IngressChannelParams(
   possibleEgresses: Set[Int],
   vNetId: Int,
   payloadBits: Int
-) extends IOChannelParams {
+) extends TerminalChannelParams {
   def srcId = -1
   def possiblePackets = possibleEgresses.map { e => PacketInfo(e, vNetId) }
   def channelInfosForRouting = Seq(ChannelInfoForRouting(-1, 0, destId))
@@ -108,7 +108,7 @@ case class EgressChannelParams(
   possiblePackets: Set[PacketInfo],
   srcId: Int,
   payloadBits: Int
-) extends IOChannelParams {
+) extends TerminalChannelParams {
   def destId = -1
   def channelInfosForRouting = Seq(ChannelInfoForRouting(srcId, 0, -1))
 }
@@ -134,9 +134,8 @@ trait HasChannelParams extends HasNoCParams {
   val nVirtualChannels = cParam.nVirtualChannels
   val virtualChannelBits = log2Up(nVirtualChannels)
   def virtualChannelParams = cParam match {
-    case c: ChannelParams        => c.virtualChannelParams
-    case c: IngressChannelParams => require(false); Nil;
-    case c: EgressChannelParams  => require(false); Nil;
+    case c: ChannelParams         => c.virtualChannelParams
+    case c: TerminalChannelParams => require(false); Nil;
   }
   def maxBufferSize = virtualChannelParams.map(_.bufferSize).max
 }
@@ -149,8 +148,7 @@ class Channel(val cParam: ChannelParams)(implicit val p: Parameters) extends Bun
 
 class TerminalChannel(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   require(cParam match {
-    case c: IngressChannelParams => true
-    case c: EgressChannelParams => true
+    case c: TerminalChannelParams => true
     case _ => false
   })
 

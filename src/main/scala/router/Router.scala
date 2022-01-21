@@ -61,12 +61,11 @@ class Router(
 
   val destNodes = inParams.map(u => ChannelDestNode(u))
   val sourceNodes = outParams.map(u => ChannelSourceNode(u))
+  val ingressNodes = ingressParams.map(u => TerminalChannelDestNode(u))
+  val egressNodes = egressParams.map(u => TerminalChannelSourceNode(u))
 
   lazy val module = new LazyModuleImp(this) {
     val io = IO(new Bundle {
-      val ingress = MixedVec(ingressParams.map { u => Flipped(new TerminalChannel(u)) })
-      val egress = MixedVec(egressParams.map { u => new TerminalChannel(u) })
-
       val debug = Output(new Bundle {
         val va_stall = Vec(nAllInputs, UInt())
         val sa_stall = Vec(nAllInputs, UInt())
@@ -75,6 +74,8 @@ class Router(
     dontTouch(io.debug)
     val io_in = destNodes.map(_.in(0)._1)
     val io_out = sourceNodes.map(_.out(0)._1)
+    val io_ingress = ingressNodes.map(_.in(0)._1)
+    val io_egress = egressNodes.map(_.out(0)._1)
 
     require(nAllInputs >= 1)
     require(nAllOutputs >= 1)
@@ -105,11 +106,11 @@ class Router(
 
     (io_in zip input_units).foreach {
     case (i,u) => u.io.in <> i }
-    (io.ingress zip ingress_units).foreach {
+    (io_ingress zip ingress_units).foreach {
       case (i,u) => u.io.in <> i.flit }
     (output_units zip io_out).foreach {
       case (u,o) => o <> u.io.out }
-    (egress_units zip io.egress).foreach {
+    (egress_units zip io_egress).foreach {
       case (u,o) => o.flit <> u.io.out }
 
     (route_computer.io.req zip all_input_units).foreach {

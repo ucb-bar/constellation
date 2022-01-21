@@ -13,7 +13,7 @@ object ChannelImp extends SimpleNodeImp[ChannelParams, ChannelParams, ChannelEdg
     ChannelEdgeParams(pd, p)
   }
   def bundle(e: ChannelEdgeParams) = new Channel(e.cp)(e.p)
-  def render(e: ChannelEdgeParams) = RenderedEdge(colour = "#fb2c00", label = e.cp.payloadBits.toString)
+  def render(e: ChannelEdgeParams) = RenderedEdge(colour = "#ffff00", label = e.cp.payloadBits.toString)
 
   override def monitor(bundle: Channel, edge: ChannelEdgeParams): Unit = {
     val monitor = Module(new NoCMonitor(edge.cp)(edge.p))
@@ -29,3 +29,34 @@ case class ChannelAdapterNode(
   slaveFn:  ChannelParams => ChannelParams = { d => d })(
   implicit valName: ValName) extends AdapterNode(ChannelImp)(masterFn, slaveFn)
 case class ChannelIdentityNode()(implicit valName: ValName) extends IdentityNode(ChannelImp)()
+
+case class TerminalChannelEdgeParams(cp: TerminalChannelParams, p: Parameters)
+
+object TerminalChannelImp extends SimpleNodeImp[TerminalChannelParams, TerminalChannelParams, TerminalChannelEdgeParams, TerminalChannel] {
+  def edge(pd: TerminalChannelParams, pu: TerminalChannelParams, p: Parameters, sourceInfo: SourceInfo) = {
+    require (pd == pu)
+    TerminalChannelEdgeParams(pd, p)
+  }
+  def bundle(e: TerminalChannelEdgeParams) = new TerminalChannel(e.cp)(e.p)
+  def render(e: TerminalChannelEdgeParams) = RenderedEdge(colour = e.cp match {
+    case e: IngressChannelParams => "#00ff00"
+    case e: EgressChannelParams => "#ff0000"
+  }, label = e.cp.payloadBits.toString)
+}
+
+case class TerminalChannelSourceNode(val sourceParams: TerminalChannelParams)(implicit valName: ValName) extends SourceNode(TerminalChannelImp)(Seq(sourceParams))
+case class TerminalChannelDestNode(val destParams: TerminalChannelParams)(implicit valName: ValName) extends SinkNode(TerminalChannelImp)(Seq(destParams))
+case class IngressChannelAdapterNode(
+  masterFn: IngressChannelParams => IngressChannelParams = { s => s },
+  slaveFn:  IngressChannelParams => IngressChannelParams = { d => d })(
+  implicit valName: ValName) extends AdapterNode(TerminalChannelImp)(
+  (m: TerminalChannelParams) => masterFn(m.asInstanceOf[IngressChannelParams]),
+  (s: TerminalChannelParams) => slaveFn (s.asInstanceOf[IngressChannelParams]))
+case class EgressChannelAdapterNode(
+  masterFn: EgressChannelParams => EgressChannelParams = { s => s },
+  slaveFn:  EgressChannelParams => EgressChannelParams = { d => d })(
+  implicit valName: ValName) extends AdapterNode(TerminalChannelImp)(
+  (m: TerminalChannelParams) => masterFn(m.asInstanceOf[EgressChannelParams]),
+  (s: TerminalChannelParams) => slaveFn (s.asInstanceOf[EgressChannelParams]))
+case class TerminalChannelIdentityNode()(implicit valName: ValName) extends IdentityNode(TerminalChannelImp)(
+)

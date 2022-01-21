@@ -225,6 +225,9 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
     egressParams = globalEgressParams.filter(_.srcId == i)
   )) }
 
+  val ingressNodes = globalIngressParams.map { u => TerminalChannelSourceNode(u) }
+  val egressNodes = globalEgressParams.map { u => TerminalChannelDestNode(u) }
+
   Seq.tabulate(nNodes, nNodes) { case (i, j) => if (i != j) {
     val sourceNodes = routers(i).sourceNodes.filter(_.sourceParams.destId == j)
     val destNodes = routers(j).destNodes.filter(_.destParams.srcId == i)
@@ -232,24 +235,28 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
       (sourceNodes zip destNodes).foreach { t => t._2 := p(NoCKey).topology(i, j).get.channel(p)(t._1) }
   }}
 
-  lazy val module = new LazyModuleImp(this) {
-    println("Constellation: Starting NoC RTL generation")
+  routers.zipWithIndex.map { case (dst,dstId) =>
+    dst.ingressNodes.foreach(n =>
+      n := ingressNodes(n.destParams.asInstanceOf[IngressChannelParams].ingressId)
+    )
+    dst.egressNodes.foreach(n =>
+      egressNodes(n.sourceParams.asInstanceOf[EgressChannelParams].egressId) := n
+    )
 
+
+  }
+
+  println("Constellation: Starting NoC RTL generation")
+  lazy val module = new LazyModuleImp(this) {
     val io = IO(new Bundle {
       val ingress = MixedVec(globalIngressParams.map { u => Flipped(new TerminalChannel(u)) })
       val egress = MixedVec(globalEgressParams.map { u => new TerminalChannel(u) })
     })
 
-    val routerModules = routers.map(r => r.module)
+    (io.ingress zip ingressNodes.map(_.out(0)._1)).foreach { case (l,r) => r <> l }
+    (io.egress  zip egressNodes .map(_.in (0)._1)).foreach { case (l,r) => l <> r }
 
-    routers.zipWithIndex.map { case (dst,dstId) =>
-      (dst.ingressParams zip routerModules(dstId).io.ingress) map { case (u,i) =>
-        i <> io.ingress(u.ingressId)
-      }
-      (dst.egressParams zip routerModules(dstId).io.egress) map { case (u,i) =>
-        io.egress(u.egressId) <> i
-      }
-    }
+    val routerModules = routers.map(r => r.module)
 
     val debug_va_stall_ctr = RegInit(0.U(64.W))
     val debug_sa_stall_ctr = RegInit(0.U(64.W))
