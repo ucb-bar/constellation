@@ -80,4 +80,4 @@ class NoCTest43 extends NoCTest(Seq(new TestConfig43))
 
 class NoCTestTL00 extends TLNoCTest(Seq(new TLTestConfig00))
 class NoCTestTL01 extends TLNoCTest(Seq(new TLTestConfig01))
-
+class NoCTestTL02 extends TLNoCTest(Seq(new TLTestConfig02))

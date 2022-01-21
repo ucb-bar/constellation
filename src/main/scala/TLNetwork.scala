@@ -60,8 +60,10 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       val r = inputIdRanges(i)
 
       if (connectAIO(i).exists(x=>x)) {
-        in(i).a :<> io_in(i).a
-        in(i).a.bits.source := io_in(i).a.bits.source | r.start.U
+        val a_q = Module(new Queue(in(i).a.bits.cloneType, 1, pipe=true, flow=true))
+        a_q.io.enq :<> io_in(i).a
+        a_q.io.enq.bits.source := io_in(i).a.bits.source | r.start.U
+        in(i).a <> a_q.io.deq
       } else {
         in(i).a.valid      := false.B
         in(i).a.bits       := DontCare
@@ -80,8 +82,10 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       }
 
       if (connectCIO(i).exists(x=>x)) {
-        in(i).c :<> io_in(i).c
-        in(i).c.bits.source := io_in(i).c.bits.source | r.start.U
+        val c_q = Module(new Queue(in(i).c.bits.cloneType, 1, pipe=true, flow=true))
+        c_q.io.enq :<> io_in(i).c
+        c_q.io.enq.bits.source := io_in(i).c.bits.source | r.start.U
+        in(i).c <> c_q.io.deq
       } else {
         in(i).c.valid := false.B
         in(i).c.bits  := DontCare
@@ -100,7 +104,9 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       }
 
       if (connectEIO(i).exists(x=>x)) {
-        in(i).e :<> io_in(i).e
+        val e_q = Module(new Queue(in(i).e.bits.cloneType, 1, pipe=true, flow=true))
+        e_q.io.enq :<> io_in(i).e
+        in(i).e <> e_q.io.deq
       } else {
         in(i).e.valid := false.B
         in(i).e.bits  := DontCare
@@ -124,7 +130,9 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       }
 
       if (connectBOI(o).exists(x=>x)) {
-        out(o).b :<> io_out(o).b
+        val b_q = Module(new Queue(out(o).b.bits.cloneType, 1, pipe=true, flow=true))
+        b_q.io.enq :<> io_out(o).b
+        out(o).b <> b_q.io.deq
       } else {
         out(o).b.valid := false.B
         out(o).b.bits  := DontCare
@@ -142,8 +150,10 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       }
 
       if (connectDOI(o).exists(x=>x)) {
-        out(o).d :<> io_out(o).d
-        out(o).d.bits.sink := io_out(o).d.bits.sink | r.start.U
+        val d_q = Module(new Queue(out(o).d.bits.cloneType, 1, pipe=true, flow=true))
+        d_q.io.enq :<> io_out(o).d
+        d_q.io.enq.bits.sink := io_out(o).d.bits.sink | r.start.U
+        out(o).d <> d_q.io.deq
       } else {
         out(o).d.valid := false.B
         out(o).d.bits  := DontCare
@@ -255,10 +265,78 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       }
     }
 
-    val debugPrintLatencies = false
+    def getBodyFields(b: Data) = b match {
+      case b: TLBundleA => Seq(b.mask, b.data, b.corrupt)
+      case b: TLBundleB => Seq(b.mask, b.data, b.corrupt)
+      case b: TLBundleC => Seq(        b.data, b.corrupt)
+      case b: TLBundleD => Seq(        b.data, b.corrupt)
+      case b: TLBundleE => Seq()
+      case _ => throw new Exception("wrong type")
+    }
+    def getConstFields(b: Data) = b match {
+      case b: TLBundleA => Seq(b.opcode, b.param, b.size, b.source, b.address, b.user, b.echo                  )
+      case b: TLBundleB => Seq(b.opcode, b.param, b.size, b.source, b.address                                  )
+      case b: TLBundleC => Seq(b.opcode, b.param, b.size, b.source, b.address, b.user, b.echo                  )
+      case b: TLBundleD => Seq(b.opcode, b.param, b.size, b.source,            b.user, b.echo, b.sink, b.denied)
+      case b: TLBundleE => Seq(                                                                b.sink          )
+      case _ => throw new Exception("wrong type")
+    }
+
+    def bodyWidth(b: Data) = getBodyFields(b).map(_.getWidth).sum
+    def constWidth(b: Data) = getConstFields(b).map(_.getWidth).sum
+
+    def split(b: Data) = (
+      Cat(getBodyFields(b) .filter(_.getWidth > 0).map(_.asUInt)),
+      Cat(getConstFields(b).filter(_.getWidth > 0).map(_.asUInt))
+    )
+
+    def combine(b: Data, const: UInt, body: UInt) {
+      def assign(i: UInt, sigs: Seq[Data]) = {
+        var t = i
+        for (s <- sigs.reverse) {
+          s := t.asTypeOf(s.cloneType)
+          t = t >> s.getWidth
+        }
+      }
+      assign(const, getConstFields(b))
+      assign(body, getBodyFields(b))
+    }
+
     val wb = new TLBundle(wide_bundle)
-    val payloadWidth = Seq(wb.a, wb.b, wb.c, wb.d, wb.e).map(_.bits.getWidth).max
+    val payloadWidth = Seq(wb.a, wb.b, wb.c, wb.d, wb.e)
+      .map(_.bits)
+      .map(b => bodyWidth(b) max constWidth(b))
+      .max
+    val debugPrintLatencies = false
     val actualPayloadWidth = payloadWidth + (if (debugPrintLatencies) 64 else 0)
+
+    def splitToFlit(i: DecoupledIO[Data], o: DecoupledIO[IOFlit], first: Bool, last: Bool, egress: UInt, debug: UInt) = {
+      val is_body = RegInit(false.B)
+      o.valid := i.valid
+      i.ready := o.ready && is_body
+
+      val (body, const) = split(i.bits)
+
+      o.bits.head := first && !is_body
+      o.bits.tail := last && is_body
+      o.bits.egress_id := egress
+      o.bits.payload := Mux(is_body, body, const) | debug << payloadWidth
+
+      when (o.fire() && o.bits.head) { is_body := true.B }
+      when (o.fire() && o.bits.tail) { is_body := false.B }
+    }
+    def combineFromFlit(i: DecoupledIO[IOFlit], o: DecoupledIO[Data]) = {
+      val is_const = RegInit(true.B)
+      val const = Reg(UInt(constWidth(o.bits).W))
+
+      i.ready := is_const || o.ready
+      o.valid := !is_const && i.valid
+      combine(o.bits, const, i.bits.payload)
+      when (i.fire() && i.bits.head) { is_const := false.B; const := i.bits.payload }
+      when (i.fire() && i.bits.tail) { is_const := true.B }
+    }
+
+
 
     val nIngresses = in.size * 3 + out.size * 2
     val nEgresses = out.size * 3 + in.size * 2
@@ -286,8 +364,9 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
 
     val tsc = RegInit(0.U(32.W))
     tsc := tsc + 1.U
-    def debugPrint(channel: String, payload: UInt, fire: Bool) = {
-      when (fire) {
+    def debugPrint(channel: String, term: TerminalChannel) = {
+      when (term.flit.fire() && term.flit.bits.tail) {
+        val payload = term.flit.bits.payload
         printf(s"TLNoC, $channel, %d, %d, %d\n",
           tsc - payload(payloadWidth+32-1,payloadWidth),
           payload(payloadWidth+48-1,payloadWidth+32),
@@ -303,38 +382,19 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       val inE  = noc.io.ingress (i*3+2)
       println(s"Constellation TLNoC: in  $i @ ${inNodeMapping(i)}: ingress (${i*3} ${i*3+1} ${i*3+2}) egress (${i*2} ${i*2+1})")
 
-      inA.flit.valid := in(i).a.valid
-      in(i).a.ready := inA.flit.ready
-      inA.flit.bits.head := firstAI(i)
-      inA.flit.bits.tail := lastAI(i)
-      inA.flit.bits.egress_id := (in.size*2+0).U +& (requestAIIds(i) * 3.U)
-      inA.flit.bits.payload := in(i).a.bits.asUInt | (Cat(requestAIIds(i), i.U(16.W), tsc) << payloadWidth)
+      splitToFlit     (in(i).a, inA.flit, firstAI(i), lastAI(i), (in.size*2+0).U +& (requestAIIds(i) * 3.U),
+                       Cat(requestAIIds(i), i.U(16.W), tsc))
+      splitToFlit     (in(i).c, inC.flit, firstCI(i), lastCI(i), (in.size*2+1).U +& (requestCIIds(i) * 3.U),
+                       Cat(requestCIIds(i), i.U(16.W), tsc))
+      splitToFlit     (in(i).e, inE.flit, firstEI(i), lastEI(i), (in.size*2+2).U +& (requestEIIds(i) * 3.U),
+                       Cat(requestEIIds(i), i.U(16.W), tsc))
 
-      in(i).b.valid := outB.flit.valid
-      outB.flit.ready := in(i).b.ready
-      in(i).b.bits := outB.flit.bits.payload.asTypeOf(new TLBundleB(wide_bundle))
-
-      inC.flit.valid := in(i).c.valid
-      in(i).c.ready := inC.flit.ready
-      inC.flit.bits.head := firstCI(i)
-      inC.flit.bits.tail := lastCI(i)
-      inC.flit.bits.egress_id := (in.size*2+1).U +& (requestCIIds(i) * 3.U)
-      inC.flit.bits.payload := in(i).c.bits.asUInt | (Cat(requestCIIds(i), i.U(16.W), tsc) << payloadWidth)
-
-      in(i).d.valid := outD.flit.valid
-      outD.flit.ready := in(i).d.ready
-      in(i).d.bits := outD.flit.bits.payload.asTypeOf(new TLBundleD(wide_bundle))
-
-      inE.flit.valid := in(i).e.valid
-      in(i).e.ready := inE.flit.ready
-      inE.flit.bits.head := firstEI(i)
-      inE.flit.bits.tail := lastEI(i)
-      inE.flit.bits.egress_id := (in.size*2+2).U +& (requestEIIds(i) * 3.U)
-      inE.flit.bits.payload := in(i).e.bits.asUInt | (Cat(requestEIIds(i), i.U(16.W), tsc) << payloadWidth)
+      combineFromFlit (outB.flit, in(i).b)
+      combineFromFlit (outD.flit, in(i).d)
 
       if (debugPrintLatencies) {
-        debugPrint("B", outB.flit.bits.payload, in(i).b.fire() && edgesIn(i).last(in(i).b))
-        debugPrint("D", outD.flit.bits.payload, in(i).d.fire() && edgesIn(i).last(in(i).d))
+        debugPrint("B", outB)
+        debugPrint("D", outD)
       }
     }
 
@@ -346,36 +406,19 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
       val outE  = noc.io.egress  (in.size*2+i*3+2)
       println(s"Constellation TLNoC: out $i @ ${outNodeMapping(i)}: ingress (${in.size*3+i*2} ${in.size*3+i*2+1}) egress (${in.size*2+i*3} ${in.size*2+i*3+1} ${in.size*2+i*3+2})")
 
-      out(i).a.valid := outA.flit.valid
-      outA.flit.ready := out(i).a.ready
-      out(i).a.bits := outA.flit.bits.payload.asTypeOf(new TLBundleA(wide_bundle))
+      combineFromFlit (outA.flit, out(i).a)
+      combineFromFlit (outC.flit, out(i).c)
+      combineFromFlit (outE.flit, out(i).e)
 
-      inB.flit.valid := out(i).b.valid
-      out(i).b.ready := inB.flit.ready
-      inB.flit.bits.head := firstBO(i)
-      inB.flit.bits.tail := lastBO(i)
-      inB.flit.bits.egress_id := 0.U +& (requestBOIds(i) * 2.U)
-      inB.flit.bits.payload := out(i).b.bits.asUInt | (Cat(requestBOIds(i), i.U(16.W), tsc << payloadWidth))
-
-      out(i).c.valid := outC.flit.valid
-      outC.flit.ready := out(i).c.ready
-      out(i).c.bits := outC.flit.bits.payload.asTypeOf(new TLBundleC(wide_bundle))
-
-      inD.flit.valid := out(i).d.valid
-      out(i).d.ready := inD.flit.ready
-      inD.flit.bits.head := firstDO(i)
-      inD.flit.bits.tail := lastDO(i)
-      inD.flit.bits.egress_id := 1.U +& (requestDOIds(i) * 2.U)
-      inD.flit.bits.payload := out(i).d.bits.asUInt | (Cat(requestDOIds(i), i.U(16.W), tsc << payloadWidth))
-
-      out(i).e.valid := outE.flit.valid
-      outE.flit.ready := out(i).e.ready
-      out(i).e.bits := outE.flit.bits.payload.asTypeOf(new TLBundleE(wide_bundle))
+      splitToFlit     (out(i).b, inB.flit, firstBO(i), lastBO(i), 0.U +& (requestBOIds(i) * 2.U),
+                       Cat(requestBOIds(i), i.U(16.W), tsc))
+      splitToFlit     (out(i).d, inD.flit, firstDO(i), lastDO(i), 1.U +& (requestDOIds(i) * 2.U),
+                       Cat(requestDOIds(i), i.U(16.W), tsc))
 
       if (debugPrintLatencies) {
-        debugPrint("A", outA.flit.bits.payload, out(i).a.fire() && edgesOut(i).last(out(i).a))
-        debugPrint("C", outC.flit.bits.payload, out(i).c.fire() && edgesOut(i).last(out(i).c))
-        debugPrint("E", outE.flit.bits.payload, out(i).e.fire() && edgesOut(i).last(out(i).e))
+        debugPrint("A", outA)
+        debugPrint("C", outC)
+        debugPrint("E", outE)
       }
     }
   }

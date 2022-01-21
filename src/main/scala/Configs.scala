@@ -379,13 +379,20 @@ class TestConfig43 extends Config(
   new BidirectionalTorus2DConfig(3, 3))
 
 class TLTestConfig00 extends Config(
+  new WithTLNoCTesterParams(TLNoCTesterParams(Seq(0), Seq(1))) ++
+  new WithNNonblockingVirtualNetworks(5) ++
+  new WithUniformVirtualChannels(1, UserVirtualChannelParams(1)) ++
+  new BidirectionalLineConfig(2))
+
+class TLTestConfig01 extends Config(
   new WithTLNoCTesterParams(TLNoCTesterParams(Seq(4, 0, 2, 5, 6, 9, 11), Seq(7, 1, 3, 8, 10))) ++
   new WithNNonblockingVirtualNetworksWithSharing(5, 2) ++
   new WithUniformVirtualChannels(2, UserVirtualChannelParams(3)) ++
   new Mesh2DConfig(4, 3, RoutingRelations.mesh2DEscapeRouter))
 
-class TLTestConfig01 extends Config(
+class TLTestConfig02 extends Config(
   new WithTLNoCTesterParams(TLNoCTesterParams(Seq(4, 0, 2, 5, 6, 9, 11), Seq(7, 1, 3, 8, 10))) ++
   new WithNBlockingVirtualNetworks(5) ++
   new WithUniformVirtualChannels(6, UserVirtualChannelParams(3)) ++
   new Mesh2DConfig(4, 3, RoutingRelations.mesh2DEscapeRouter))
+
