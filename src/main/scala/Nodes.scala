@@ -15,7 +15,10 @@ object ChannelImp extends SimpleNodeImp[ChannelParams, ChannelParams, ChannelEdg
   def bundle(e: ChannelEdgeParams) = new Channel(e.cp)(e.p)
   def render(e: ChannelEdgeParams) = RenderedEdge(colour = "#fb2c00", label = e.cp.payloadBits.toString)
 
-  // TODO: Add monitors? override def monitor
+  override def monitor(bundle: Channel, edge: ChannelEdgeParams): Unit = {
+    val monitor = Module(new NoCMonitor(edge))
+    monitor.io.in := bundle
+  }
   // TODO: Add nodepath stuff? override def mixO, override def mixI
 }
 
