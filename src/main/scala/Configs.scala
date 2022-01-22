@@ -11,13 +11,6 @@ import freechips.rocketchip.config.{Field, Parameters, Config}
 import constellation.topology._
 import constellation.routing._
 
-object TopologyConverter {
-  implicit def apply(topo: PhysicalTopology): ((Int, Int) => Option[UserChannelParams]) = {
-    (src: Int, dst: Int) => if (topo(src, dst)) Some(UserChannelParams()) else None
-  }
-}
-import TopologyConverter._
-
 class WithCombineRCVA extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(routerParams = (i: Int) =>
     up(NoCKey, site).routerParams(i).copy(combineRCVA = true)
@@ -32,29 +25,29 @@ class WithCombineSAST extends Config((site, here, up) => {
 
 
 class WithUniformChannelDepth(depth: Int) extends Config((site, here, up) => {
-  case NoCKey => up(NoCKey, site).copy(topology = (src: Int, dst: Int) => {
-    up(NoCKey, site).topology(src, dst).map(_.copy(channel = (u: Parameters) => {
+  case NoCKey => up(NoCKey, site).copy(channelParamGen = (src: Int, dst: Int) => {
+    up(NoCKey, site).channelParamGen(src, dst).copy(channel = (u: Parameters) => {
       implicit val p: Parameters = u
       ChannelBuffer(depth) := _
-    }))
+    })
   })
 })
 
 class WithUniformVirtualChannelBufferSize(size: Int) extends Config((site, here, up) => {
-  case NoCKey => up(NoCKey, site).copy(topology = (src: Int, dst: Int) =>
-    up(NoCKey, site).topology(src, dst).map(u => u.copy(
-      virtualChannelParams = u.virtualChannelParams.map(_.copy(bufferSize = size))
-    ))
-  )
+  case NoCKey => up(NoCKey, site).copy(channelParamGen = (src: Int, dst: Int) => {
+    val cp = up(NoCKey, site).channelParamGen(src, dst)
+    cp.copy(virtualChannelParams = cp.virtualChannelParams.map(_.copy(bufferSize = size)))
+  })
 })
 
 class WithNNonblockingVirtualNetworks(n: Int) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     routingRelation = RoutingRelations.nonblockingVirtualSubnetworks(
       up(NoCKey, site).routingRelation, n),
-    topology = (src: Int, dst: Int) => up(NoCKey, site).topology(src, dst).map(u => u.copy(
-      virtualChannelParams = u.virtualChannelParams.map(c => Seq.fill(n) { c }).flatten
-    )),
+    channelParamGen = (src: Int, dst: Int) => {
+      val cp = up(NoCKey, site).channelParamGen(src, dst)
+      cp.copy(virtualChannelParams = cp.virtualChannelParams.map(c => Seq.fill(n) { c }).flatten)
+    },
     nVirtualNetworks = n
   )
 })
@@ -71,19 +64,20 @@ class WithNBlockingVirtualNetworks(n: Int) extends Config((site, here, up) => {
 class WithNNonblockingVirtualNetworksWithSharing(n: Int, nSharedChannels: Int = 1) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     routingRelation = RoutingRelations.sharedNonblockingVirtualSubnetworks(up(NoCKey, site).routingRelation, n, nSharedChannels),
-    topology = (src: Int, dst: Int) => up(NoCKey, site).topology(src, dst).map(u => u.copy(
-      virtualChannelParams = Seq.fill(n) { u.virtualChannelParams(0) } ++ u.virtualChannelParams,
-    )),
+    channelParamGen = (src: Int, dst: Int) => {
+      val cp = up(NoCKey, site).channelParamGen(src, dst)
+      cp.copy(virtualChannelParams = Seq.fill(n) { cp.virtualChannelParams(0) } ++ cp.virtualChannelParams)
+    },
     nVirtualNetworks = n
   )
 })
 
 
 class WithUniformVirtualChannels(n: Int, v: UserVirtualChannelParams) extends Config((site, here, up) => {
-  case NoCKey => up(NoCKey, site).copy(topology = (src: Int, dst: Int) =>
-    up(NoCKey, site).topology(src, dst).map(_.copy(
+  case NoCKey => up(NoCKey, site).copy(channelParamGen = (src: Int, dst: Int) =>
+    up(NoCKey, site).channelParamGen(src, dst).copy(
       virtualChannelParams = Seq.fill(n) { v }
-    ))
+    )
   )
 })
 

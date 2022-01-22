@@ -8,15 +8,15 @@ import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp}
 import freechips.rocketchip.util.ElaborationArtefacts
 import constellation.router._
 import constellation.routing._
-
+import constellation.topology._
 
 case class NoCConfig(
   nNodes: Int = 3,
   maxFlits: Int = 8,
   nVirtualNetworks: Int = 1,
 
-  // srcNodeId, destNodeId => virtualChannelParams
-  topology: (Int, Int) => Option[UserChannelParams] = (a: Int, b: Int) => None,
+  topology: PhysicalTopology = Topologies.unidirectionalLine,
+  channelParamGen: (Int, Int) => UserChannelParams = (a: Int, b: Int) => UserChannelParams(),
   ingresses: Seq[UserIngressParams] = Nil,
   egresses: Seq[UserEgressParams] = Nil,
   routingRelation: RoutingRelation = RoutingRelations.allLegal,
@@ -52,17 +52,20 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
   }
 
   val fullChannelParams: Seq[ChannelParams] = Seq.tabulate(nNodes, nNodes) { case (i,j) =>
-    p(NoCKey).topology(i, j).map { cP =>
+    if (p(NoCKey).topology(i, j)) {
+      val cP = p(NoCKey).channelParamGen(i, j)
       val payloadBits = p(NoCKey).routerParams(i).payloadBits
       require(p(NoCKey).routerParams(i).payloadBits == p(NoCKey).routerParams(j).payloadBits)
-      ChannelParams(
+      Some(ChannelParams(
         srcId = i,
         destId = j,
         payloadBits = payloadBits,
         virtualChannelParams = cP.virtualChannelParams.zipWithIndex.map { case (vP, vc) =>
           VirtualChannelParams(i, j, vc, vP.bufferSize, Set[PacketInfo](), getUniqueChannelId())
         }
-      )
+      ))
+    } else {
+      None
     }
   }.flatten.flatten
 
@@ -233,7 +236,7 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
     val sourceNodes = routers(i).sourceNodes.filter(_.sourceParams.destId == j)
     val destNodes = routers(j).destNodes.filter(_.destParams.srcId == i)
     require (sourceNodes.size == destNodes.size)
-      (sourceNodes zip destNodes).foreach { t => t._2 := p(NoCKey).topology(i, j).get.channel(p)(t._1) }
+      (sourceNodes zip destNodes).foreach { t => t._2 := p(NoCKey).channelParamGen(i, j).channel(p)(t._1) }
   }}
 
   routers.zipWithIndex.map { case (dst,dstId) =>
