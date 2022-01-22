@@ -15,7 +15,7 @@ case class NoCConfig(
   maxFlits: Int = 8,
   nVirtualNetworks: Int = 1,
 
-  topology: PhysicalTopology = Topologies.unidirectionalLine,
+  topology: PhysicalTopology = new Topologies.UnidirectionalLine,
   channelParamGen: (Int, Int) => UserChannelParams = (a: Int, b: Int) => UserChannelParams(),
   ingresses: Seq[UserIngressParams] = Nil,
   egresses: Seq[UserEgressParams] = Nil,
@@ -52,7 +52,7 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
   }
 
   val fullChannelParams: Seq[ChannelParams] = Seq.tabulate(nNodes, nNodes) { case (i,j) =>
-    if (p(NoCKey).topology(i, j)) {
+    if (p(NoCKey).topology.topo(i, j)) {
       val cP = p(NoCKey).channelParamGen(i, j)
       val payloadBits = p(NoCKey).routerParams(i).payloadBits
       require(p(NoCKey).routerParams(i).payloadBits == p(NoCKey).routerParams(j).payloadBits)

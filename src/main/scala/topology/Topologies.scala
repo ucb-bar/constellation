@@ -3,28 +3,35 @@ package constellation.topology
 import scala.math.{pow, cos, sin, Pi}
 
 object Topologies {
-  val unidirectionalLine = new PhysicalTopology((src, dest) => dest - src == 1, n => (n, 0))
-  val bidirectionalLine = new PhysicalTopology((src, dest) => (dest - src).abs == 1, n => (n, 0))
+  class UnidirectionalLine extends PhysicalTopology {
+    def topo(src: Int, dest: Int) = dest - src == 1
+    def toXY(n: Int) = (n, 0)
+  }
 
-  def unidirectionalTorus1D(nNodes: Int) = new PhysicalTopology(
-    (src, dest) => dest - src == 1 || (dest == 0 && src == nNodes - 1),
-    nodeId => {
+  class BidirectionalLine extends PhysicalTopology {
+    def topo(src: Int, dest: Int) = (dest - src).abs == 1
+    def toXY(n: Int) = (n, 0)
+  }
+
+  class UnidirectionalTorus1D(nNodes: Int) extends PhysicalTopology {
+    def topo(src: Int, dest: Int) = dest - src == 1 || (dest == 0 && src == nNodes - 1)
+    def toXY(nodeId: Int) = {
       val rad = nodeId.toFloat * 2 * Pi / nNodes
       val r = nNodes.toFloat / (2 * Pi)
       ((cos(rad) * r).toInt, (sin(rad) * r).toInt)
     }
-  )
+  }
 
-  def bidirectionalTorus1D(nNodes: Int) = new PhysicalTopology(
-    (src, dest) => (dest + nNodes - src) % nNodes == 1 || (src + nNodes - dest) % nNodes == 1,
-    nodeId => {
+  class BidirectionalTorus1D(nNodes: Int) extends PhysicalTopology {
+    def topo(src: Int, dest: Int) = (dest + nNodes - src) % nNodes == 1 || (src + nNodes - dest) % nNodes == 1
+    def toXY(nodeId: Int) = {
       val rad = nodeId.toFloat * 2 * Pi / nNodes
       val r = nNodes.toFloat / (2 * Pi)
       ((cos(rad) * r).toInt, (sin(rad) * r).toInt)
     }
-  )
+  }
 
-  def butterfly(kAry: Int, nFly: Int) = {
+  class Butterfly(kAry: Int, nFly: Int) extends PhysicalTopology {
     require(kAry >= 2 && nFly >= 2)
     val height = pow(kAry, nFly-1).toInt
     def digitsToNum(dig: Seq[Int]) = dig.zipWithIndex.map { case (d,i) => d * pow(kAry,i).toInt }.sum
@@ -34,45 +41,46 @@ object Topologies {
     val channels = (1 until nFly).map { i =>
       table.map { e => (digitsToNum(e.drop(1)), digitsToNum(e.updated(i, e(0)).drop(1))) }
     }
-    new PhysicalTopology(
-      (src, dest) => {
-        val (srcX, srcY) = (src / height, src % height)
-        val (destX, destY) = (dest / height, dest % height)
-        if (srcX < nFly - 1 && destX == srcX + 1) {
-          val connected = channels(srcX).contains((srcY, destY))
-          connected
-        } else {
-          false
-        }
-      },
-      nodeId => (nodeId / height, nodeId % height)
-    )
+
+    def topo(src: Int, dest: Int) = {
+      val (srcX, srcY) = (src / height, src % height)
+      val (destX, destY) = (dest / height, dest % height)
+      if (srcX < nFly - 1 && destX == srcX + 1) {
+        val connected = channels(srcX).contains((srcY, destY))
+        connected
+      } else {
+        false
+      }
+    }
+    def toXY(nodeId: Int) = (nodeId / height, nodeId % height)
   }
 
-  def mesh2D(nX: Int, nY: Int) = new PhysicalTopology(
-    (src, dst) => {
+  class Mesh2D(nX: Int, nY: Int) extends PhysicalTopology {
+    def topo(src: Int, dst: Int) = {
       val (srcX, srcY) = (src % nX, src / nX)
       val (dstX, dstY) = (dst % nX, dst / nX)
       (srcX == dstX && (srcY - dstY).abs == 1) || (srcY == dstY && (srcX - dstX).abs == 1)
-    },
-    nodeId => (nodeId % nX, nodeId / nX)
-  )
+    }
+    def toXY(nodeId: Int) = (nodeId % nX, nodeId / nX)
+  }
 
-  def unidirectionalTorus2D(nX: Int, nY: Int) = new PhysicalTopology(
-    (src, dst) => {
+  class UnidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology {
+    def topo(src: Int, dst: Int) = {
       val (srcX, srcY) = (src % nX, src / nX)
       val (dstX, dstY) = (dst % nX, dst / nX)
-      (srcY == dstY && unidirectionalTorus1D(nX)(srcX, dstX)) || (srcX == dstX && unidirectionalTorus1D(nY)(srcY, dstY))
-    },
-    nodeId => (nodeId % nX, nodeId / nX)
-  )
+      ((srcY == dstY && new UnidirectionalTorus1D(nX).topo(srcX, dstX)) ||
+       (srcX == dstX && new UnidirectionalTorus1D(nY).topo(srcY, dstY)))
+    }
+    def toXY(nodeId: Int) = (nodeId % nX, nodeId / nX)
+  }
 
-  def bidirectionalTorus2D(nX: Int, nY: Int) = new PhysicalTopology(
-    (src, dst) => {
+  class BidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology {
+    def topo(src: Int, dst: Int) = {
       val (srcX, srcY) = (src % nX, src / nX)
       val (dstX, dstY) = (dst % nX, dst / nX)
-      (srcY == dstY && bidirectionalTorus1D(nX)(srcX, dstX)) || (srcX == dstX && bidirectionalTorus1D(nY)(srcY, dstY))
-    },
-    nodeId => (nodeId % nX, nodeId / nX)
-  )
+      ((srcY == dstY && new BidirectionalTorus1D(nX).topo(srcX, dstX)) ||
+       (srcX == dstX && new BidirectionalTorus1D(nY).topo(srcY, dstY)))
+    }
+    def toXY(nodeId: Int) = (nodeId % nX, nodeId / nX)
+  }
 }
