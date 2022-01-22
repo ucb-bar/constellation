@@ -12,7 +12,6 @@ import constellation.topology._
 
 case class NoCConfig(
   nNodes: Int = 3,
-  maxFlits: Int = 8,
   nVirtualNetworks: Int = 1,
 
   topology: PhysicalTopology = new UnidirectionalLine,
@@ -24,6 +23,7 @@ case class NoCConfig(
   // (blocker, blockee) => bool
   // If true, then blocker must be able to proceed when blockee is blocked
   vNetBlocking: (Int, Int) => Boolean = (_: Int, _: Int) => true,
+  prefix: Option[String] = None
 )
 case object NoCKey extends Field[NoCConfig](NoCConfig())
 
@@ -32,11 +32,9 @@ trait HasNoCParams {
   private val params = p(NoCKey)
 
   val nNodes = params.nNodes
-  val maxFlits = params.maxFlits
   val nVirtualNetworks = params.nVirtualNetworks
 
   val nodeIdBits = log2Ceil(params.nNodes)
-  val flitIdBits = log2Up(params.maxFlits+1)
   val vNetBits = log2Up(params.nVirtualNetworks)
   val nEgresses = params.egresses.size
   val egressIdBits = log2Up(params.egresses.size)
@@ -272,7 +270,8 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
     dontTouch(debug_sa_stall_ctr)
     dontTouch(debug_any_stall_ctr)
 
-    ElaborationArtefacts.add("noc.graphml", graphML)
+    def prepend(s: String) = (p(NoCKey).prefix ++ Seq(s)).mkString(".")
+    ElaborationArtefacts.add(prepend("noc.graphml"), graphML)
 
     val adjList = routers.map { r =>
       val outs = r.outParams.map(o => s"${o.destId}").mkString(" ")
@@ -281,7 +280,7 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
       (Seq(s"${r.nodeId} $outs $egresses") ++ ingresses).mkString("\n")
     }.mkString("\n")
 
-    ElaborationArtefacts.add("noc.adjlist", adjList)
+    ElaborationArtefacts.add(prepend("noc.adjlist"), adjList)
 
     val xys = routers.map(r => {
       val n = r.nodeId
@@ -298,6 +297,6 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
       (ids zip coords).map { case (i, (x, y)) => s"$i $x $y" }.mkString("\n")
     }).mkString("\n")
     println(xys)
-    ElaborationArtefacts.add("noc.xy", xys)
+    ElaborationArtefacts.add(prepend("noc.xy"), xys)
   }
 }

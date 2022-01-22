@@ -24,7 +24,8 @@ object SelectFirstNUInt
   }
 }
 
-class InputGen(idx: Int, cParams: IngressChannelParams, inputStallProbability: Double)(implicit val p: Parameters) extends Module with HasNoCParams {
+class InputGen(idx: Int, cParams: IngressChannelParams, inputStallProbability: Double, maxFlits: Int)(implicit val p: Parameters) extends Module with HasNoCParams {
+  val flitIdBits = log2Ceil(maxFlits+1)
   val io = IO(new Bundle {
     val out = Decoupled(new IOFlit(cParams))
     val rob_ready = Input(Bool())
@@ -79,6 +80,8 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
   val totalTxs = 50000
   val inputStallProbability = 0.0
   val outputStallProbability = 0.0
+  val maxFlits = 8
+  val flitIdBits = log2Ceil(maxFlits+1)
 
   val io = IO(new Bundle {
     val to_noc = MixedVec(inputParams.map { u => new TerminalChannel(u) })
@@ -130,7 +133,7 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
 
   val tx_fire = Wire(Vec(nInputs, Bool()))
   io.to_noc.zipWithIndex.map { case (i,idx) =>
-    val igen = Module(new InputGen(idx, inputParams(idx), inputStallProbability))
+    val igen = Module(new InputGen(idx, inputParams(idx), inputStallProbability, maxFlits))
     val rob_idx = WireInit(rob_alloc_ids(idx))
     igen.io.rob_idx := rob_idx
     igen.io.rob_ready := (rob_alloc_avail(idx) && rob_alloc_fires(idx) &&
@@ -214,7 +217,7 @@ class TLNoCTester(implicit p: Parameters) extends LazyModule {
   val outNodeMapping = tParams.outNodeMapping
   val nManagers = outNodeMapping.size
   val nClients = inNodeMapping.size
-  val xbar = LazyModule(new TLNoC(inNodeMapping, outNodeMapping))
+  val xbar = LazyModule(new TLNoC(inNodeMapping, outNodeMapping, "test"))
 
   val fuzzers = (0 until nClients) map { n =>
     val fuzz = LazyModule(new TLFuzzer(txns))

@@ -9,7 +9,7 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.subsystem._
 import freechips.rocketchip.util._
 
-class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Parameters) extends TLXbar {
+class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int], nocName: String)(implicit p: Parameters) extends TLXbar {
   override lazy val module = new LazyModuleImp(this) {
     val (io_in, edgesIn) = node.in.unzip
     val (io_out, edgesOut) = node.out.unzip
@@ -359,6 +359,7 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])(implicit p: Param
             srcId = e,
             payloadBits = actualPayloadWidth
           )},
+          prefix = Some(nocName)
         )
     }))).module)
 
@@ -440,7 +441,7 @@ case class ConstellationSystemBusParams(
 
 class ConstellationSystemBus(params: SystemBusParams, inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])
   (implicit p: Parameters) extends SystemBus(params) {
-  val system_bus_noc = LazyModule(new TLNoC(inNodeMapping, outNodeMapping))
+  val system_bus_noc = LazyModule(new TLNoC(inNodeMapping, outNodeMapping, "sbus"))
 
   override val inwardNode: TLInwardNode = system_bus_noc.node
   override val outwardNode: TLOutwardNode = system_bus_noc.node
