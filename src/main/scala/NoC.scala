@@ -15,7 +15,7 @@ case class NoCConfig(
   maxFlits: Int = 8,
   nVirtualNetworks: Int = 1,
 
-  topology: PhysicalTopology = new Topologies.UnidirectionalLine,
+  topology: PhysicalTopology = new UnidirectionalLine,
   channelParamGen: (Int, Int) => UserChannelParams = (a: Int, b: Int) => UserChannelParams(),
   ingresses: Seq[UserIngressParams] = Nil,
   egresses: Seq[UserEgressParams] = Nil,
@@ -273,5 +273,31 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
     dontTouch(debug_any_stall_ctr)
 
     ElaborationArtefacts.add("noc.graphml", graphML)
+
+    val adjList = routers.map { r =>
+      val outs = r.outParams.map(o => s"${o.destId}").mkString(" ")
+      val egresses = r.egressParams.map(e => s"e${e.egressId}").mkString(" ")
+      val ingresses = r.ingressParams.map(i => s"i${i.ingressId} ${r.nodeId}")
+      (Seq(s"${r.nodeId} $outs $egresses") ++ ingresses).mkString("\n")
+    }.mkString("\n")
+
+    ElaborationArtefacts.add("noc.adjlist", adjList)
+
+    val xys = routers.map(r => {
+      val n = r.nodeId
+      val ids = (Seq(r.nodeId.toString)
+        ++ r.egressParams.map(e => s"e${e.egressId}")
+        ++ r.ingressParams.map(i => s"i${i.ingressId}")
+      )
+      val plotter = p(NoCKey).topology.plotter
+      val coords = (Seq(plotter.node(r.nodeId))
+        ++ Seq.tabulate(r.egressParams.size ) { i => plotter. egress(i, r. egressParams.size, r.nodeId) }
+        ++ Seq.tabulate(r.ingressParams.size) { i => plotter.ingress(i, r.ingressParams.size, r.nodeId) }
+      )
+
+      (ids zip coords).map { case (i, (x, y)) => s"$i $x $y" }.mkString("\n")
+    }).mkString("\n")
+    println(xys)
+    ElaborationArtefacts.add("noc.xy", xys)
   }
 }
