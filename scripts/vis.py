@@ -9,12 +9,13 @@ def get_file(ext):
     return sys.argv[1] + ext
 
 adjlist = get_file("noc.adjlist")
-
 xys = get_file("noc.xy")
+edgeprops = get_file("noc.edgeprops")
 
 
 G = nx.read_adjlist(adjlist, create_using=nx.DiGraph())
 xys = {n: (float(x), float(y)) for n, x, y in [l.split(' ') for l in open(xys).read().splitlines()]}
+edgeprops = {(e[0], e[1]): e[2:] for e in [l.split(' ') for l in open(edgeprops).read().splitlines()]}
 
 def toColor(n):
     if "i" in n:
@@ -52,11 +53,16 @@ for e in G.edges:
     offset = -0.2 + 0.4 * (i + 1.0) / (c + 1.0)
     if (flipped):
         offset = offset * -1
-    print(t, i, c, offset)
+
+    props = edgeprops[e]
+    if "unused" in props:
+        color = "#eeeeee"
+    else:
+        color = "#000000"
     ax.annotate("",
                 xy=xys[e[0]], xycoords='data',
                 xytext=xys[e[1]], textcoords='data',
-                arrowprops=dict(arrowstyle="->", color="0",
+                arrowprops=dict(arrowstyle="->", color=color,
                                 shrinkA=5, shrinkB=5,
                                 patchA=None, patchB=None,
                                 connectionstyle="arc3,rad=rrr".replace('rrr',str(offset)),

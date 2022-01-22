@@ -279,7 +279,6 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
       val ingresses = r.ingressParams.map(i => s"i${i.ingressId} ${r.nodeId}")
       (Seq(s"${r.nodeId} $outs $egresses") ++ ingresses).mkString("\n")
     }.mkString("\n")
-
     ElaborationArtefacts.add(prepend("noc.adjlist"), adjList)
 
     val xys = routers.map(r => {
@@ -296,7 +295,23 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
 
       (ids zip coords).map { case (i, (x, y)) => s"$i $x $y" }.mkString("\n")
     }).mkString("\n")
-    println(xys)
     ElaborationArtefacts.add(prepend("noc.xy"), xys)
+
+    val edgeProps = routers.map { r =>
+      val outs = r.outParams.map { o =>
+        (Seq(s"${r.nodeId} ${o.destId}") ++ (if (o.possiblePackets.size == 0) Some("unused") else None))
+          .mkString(" ")
+      }
+      val egresses = r.egressParams.map { e =>
+        (Seq(s"${r.nodeId} e${e.egressId}") ++ (if (e.possiblePackets.size == 0) Some("unused") else None))
+          .mkString(" ")
+      }
+      val ingresses = r.ingressParams.map { i =>
+        (Seq(s"i${i.ingressId} ${r.nodeId}") ++ (if (i.possiblePackets.size == 0) Some("unused") else None))
+          .mkString(" ")
+      }
+      (outs ++ egresses ++ ingresses).mkString("\n")
+    }.mkString("\n")
+    ElaborationArtefacts.add(prepend("noc.edgeprops"), edgeProps)
   }
 }
