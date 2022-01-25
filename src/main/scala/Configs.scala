@@ -93,8 +93,7 @@ class UnidirectionalLineConfig(
   egressNodes: Seq[Int] = Seq(1)
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
-    nNodes = nNodes,
-    topology = new UnidirectionalLine,
+    topology = new UnidirectionalLine(nNodes),
     ingresses = ingressNodes.map(i => UserIngressParams(i, (0 until egressNodes.size).toSet)),
     egresses = egressNodes.map(i => UserEgressParams(i))
   )
@@ -106,8 +105,7 @@ class BidirectionalLineConfig(
   egressNodes: Seq[Int] = Seq(0, 1),
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
-    nNodes = nNodes,
-    topology = new BidirectionalLine,
+    topology = new BidirectionalLine(nNodes),
     routingRelation = RoutingRelations.bidirectionalLine,
     ingresses = ingressNodes.map(i => UserIngressParams(i, (0 until egressNodes.size).toSet)),
     egresses = egressNodes.map(i => UserEgressParams(i))
@@ -120,7 +118,6 @@ class UnidirectionalTorus1DConfig(
   egressNodes: Seq[Int] = Seq(1),
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
-    nNodes = nNodes,
     topology = new UnidirectionalTorus1D(nNodes),
     routingRelation = RoutingRelations.unidirectionalTorus1DDateline(nNodes),
     ingresses = ingressNodes.map(i => UserIngressParams(i, (0 until egressNodes.size).toSet)),
@@ -135,7 +132,6 @@ class BidirectionalTorus1DConfig(
   randomRoute: Boolean = false
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
-    nNodes = nNodes,
     topology = new BidirectionalTorus1D(nNodes),
     routingRelation = if (randomRoute) {
       RoutingRelations.bidirectionalTorus1DRandom(nNodes)
@@ -154,7 +150,6 @@ class ButterflyConfig(
   case NoCKey => {
     val height = pow(kAry,nFly-1).toInt
     up(NoCKey, site).copy(
-      nNodes = height * nFly,
       topology = new Butterfly(kAry, nFly),
       routingRelation = RoutingRelations.butterfly(kAry, nFly),
       ingresses = ((0 until height) ++ (0 until height)).map(
@@ -171,7 +166,6 @@ class Mesh2DConfig(
   routingRelation: (Int, Int) => RoutingRelation = RoutingRelations.mesh2DDimensionOrdered()
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
-    nNodes = nX * nY,
     topology = new Mesh2D(nX, nY),
     routingRelation = routingRelation(nX, nY),
     ingresses = (0 until nX * nY).map(i => UserIngressParams(i, (0 until nX * nY).toSet, 0)),
@@ -184,7 +178,6 @@ class UnidirectionalTorus2DConfig(
   nY: Int = 3,
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
-    nNodes = nX * nY,
     topology = new UnidirectionalTorus2D(nX, nY),
     routingRelation = RoutingRelations.dimensionOrderedUnidirectionalTorus2DDateline(nX, nY),
     ingresses = (0 until nX * nY).map(i => UserIngressParams(i, (0 until nX * nY).toSet, 0)),
@@ -198,7 +191,6 @@ class BidirectionalTorus2DConfig(
   nY: Int = 3,
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
-    nNodes = nX * nY,
     topology = new BidirectionalTorus2D(nX, nY),
     routingRelation = RoutingRelations.dimensionOrderedBidirectionalTorus2DDateline(nX, nY),
     ingresses = (0 until nX * nY).map(i => UserIngressParams(i, (0 until nX * nY).toSet, 0)),

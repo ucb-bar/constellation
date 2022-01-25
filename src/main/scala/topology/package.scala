@@ -11,7 +11,7 @@ package object topology {
     def egress (eId: Double, nE: Double, nodeId: Double): (Double, Double)
   }
 
-  abstract class PhysicalTopology {
+  abstract class PhysicalTopology(val nNodes: Int) {
     def topo(src: Int, dst: Int): Boolean
     val plotter: PhysicalTopologyPlotter
   }

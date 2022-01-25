@@ -2,27 +2,27 @@ package constellation.topology
 
 import scala.math.{pow, cos, sin, Pi}
 
-class UnidirectionalLine extends PhysicalTopology {
+class UnidirectionalLine(n: Int) extends PhysicalTopology(n) {
   def topo(src: Int, dest: Int) = dest - src == 1
   val plotter = new LinePlotter
 }
 
-class BidirectionalLine extends PhysicalTopology {
+class BidirectionalLine(n: Int) extends PhysicalTopology(n) {
   def topo(src: Int, dest: Int) = (dest - src).abs == 1
   val plotter = new LinePlotter
 }
 
-class UnidirectionalTorus1D(nNodes: Int) extends PhysicalTopology {
+class UnidirectionalTorus1D(n: Int) extends PhysicalTopology(n) {
   def topo(src: Int, dest: Int) = dest - src == 1 || (dest == 0 && src == nNodes - 1)
   val plotter = new Torus1DPlotter(nNodes)
 }
 
-class BidirectionalTorus1D(nNodes: Int) extends PhysicalTopology {
+class BidirectionalTorus1D(n: Int) extends PhysicalTopology(n) {
   def topo(src: Int, dest: Int) = (dest + nNodes - src) % nNodes == 1 || (src + nNodes - dest) % nNodes == 1
   val plotter = new Torus1DPlotter(nNodes)
 }
 
-class Butterfly(kAry: Int, nFly: Int) extends PhysicalTopology {
+class Butterfly(kAry: Int, nFly: Int) extends PhysicalTopology(pow(kAry, nFly-1).toInt * nFly) {
   require(kAry >= 2 && nFly >= 2)
   val height = pow(kAry, nFly-1).toInt
   def digitsToNum(dig: Seq[Int]) = dig.zipWithIndex.map { case (d,i) => d * pow(kAry,i).toInt }.sum
@@ -46,7 +46,7 @@ class Butterfly(kAry: Int, nFly: Int) extends PhysicalTopology {
   val plotter = new ButterflyPlotter(kAry, nFly)
 }
 
-class Mesh2D(nX: Int, nY: Int) extends PhysicalTopology {
+class Mesh2D(nX: Int, nY: Int) extends PhysicalTopology(nX * nY) {
   def topo(src: Int, dst: Int) = {
     val (srcX, srcY) = (src % nX, src / nX)
     val (dstX, dstY) = (dst % nX, dst / nX)
@@ -55,7 +55,7 @@ class Mesh2D(nX: Int, nY: Int) extends PhysicalTopology {
   val plotter = new Mesh2DPlotter(nX, nY)
 }
 
-class UnidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology {
+class UnidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology(nX * nY) {
   def topo(src: Int, dst: Int) = {
     val (srcX, srcY) = (src % nX, src / nX)
     val (dstX, dstY) = (dst % nX, dst / nX)
@@ -65,7 +65,7 @@ class UnidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology {
   val plotter = new Mesh2DPlotter(nX, nY)
 }
 
-class BidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology {
+class BidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology(nX * nY) {
   def topo(src: Int, dst: Int) = {
     val (srcX, srcY) = (src % nX, src / nX)
     val (dstX, dstY) = (dst % nX, dst / nX)

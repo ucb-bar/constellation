@@ -8,7 +8,7 @@ class LinePlotter extends PhysicalTopologyPlotter {
   def egress (t: Double, nT: Double, n: Double) = (n - 0.5 + (t + 1) / (nT + 1), -0.5)
 }
 
-class Torus1DPlotter(nNodes: Double) extends PhysicalTopologyPlotter {
+class Torus1DPlotter(nNodes: Int) extends PhysicalTopologyPlotter {
   def node(n: Double) = {
     val rad = n * 2 * Pi / nNodes
     (cos(rad), sin(rad))

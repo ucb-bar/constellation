@@ -11,10 +11,9 @@ import constellation.routing._
 import constellation.topology._
 
 case class NoCConfig(
-  nNodes: Int = 3,
   nVirtualNetworks: Int = 1,
 
-  topology: PhysicalTopology = new UnidirectionalLine,
+  topology: PhysicalTopology = new UnidirectionalLine(1),
   channelParamGen: (Int, Int) => UserChannelParams = (a: Int, b: Int) => UserChannelParams(),
   ingresses: Seq[UserIngressParams] = Nil,
   egresses: Seq[UserEgressParams] = Nil,
@@ -31,10 +30,10 @@ trait HasNoCParams {
   implicit val p: Parameters
   private val params = p(NoCKey)
 
-  val nNodes = params.nNodes
+  val nNodes = params.topology.nNodes
   val nVirtualNetworks = params.nVirtualNetworks
 
-  val nodeIdBits = log2Ceil(params.nNodes)
+  val nodeIdBits = log2Ceil(nNodes)
   val vNetBits = log2Up(params.nVirtualNetworks)
   val nEgresses = params.egresses.size
   val egressIdBits = log2Up(params.egresses.size)
