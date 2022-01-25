@@ -73,13 +73,16 @@ class WithNNonblockingVirtualNetworksWithSharing(n: Int, nSharedChannels: Int = 
 })
 
 
-class WithUniformVirtualChannels(n: Int, v: UserVirtualChannelParams) extends Config((site, here, up) => {
+
+class WithVirtualChannels(v: Seq[UserVirtualChannelParams]) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(channelParamGen = (src: Int, dst: Int) =>
     up(NoCKey, site).channelParamGen(src, dst).copy(
-      virtualChannelParams = Seq.fill(n) { v }
+      virtualChannelParams = v
     )
   )
 })
+class WithUniformVirtualChannels(n: Int, v: UserVirtualChannelParams) extends WithVirtualChannels(Seq.fill(n)(v))
+
 
 class WithIngressVNets(f: Int => Int) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(ingresses = up(NoCKey, site).ingresses.zipWithIndex.map { case (u,i) =>
