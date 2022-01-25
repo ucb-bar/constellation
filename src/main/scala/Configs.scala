@@ -44,10 +44,6 @@ class WithNNonblockingVirtualNetworks(n: Int) extends Config((site, here, up) =>
   case NoCKey => up(NoCKey, site).copy(
     routingRelation = RoutingRelations.nonblockingVirtualSubnetworks(
       up(NoCKey, site).routingRelation, n),
-    channelParamGen = (src: Int, dst: Int) => {
-      val cp = up(NoCKey, site).channelParamGen(src, dst)
-      cp.copy(virtualChannelParams = cp.virtualChannelParams.map(c => Seq.fill(n) { c }).flatten)
-    },
     nVirtualNetworks = n
   )
 })
@@ -64,10 +60,6 @@ class WithNBlockingVirtualNetworks(n: Int) extends Config((site, here, up) => {
 class WithNNonblockingVirtualNetworksWithSharing(n: Int, nSharedChannels: Int = 1) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     routingRelation = RoutingRelations.sharedNonblockingVirtualSubnetworks(up(NoCKey, site).routingRelation, n, nSharedChannels),
-    channelParamGen = (src: Int, dst: Int) => {
-      val cp = up(NoCKey, site).channelParamGen(src, dst)
-      cp.copy(virtualChannelParams = Seq.fill(n) { cp.virtualChannelParams(0) } ++ cp.virtualChannelParams)
-    },
     nVirtualNetworks = n
   )
 })
@@ -370,18 +362,18 @@ class TestConfig43 extends Config(
 class TLTestConfig00 extends Config(
   new WithTLNoCTesterParams(TLNoCTesterParams(Seq(0), Seq(1))) ++
   new WithNNonblockingVirtualNetworks(5) ++
-  new WithUniformVirtualChannels(1, UserVirtualChannelParams(1)) ++
+  new WithUniformVirtualChannels(5, UserVirtualChannelParams(1)) ++
   new BidirectionalLineConfig(2))
 
 class TLTestConfig01 extends Config(
   new WithTLNoCTesterParams(TLNoCTesterParams(Seq(4, 0, 2, 5, 6, 9, 11), Seq(7, 1, 3, 8, 10))) ++
   new WithNNonblockingVirtualNetworksWithSharing(5, 2) ++
-  new WithUniformVirtualChannels(2, UserVirtualChannelParams(3)) ++
+  new WithUniformVirtualChannels(7, UserVirtualChannelParams(3)) ++
   new Mesh2DConfig(4, 3, RoutingRelations.mesh2DEscapeRouter))
 
 class TLTestConfig02 extends Config(
   new WithTLNoCTesterParams(TLNoCTesterParams(Seq(4, 0, 2, 5, 6, 9, 11), Seq(7, 1, 3, 8, 10))) ++
   new WithNBlockingVirtualNetworks(5) ++
-  new WithUniformVirtualChannels(6, UserVirtualChannelParams(3)) ++
+  new WithUniformVirtualChannels(5, UserVirtualChannelParams(3)) ++
   new Mesh2DConfig(4, 3, RoutingRelations.mesh2DEscapeRouter))
 
