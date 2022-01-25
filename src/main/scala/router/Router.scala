@@ -5,6 +5,7 @@ import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp}
+import freechips.rocketchip.util.{PlusArg}
 
 import constellation._
 import constellation.routing._
@@ -143,6 +144,35 @@ class Router(
       case (u,o) => u.io.in <> o }
 
     (io.debug.va_stall zip all_input_units.map(_.io.debug.va_stall)).map { case (l,r) => l := r }
-      (io.debug.sa_stall zip all_input_units.map(_.io.debug.sa_stall)).map { case (l,r) => l := r }
+    (io.debug.sa_stall zip all_input_units.map(_.io.debug.sa_stall)).map { case (l,r) => l := r }
+
+    val debug_tsc = RegInit(0.U(64.W))
+    debug_tsc := debug_tsc + 1.U
+    val debug_sample = RegInit(0.U(64.W))
+    debug_sample := debug_sample + 1.U
+    val sample_rate = PlusArg("noc_util_sample_rate", width=20)
+    when (debug_sample === sample_rate - 1.U) { debug_sample := 0.U }
+
+    def sample(fire: Bool, s: String) = {
+      val util_ctr = RegInit(0.U(64.W))
+      val fired = RegInit(false.B)
+      util_ctr := util_ctr + fire
+      fired := fired || fire
+      when (sample_rate =/= 0.U && debug_sample === sample_rate - 1.U && fired) {
+        printf(s"nocsample %d $s %d\n", debug_tsc, util_ctr);
+        fired := fire
+      }
+    }
+
+    destNodes.map(_.in(0)).foreach { case (in, edge) =>
+      sample(in.flit.fire(), s"${edge.cp.srcId} $nodeId")
+    }
+    ingressNodes.map(_.in(0)).foreach { case (in, edge) =>
+      sample(in.flit.fire(), s"i${edge.cp.asInstanceOf[IngressChannelParams].ingressId} $nodeId")
+    }
+    egressNodes.map(_.out(0)).foreach { case (out, edge) =>
+      sample(out.flit.fire(), s"$nodeId e${edge.cp.asInstanceOf[EgressChannelParams].egressId}")
+    }
+
   }
 }
