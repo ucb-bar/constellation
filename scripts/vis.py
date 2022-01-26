@@ -56,8 +56,8 @@ for e in G.edges:
     edge_offsets[e] = str(offset)
     edge_indices[t] += 1
 
-    
-if (len(sys.argv) > 2):
+animate = len(sys.argv) > 2
+if animate:
     trace = open(sys.argv[2]).read().splitlines()
     trace = list(filter(lambda x: "nocsample" in x, trace))
     trace = {(int(t), e0, e1): int(n) for _, t, e0, e1, n in [l.split() for l in trace]}
@@ -73,10 +73,11 @@ if (len(sys.argv) > 2):
             if (e[0], e[1]) not in timestamps[k]:
                 timestamps[k][e] = timestamps[sorted_tscs[i-1]][e]
 else:
-    sorted_tscs = [0, 9999999]
-                
+    sorted_tscs = [0, 99999]
+
+
 def getPercentage(tsc, prev_tsc, e0, e1):
-    if (len(sys.argv) > 2):
+    if animate:
         packets = timestamps[tsc][(e0, e1)] - timestamps[prev_tsc][(e0, e1)]
         delta = tsc - prev_tsc
         return packets / (tsc - prev_tsc)
@@ -115,7 +116,11 @@ def update(num):
                     )
         edge_indices[t] += 1
     ax.set_title("{} to {}".format(prev_tsc, tsc))
-ani = matplotlib.animation.FuncAnimation(fig, update, frames=int(len(sorted_tscs)/multiplier) - 1, interval=30, repeat=True)
+
+if animate:
+    ani = matplotlib.animation.FuncAnimation(fig, update, frames=int(len(sorted_tscs)/multiplier) - 1, interval=30, repeat=True)
+else:
+    update(0)
 #ani.save('animation.html', writer='imagemagick', fps=30)
 
 plt.show()
