@@ -33,6 +33,13 @@ class BidirectionalTorus1D(n: Int) extends PhysicalTopology(n) {
   val plotter = new Torus1DPlotter(nNodes)
 }
 
+/** A k-ary n-fly butterfly topology. This network has n stages of nodes; each node connects to k
+  * nodes in the next stage. Unlike the other topologies above, this network has k**(n-1) * n nodes,
+  * not n nodes.
+  *
+  * @param kAry number of channels of a node that connect to the previous and/or next stage
+  * @param nFly number of stages in network
+  */
 class Butterfly(kAry: Int, nFly: Int) extends PhysicalTopology(pow(kAry, nFly-1).toInt * nFly) {
   require(kAry >= 2 && nFly >= 2)
   val height = pow(kAry, nFly-1).toInt
@@ -57,6 +64,13 @@ class Butterfly(kAry: Int, nFly: Int) extends PhysicalTopology(pow(kAry, nFly-1)
   val plotter = new ButterflyPlotter(kAry, nFly)
 }
 
+/** A quadrilateral mesh network with nX * nY nodes. Channels exist between nodes that are a
+ *  Manhattan distance of 1 away from each other. Node i can be thought of as being located
+ *  at euclidean coordinate (i % nX, i / nX) where nX is as described below.
+ *
+ *  @param nX maximum x-coordinate of a node
+ *  @param nY maximum y-coordinate of a node
+ */
 class Mesh2D(nX: Int, nY: Int) extends PhysicalTopology(nX * nY) {
   def topo(src: Int, dst: Int) = {
     val (srcX, srcY) = (src % nX, src / nX)
@@ -66,6 +80,12 @@ class Mesh2D(nX: Int, nY: Int) extends PhysicalTopology(nX * nY) {
   val plotter = new Mesh2DPlotter(nX, nY)
 }
 
+/** A 2d unidirectional torus network with nX * nY nodes. Node i can be thought of as being
+ * located at euclidean coordinate (i % nX, i / nX) where nX is as described below.
+ * 
+ *  @param nX maximum x-coordinate of a node
+ *  @param nY maximum y-coordinate of a node
+ */
 class UnidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology(nX * nY) {
   def topo(src: Int, dst: Int) = {
     val (srcX, srcY) = (src % nX, src / nX)
@@ -76,6 +96,12 @@ class UnidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology(nX * nY) 
   val plotter = new Mesh2DPlotter(nX, nY)
 }
 
+/** A 2d bidirectional torus network with nX * nY nodes. Node i can be thought of as being
+ * located at euclidean coordinate (i % nX, i / nX) where nX is as described below.
+ * 
+ *  @param nX maximum x-coordinate of a node
+ *  @param nY maximum y-coordinate of a node
+ */
 class BidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology(nX * nY) {
   def topo(src: Int, dst: Int) = {
     val (srcX, srcY) = (src % nX, src / nX)
