@@ -11,13 +11,20 @@ package object topology {
     def egress (eId: Double, nE: Double, nodeId: Double): (Double, Double)
   }
   
-  /** 
-   * Abstract class for the network topology. See Topologies.scala for concrete network topologies.
+  /** Abstract class for the network topology. See Topologies.scala for concrete network topologies.
    * 
-   * @param nNodes number of nodes in the network.
+   *  @param nNodes number of nodes in the network.
    */
   abstract class PhysicalTopology(val nNodes: Int) {
+    /** Method that describes the particular topology represented by the concrete class. Returns true
+     *  if the two nodes SRC and DST can be connected via a channel in this topology.
+     *
+     *  @param src source point
+     *  @param dst destination point
+     */
     def topo(src: Int, dst: Int): Boolean
+    
+    /** Plotter from TopologyPlotters.scala. Helps construct diagram of a concrete topology. */
     val plotter: PhysicalTopologyPlotter
   }
 }
