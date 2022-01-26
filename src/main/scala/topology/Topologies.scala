@@ -2,21 +2,32 @@ package constellation.topology
 
 import scala.math.{pow, cos, sin, Pi}
 
+/* See topology/package.scala for a description of PhysicalTopology and the topo method. */
+
+/** A 2-node network where an ingress node has a unidrectional channel connecting to an egress node. */
 class UnidirectionalLine(n: Int) extends PhysicalTopology(n) {
   def topo(src: Int, dest: Int) = dest - src == 1
   val plotter = new LinePlotter
 }
 
+/** A 2-node network with a bidirectional channel connecting both nodes. */
 class BidirectionalLine(n: Int) extends PhysicalTopology(n) {
   def topo(src: Int, dest: Int) = (dest - src).abs == 1
   val plotter = new LinePlotter
 }
 
+/** An n-node (nodes are [0, n-1]) unidrectional network shaped like a torus. 
+ *  Node i has a channel to node i+1 with the exception of node-1 which has a channel
+ *  to node 0.
+ */
 class UnidirectionalTorus1D(n: Int) extends PhysicalTopology(n) {
   def topo(src: Int, dest: Int) = dest - src == 1 || (dest == 0 && src == nNodes - 1)
   val plotter = new Torus1DPlotter(nNodes)
 }
 
+/** An n-node (nodes are [0, n-1]) network shaped like a torus. 
+ *  Node i has a channel to nodes (i+1)%n and (i-1)%n with the exception of 
+ */
 class BidirectionalTorus1D(n: Int) extends PhysicalTopology(n) {
   def topo(src: Int, dest: Int) = (dest + nNodes - src) % nNodes == 1 || (src + nNodes - dest) % nNodes == 1
   val plotter = new Torus1DPlotter(nNodes)
