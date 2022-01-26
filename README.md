@@ -1,11 +1,11 @@
 The Constellation NoC Generator
 =======================================================
 
-### Compile
+## Compile
 
 `CONSTELLATION_CI=1 sbt compile`
 
-### Test
+## Test
 
 `CONSTELLATION_CI=1 sbt "testOnly constellation.NoCTest00"`
 
@@ -13,7 +13,7 @@ The Constellation NoC Generator
 
 etc.
 
-### Generating Topology Diagrams
+## Generating Topology Diagrams
 To run the diagram generator, the NoC must be run as part of the [saturnv branch of Chipyard](https://github.com/ucb-bar/chipyard/tree/saturnv):
 ```
 git clone https://github.com/ucb-bar/chipyard.git
