@@ -17,7 +17,7 @@ package object topology {
    */
   abstract class PhysicalTopology(val nNodes: Int) {
     /** Method that describes the particular topology represented by the concrete class. Returns true
-     *  if the two nodes SRC and DST can be connected via a channel in this topology.
+     *  if the two nodes SRC and DST can be connected via a channel in this topology and false if they cannot.
      *
      *  @param src source point
      *  @param dst destination point
