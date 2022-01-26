@@ -10,7 +10,12 @@ package object topology {
     def ingress(iId: Double, nI: Double, nodeId: Double): (Double, Double)
     def egress (eId: Double, nE: Double, nodeId: Double): (Double, Double)
   }
-
+  
+  /** 
+   * Abstract class for the network topology. See Topologies.scala for concrete network topologies.
+   * 
+   * @param nNodes number of nodes in the network.
+   */
   abstract class PhysicalTopology(val nNodes: Int) {
     def topo(src: Int, dst: Int): Boolean
     val plotter: PhysicalTopologyPlotter
