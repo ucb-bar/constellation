@@ -26,6 +26,7 @@ Once Chipyard has been [set up](https://chipyard.readthedocs.io/en/latest/Chipya
 ```
 cd sims/vcs
 make SUB_PROJECT=constellation CONFIG=TestConfig00
+pip3 install networkx # package dependency for visualization script
 python3 ../../generators/constellation/scripts/vis.py generated-src/constellation.TestHarness.TestConfig00/constellation.TestHarness.TestConfig00.noc
 ```
 
