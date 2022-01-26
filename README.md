@@ -3,12 +3,12 @@ The Constellation NoC Generator
 
 ### Compile
 
-`sbt compile`
+`CONSTELLATION_CI=1 sbt compile`
 
 ### Test
 
-`sbt "testOnly constellation.NoCTest00"`
+`CONSTELLATION_CI=1 sbt "testOnly constellation.NoCTest00"`
 
-`sbt "testOnly constellation.NoCTest01"`
+`CONSTELLATION_CI=1 sbt "testOnly constellation.NoCTest01"`
 
 etc.
