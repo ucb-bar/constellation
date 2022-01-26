@@ -2,40 +2,32 @@ package constellation.topology
 
 import scala.math.{pow, cos, sin, Pi}
 
-/* See topology/package.scala for a description of PhysicalTopology and the topo method. */
-
-/** A 2-node network where an ingress node has a unidrectional channel connecting to an egress node. */
+/** A network where sequential nodes are connected unidirectionally */
 class UnidirectionalLine(n: Int) extends PhysicalTopology(n) {
   def topo(src: Int, dest: Int) = dest - src == 1
   val plotter = new LinePlotter
 }
 
-/** A 2-node network with a bidirectional channel connecting both nodes. */
+/** A network where sequential nodes are connected bidirectionally */
 class BidirectionalLine(n: Int) extends PhysicalTopology(n) {
   def topo(src: Int, dest: Int) = (dest - src).abs == 1
   val plotter = new LinePlotter
 }
 
-/** An n-node (nodes are [0, n-1]) unidrectional network shaped like a torus. 
- *  Node i has a channel to node i+1 with the exception of node-1 which has a channel
- *  to node 0.
- */
+/** An n-node network shaped like a torus, with clockwise channels */
 class UnidirectionalTorus1D(n: Int) extends PhysicalTopology(n) {
   def topo(src: Int, dest: Int) = dest - src == 1 || (dest == 0 && src == nNodes - 1)
   val plotter = new Torus1DPlotter(nNodes)
 }
 
-/** An n-node (nodes are [0, n-1]) network shaped like a torus. 
- *  Node i has a channel to nodes (i+1)%n and (i-1)%n with the exception of 
- */
+/** An n-node network shaped like a torus, with bidirectional channels */
 class BidirectionalTorus1D(n: Int) extends PhysicalTopology(n) {
   def topo(src: Int, dest: Int) = (dest + nNodes - src) % nNodes == 1 || (src + nNodes - dest) % nNodes == 1
   val plotter = new Torus1DPlotter(nNodes)
 }
 
 /** A k-ary n-fly butterfly topology. This network has n stages of nodes; each node connects to k
-  * nodes in the next stage. Unlike the other topologies above, this network has k**(n-1) * n nodes,
-  * not n nodes.
+  * nodes in the next stage.
   *
   * @param kAry number of channels of a node that connect to the previous and/or next stage
   * @param nFly number of stages in network
@@ -64,7 +56,7 @@ class Butterfly(kAry: Int, nFly: Int) extends PhysicalTopology(pow(kAry, nFly-1)
   val plotter = new ButterflyPlotter(kAry, nFly)
 }
 
-/** A quadrilateral mesh network with nX * nY nodes. Channels exist between nodes that are a
+/** A 2D mesh network with nX * nY nodes. Bidirectional channels exist between nodes that are a
  *  Manhattan distance of 1 away from each other. Node i can be thought of as being located
  *  at euclidean coordinate (i % nX, i / nX) where nX is as described below.
  *
@@ -80,9 +72,8 @@ class Mesh2D(nX: Int, nY: Int) extends PhysicalTopology(nX * nY) {
   val plotter = new Mesh2DPlotter(nX, nY)
 }
 
-/** A 2d unidirectional torus network with nX * nY nodes. Node i can be thought of as being
- * located at euclidean coordinate (i % nX, i / nX) where nX is as described below.
- * 
+/** A 2D unidirectional torus network with nX * nY nodes.
+ *
  *  @param nX maximum x-coordinate of a node
  *  @param nY maximum y-coordinate of a node
  */
@@ -96,9 +87,8 @@ class UnidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology(nX * nY) 
   val plotter = new Mesh2DPlotter(nX, nY)
 }
 
-/** A 2d bidirectional torus network with nX * nY nodes. Node i can be thought of as being
- * located at euclidean coordinate (i % nX, i / nX) where nX is as described below.
- * 
+/** A 2D bidirectional torus network with nX * nY nodes. 
+ *
  *  @param nX maximum x-coordinate of a node
  *  @param nY maximum y-coordinate of a node
  */
