@@ -72,14 +72,16 @@ if (len(sys.argv) > 2):
         for e in G.edges:
             if (e[0], e[1]) not in timestamps[k]:
                 timestamps[k][e] = timestamps[sorted_tscs[i-1]][e]
-
+else:
+    sorted_tscs = [0, 9999999]
+                
 def getPercentage(tsc, prev_tsc, e0, e1):
     if (len(sys.argv) > 2):
         packets = timestamps[tsc][(e0, e1)] - timestamps[prev_tsc][(e0, e1)]
         delta = tsc - prev_tsc
         return packets / (tsc - prev_tsc)
     else:
-        return 1.0
+        return 0.0
 
 
 ax = plt.gca()
