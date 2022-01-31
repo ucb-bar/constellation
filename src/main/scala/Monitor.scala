@@ -22,7 +22,7 @@ class NoCMonitor(val cParam: ChannelParams)(implicit val p: Parameters) extends 
     }
   }
 
-  val possiblePackets = cParam.possiblePackets.map(p => Cat(p.egressId.U, p.vNetId.U(vNetBits-1,0)))
+  val possiblePackets = cParam.possiblePackets.map(p => Cat(p.egressId.U, p.vNet.U(vNetBits-1,0)))
   when (io.in.flit.valid && io.in.flit.bits.head) {
     assert (Cat(io.in.flit.bits.egress_id, io.in.flit.bits.vnet_id).isOneOf(possiblePackets.toSeq),
       "Illegal packet found")

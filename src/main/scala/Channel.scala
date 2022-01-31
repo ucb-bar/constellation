@@ -5,7 +5,7 @@ import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.diplomacy.{OutwardNodeHandle}
-import constellation.routing.ChannelInfoForRouting
+import constellation.routing.{ChannelRoutingInfo, PacketRoutingInfo}
 
 
 // User-facing params, for adjusting config options
@@ -39,19 +39,19 @@ case class VirtualChannelParams(
   dst: Int,
   vc: Int,
   bufferSize: Int,
-  possiblePackets: Set[PacketInfo],
+  possiblePackets: Set[PacketRoutingInfo],
   uniqueId: Int,
 ) {
   val traversable = possiblePackets.size > 0
-  def asChannelInfoForRouting: ChannelInfoForRouting = ChannelInfoForRouting(src, vc, dst)
+  def asChannelRoutingInfo(implicit p: Parameters): ChannelRoutingInfo = ChannelRoutingInfo(src, vc, dst)
 }
 
 trait BaseChannelParams {
   def srcId: Int
   def destId: Int
-  def possiblePackets: Set[PacketInfo]
+  def possiblePackets: Set[PacketRoutingInfo]
   def nVirtualChannels: Int
-  def channelInfosForRouting: Seq[ChannelInfoForRouting]
+  def channelRoutingInfos: Seq[ChannelRoutingInfo]
   def payloadBits: Int
 }
 
@@ -65,14 +65,14 @@ case class ChannelParams(
   destId: Int,
   payloadBits: Int,
   virtualChannelParams: Seq[VirtualChannelParams],
-) extends BaseChannelParams {
+)(implicit p: Parameters) extends BaseChannelParams {
   def nVirtualChannels = virtualChannelParams.size
   val maxBufferSize = virtualChannelParams.map(_.bufferSize).max
 
   def possiblePackets = virtualChannelParams.map(_.possiblePackets).reduce(_++_)
   val traversable = virtualChannelParams.map(_.traversable).reduce(_||_)
 
-  def channelInfosForRouting = virtualChannelParams.map(_.asChannelInfoForRouting)
+  def channelRoutingInfos = virtualChannelParams.map(_.asChannelRoutingInfo)
 }
 
 case class IngressChannelParams(
@@ -82,14 +82,17 @@ case class IngressChannelParams(
   possibleEgresses: Set[Int],
   vNetId: Int,
   payloadBits: Int
-) extends TerminalChannelParams {
+)(implicit p: Parameters) extends TerminalChannelParams {
   def srcId = -1
-  def possiblePackets = possibleEgresses.map { e => PacketInfo(e, vNetId) }
-  def channelInfosForRouting = Seq(ChannelInfoForRouting(-1, 0, destId))
+  def possiblePackets = possibleEgresses.map { e => PacketRoutingInfo(e, vNetId) }
+  def channelRoutingInfos = Seq(ChannelRoutingInfo(-1, 0, destId))
 }
 
 object IngressChannelParams {
-  def apply(ingressId: Int, uniqueId: Int, user: UserIngressParams): IngressChannelParams =
+  def apply(
+    ingressId: Int,
+    uniqueId: Int,
+    user: UserIngressParams)(implicit p: Parameters): IngressChannelParams =
     IngressChannelParams(
       ingressId = ingressId,
       uniqueId = uniqueId,
@@ -105,17 +108,20 @@ object IngressChannelParams {
 case class EgressChannelParams(
   egressId: Int,
   uniqueId: Int,
-  possiblePackets: Set[PacketInfo],
+  possiblePackets: Set[PacketRoutingInfo],
   srcId: Int,
   payloadBits: Int
-) extends TerminalChannelParams {
+)(implicit p: Parameters) extends TerminalChannelParams {
   def destId = -1
-  def channelInfosForRouting = Seq(ChannelInfoForRouting(srcId, 0, -1))
+  def channelRoutingInfos = Seq(ChannelRoutingInfo(srcId, 0, -1))
 }
 
 object EgressChannelParams {
   def apply(
-    egressId: Int, uniqueId: Int, possiblePackets: Set[PacketInfo], user: UserEgressParams): EgressChannelParams =
+    egressId: Int,
+    uniqueId: Int,
+    possiblePackets: Set[PacketRoutingInfo],
+    user: UserEgressParams)(implicit p: Parameters): EgressChannelParams =
     EgressChannelParams(
       egressId = egressId,
       uniqueId = uniqueId,

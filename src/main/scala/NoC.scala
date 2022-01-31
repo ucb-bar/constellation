@@ -58,7 +58,7 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
         destId = j,
         payloadBits = payloadBits,
         virtualChannelParams = cP.virtualChannelParams.zipWithIndex.map { case (vP, vc) =>
-          VirtualChannelParams(i, j, vc, vP.bufferSize, Set[PacketInfo](), getUniqueChannelId())
+          VirtualChannelParams(i, j, vc, vP.bufferSize, Set[PacketRoutingInfo](), getUniqueChannelId())
         }
       ))
     } else {
@@ -78,7 +78,7 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
       egressId = e,
       uniqueId = getUniqueChannelId(),
       possiblePackets = globalIngressParams.filter(_.possibleEgresses.contains(e)).map { i =>
-        PacketInfo(e, i.vNetId)
+        PacketRoutingInfo(e, i.vNetId)
       }.toSet
     )
   }
@@ -89,7 +89,7 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
   // Check sanity of routingRelation, all inputs can route to all outputs
 
   // Tracks the set of every possible packet that might occupy each virtual channel
-  val possiblePacketMap = scala.collection.mutable.Map[ChannelInfoForRouting, Set[PacketInfo]]().withDefaultValue(Set())
+  val possiblePacketMap = scala.collection.mutable.Map[ChannelRoutingInfo, Set[PacketRoutingInfo]]().withDefaultValue(Set())
 
   def checkConnectivity(vNetId: Int, routingRel: RoutingRelation) = {
     // Loop through accessible ingress/egress pairs
@@ -100,20 +100,21 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
         val oId = oP.srcId
 
         // Track the positions a packet performing ingress->egress might occupy
-        var positions: Set[ChannelInfoForRouting] = iP.channelInfosForRouting.toSet
+        var positions: Set[ChannelRoutingInfo] = iP.channelRoutingInfos.toSet
         while (positions.size != 0) {
-          positions.foreach { pos => possiblePacketMap(pos) += (PacketInfo(oIdx, vNetId)) }
+          positions.foreach { pos => possiblePacketMap(pos) += (PacketRoutingInfo(oIdx, vNetId)) }
           // Determine next possible positions based on current possible positions
           // and connectivity function
           positions = positions.filter(_.dst != oId).map { cI =>
             val nexts = fullChannelParams.filter(_.srcId == cI.dst).map { nxtC =>
               (0 until nxtC.nVirtualChannels).map { nxtV =>
-                val can_transition = routingRel(cI.dst)(
+                val can_transition = routingRel(
+                  cI.dst,
                   cI,
-                  nxtC.virtualChannelParams(nxtV).asChannelInfoForRouting,
-                  PacketInfoForRouting(oId, vNetId)
+                  nxtC.virtualChannelParams(nxtV).asChannelRoutingInfo,
+                  PacketRoutingInfo(oIdx, vNetId)
                 )
-                if (can_transition) Some(nxtC.virtualChannelParams(nxtV).asChannelInfoForRouting) else None
+                if (can_transition) Some(nxtC.virtualChannelParams(nxtV).asChannelRoutingInfo) else None
               }.flatten
             }.flatten
             require(nexts.size > 0,
@@ -124,17 +125,17 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
       }
     }
   }
-  def checkAcyclic(vNetId: Int, routingRel: RoutingRelation): Option[Seq[ChannelInfoForRouting]] = {
-    var visited = Set[ChannelInfoForRouting]()
-    var stack = Seq[ChannelInfoForRouting]()
+  def checkAcyclic(vNetId: Int, routingRel: RoutingRelation): Option[Seq[ChannelRoutingInfo]] = {
+    var visited = Set[ChannelRoutingInfo]()
+    var stack = Seq[ChannelRoutingInfo]()
 
-    def checkAcyclicUtil(cI: ChannelInfoForRouting): Boolean = {
+    def checkAcyclicUtil(cI: ChannelRoutingInfo): Boolean = {
       visited = visited + cI
       stack = stack ++ Seq(cI)
 
-      val neighbors = fullChannelParams.filter(_.srcId == cI.dst).map(_.channelInfosForRouting).flatten.filter { nI =>
-        possiblePacketMap(cI).filter(_.vNetId == vNetId).map { pI =>
-          routingRel(cI.dst)(cI, nI, pI.asPacketInfoForRouting)
+      val neighbors = fullChannelParams.filter(_.srcId == cI.dst).map(_.channelRoutingInfos).flatten.filter { nI =>
+        possiblePacketMap(cI).filter(_.vNet == vNetId).map { pI =>
+          routingRel(cI.dst, cI, nI, pI)
         }.fold(false)(_||_)
       }
 
@@ -150,7 +151,7 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
     }
 
     globalIngressParams.filter(_.vNetId == vNetId).zipWithIndex.map { case (iP,iIdx) =>
-      if (!checkAcyclicUtil(iP.channelInfosForRouting(0))) {
+      if (!checkAcyclicUtil(iP.channelRoutingInfos(0))) {
         return Some(stack)
       }
     }
@@ -174,7 +175,7 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
     for (b <- blockeeSets) {
       val routingRel = p(NoCKey).routingRelation
       checkConnectivity(vNetId, routingRel && !(new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
-        b.map { v => possiblePacketMap(nxtC).map(_.vNetId == v) }.flatten.fold(false)(_||_)
+        b.map { v => possiblePacketMap(nxtC).map(_.vNet == v) }.flatten.fold(false)(_||_)
       })))
     }
   }
@@ -190,7 +191,7 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
     for (b <- blockeeSets) {
       val routingRel = p(NoCKey).routingRelation
       val acyclicPath = checkAcyclic(vNetId, routingRel
-        && !(new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {b.map { v => possiblePacketMap(nxtC).map(_.vNetId == v) }.flatten.fold(false)(_||_)}))
+        && !(new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {b.map { v => possiblePacketMap(nxtC).map(_.vNet == v) }.flatten.fold(false)(_||_)}))
         && new RoutingRelation((nodeId, srcC, nxtC, pInfo) => routingRel.isEscape(nxtC, vNetId))
       )
       acyclicPath.foreach { path =>
@@ -204,11 +205,11 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
   // Also set possible nodes for each channel
   val channelParams = fullChannelParams.map { cP => cP.copy(
     virtualChannelParams=cP.virtualChannelParams.zipWithIndex.map { case (vP,vId) =>
-      val traversable = possiblePacketMap(vP.asChannelInfoForRouting).size != 0
+      val traversable = possiblePacketMap(vP.asChannelRoutingInfo).size != 0
       if (!traversable) {
         println(s"Constellation WARNING: virtual channel $vId from ${cP.srcId} to ${cP.destId} appears to be untraversable")
       }
-      vP.copy(possiblePackets=possiblePacketMap(vP.asChannelInfoForRouting))
+      vP.copy(possiblePackets=possiblePacketMap(vP.asChannelRoutingInfo))
     }
   )}
   channelParams.map(cP => if (!cP.traversable)
@@ -217,7 +218,6 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
   val routers = Seq.tabulate(nNodes) { i => LazyModule(new Router(
     routerParams = RouterParams(
       nodeId = i,
-      nodeRoutingRelation = p(NoCKey).routingRelation(i),
       user = p(NoCKey).routerParams(i)
     ),
     inParams = channelParams.filter(_.destId == i),
@@ -233,7 +233,7 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
     val sourceNodes = routers(i).sourceNodes.filter(_.sourceParams.destId == j)
     val destNodes = routers(j).destNodes.filter(_.destParams.srcId == i)
     require (sourceNodes.size == destNodes.size)
-      (sourceNodes zip destNodes).foreach { t => t._2 := p(NoCKey).channelParamGen(i, j).channel(p)(t._1) }
+    (sourceNodes zip destNodes).foreach { t => t._2 := p(NoCKey).channelParamGen(i, j).channel(p)(t._1) }
   }}
 
   routers.zipWithIndex.map { case (dst,dstId) =>

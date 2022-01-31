@@ -18,7 +18,6 @@ case class UserRouterParams(
 
 case class RouterParams(
   nodeId: Int,
-  nodeRoutingRelation: NodeRoutingRelation,
   user: UserRouterParams
 )
 
@@ -84,11 +83,11 @@ class Router(
 
     val input_units = inParams.zipWithIndex.map { case (u,i) =>
       Module(new InputUnit(u, outParams, egressParams,
-        routerParams.user.combineRCVA, routerParams.user.combineSAST, routerParams.nodeRoutingRelation))
+        routerParams.user.combineRCVA, routerParams.user.combineSAST))
         .suggestName(s"input_unit_${i}_from_${u.srcId}") }
     val ingress_units = ingressParams.zipWithIndex.map { case (u,i) =>
       Module(new IngressUnit(u, outParams, egressParams,
-        routerParams.user.combineRCVA, routerParams.user.combineSAST, routerParams.nodeRoutingRelation))
+        routerParams.user.combineRCVA, routerParams.user.combineSAST))
         .suggestName(s"ingress_unit_${i+nInputs}_from_${u.ingressId}") }
     val all_input_units = input_units ++ ingress_units
 

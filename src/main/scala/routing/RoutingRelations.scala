@@ -4,25 +4,18 @@ import scala.math.pow
 
 object RoutingRelations {
 
-  // Utility functions
-  val srcIsIngress = new RoutingRelation((nodeID, srcC, nxtC, pInfo) => srcC.src == -1)
-  val nxtIsVC0     = new RoutingRelation((nodeID, srcC, nxtC, pInfo) => nxtC.vc == 0)
-  val srcIsVC0     = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => srcC.vc == 0)
-  val nxtVLTSrcV   = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => nxtC.vc < srcC.vc)
-  val nxtVLESrcV   = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => nxtC.vc <= srcC.vc)
-
   def escapeChannels(escapeRouter: RoutingRelation, normalRouter: RoutingRelation, nEscapeChannels: Int = 1) = {
     new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
       if (srcC.src == -1) {
         if (nxtC.vc >= nEscapeChannels) {
-          normalRouter(nodeId)(srcC, nxtC.copy(vc=nxtC.vc-nEscapeChannels), pInfo)
+          normalRouter(nodeId, srcC, nxtC.copy(vc=nxtC.vc-nEscapeChannels), pInfo)
         } else {
-          escapeRouter(nodeId)(srcC, nxtC, pInfo)
+          escapeRouter(nodeId, srcC, nxtC, pInfo)
         }
       } else if (nxtC.vc < nEscapeChannels) {
-        escapeRouter(nodeId)(srcC, nxtC, pInfo)
+        escapeRouter(nodeId, srcC, nxtC, pInfo)
       } else if (srcC.vc >= nEscapeChannels && nxtC.vc >= nEscapeChannels) {
-        normalRouter(nodeId)(srcC.copy(vc=srcC.vc-nEscapeChannels), nxtC.copy(vc=nxtC.vc-nEscapeChannels), pInfo)
+        normalRouter(nodeId, srcC.copy(vc=srcC.vc-nEscapeChannels), nxtC.copy(vc=nxtC.vc-nEscapeChannels), pInfo)
       } else {
         false
     }
@@ -42,16 +35,6 @@ object RoutingRelations {
   }) && noRoutingAtEgress
 
   def unidirectionalTorus1DDateline(nNodes: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
-    // (if (srcIsIngress(nodeId)(srcC, nxtC, pInfo)) {
-    //   !nxtIsVC0
-    // } else if (srcIsVC0(nodeId)(srcC, nxtC, pInfo)) {
-    //   nxtIsVC0
-    // } else if (nodeId == nNodes - 1) {
-    //   nxtVLTSrcV
-    // } else {
-    //   nxtVLESrcV && !nxtIsVC0
-    // })(nodeId)(srcC, nxtC, pInfo)
-
     if (srcC.src == -1)  {
       nxtC.vc != 0
     } else if (srcC.vc == 0) {
@@ -97,7 +80,7 @@ object RoutingRelations {
     } else {
       true
     }
-    distSel && bidirectionalTorus1DDateline(nNodes)(nodeId)(srcC, nxtC, pInfo)
+    distSel && bidirectionalTorus1DDateline(nNodes)(nodeId, srcC, nxtC, pInfo)
   }) && noRoutingAtEgress
 
   def bidirectionalTorus1DRandom(nNodes: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
@@ -108,7 +91,7 @@ object RoutingRelations {
     } else {
       (nodeId + nNodes - nxtC.dst) % nNodes == 1
     }
-    sel && bidirectionalTorus1DDateline(nNodes)(nodeId)(srcC, nxtC, pInfo)
+    sel && bidirectionalTorus1DDateline(nNodes)(nodeId, srcC, nxtC, pInfo)
   }) && noRoutingAtEgress
 
   def butterfly(kAry: Int, nFly: Int) = {
@@ -183,7 +166,7 @@ object RoutingRelations {
       new RoutingRelation((nodeId, srcC, nxtC, pInfo) => nxtX == nodeX - 1)
     } else {
       mesh2DMinimal(nX, nY)
-    })(nodeId)(srcC, nxtC, pInfo)
+    })(nodeId, srcC, nxtC, pInfo)
   })
 
   def mesh2DNorthLast(nX: Int, nY: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
@@ -197,7 +180,7 @@ object RoutingRelations {
       new RoutingRelation((nodeId, srcC, nxtC, pInfo) => nxtY == nodeY + 1)
     } else {
       mesh2DMinimal(nX, nY)
-    })(nodeId)(srcC, nxtC, pInfo)
+    })(nodeId, srcC, nxtC, pInfo)
   })
 
 
@@ -217,7 +200,7 @@ object RoutingRelations {
     } else {
       (canRouteThis && nxtC.vc % 2 == srcC.vc % 2 && nxtC.vc <= srcC.vc) || (canRouteNext && nxtC.vc % 2 != srcC.vc % 2 && nxtC.vc <= srcC.vc)
     }
-    (mesh2DMinimal(nX, nY) && sel)(nodeId)(srcC, nxtC, pInfo)
+    (mesh2DMinimal(nX, nY) && sel)(nodeId, srcC, nxtC, pInfo)
   }) && noRoutingAtEgress
 
 
@@ -233,13 +216,15 @@ object RoutingRelations {
     if (srcC.src == -1 || turn) {
       nxtC.vc != 0
     } else if (srcX == nxtX) {
-      unidirectionalTorus1DDateline(nY)(nodeY)(
+      unidirectionalTorus1DDateline(nY)(
+        nodeY,
         srcC.copy(src=srcY, dst=nodeY),
         nxtC.copy(src=nodeY, dst=nxtY),
         pInfo.copy(dst=dstY)
       )
     } else if (srcY == nxtY) {
-      unidirectionalTorus1DDateline(nX)(nodeX)(
+      unidirectionalTorus1DDateline(nX)(
+        nodeX,
         srcC.copy(src=srcX, dst=nodeX),
         nxtC.copy(src=nodeX, dst=nxtX),
         pInfo.copy(dst=dstX)
@@ -258,13 +243,15 @@ object RoutingRelations {
     if (srcC.src == -1) {
       nxtC.vc != 0
     } else if (nodeX == nxtX) {
-      bidirectionalTorus1DDateline(nY)(nodeY)(
+      bidirectionalTorus1DDateline(nY)(
+        nodeY,
         srcC.copy(src=srcY, dst=nodeY),
         nxtC.copy(src=nodeY, dst=nxtY),
         pInfo.copy(dst=dstY)
       )
     } else if (nodeY == nxtY) {
-      bidirectionalTorus1DDateline(nX)(nodeX)(
+      bidirectionalTorus1DDateline(nX)(
+        nodeX,
         srcC.copy(src=srcX, dst=nodeX),
         nxtC.copy(src=nodeX, dst=nxtX),
         pInfo.copy(dst=dstX)
@@ -287,7 +274,7 @@ object RoutingRelations {
     } else {
       nxtX == nodeX
     }
-    (unidirectionalTorus2DDateline(nX, nY) && sel)(nodeId)(srcC, nxtC, pInfo)
+    (unidirectionalTorus2DDateline(nX, nY) && sel)(nodeId, srcC, nxtC, pInfo)
   })
 
   def dimensionOrderedBidirectionalTorus2DDateline(nX: Int, nY: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
@@ -296,18 +283,20 @@ object RoutingRelations {
     val (dstX, dstY)   = (pInfo.dst % nX , pInfo.dst / nX)
     val (srcX, srcY)   = (srcC.src % nX , srcC.src / nX)
 
-    val xdir = bidirectionalTorus1DShortest(nX)(nodeX)(
+    val xdir = bidirectionalTorus1DShortest(nX)(
+      nodeX,
       srcC.copy(src=(if (srcC.src == -1) -1 else srcX), dst=nodeX),
       nxtC.copy(src=nodeX, dst=nxtX),
       pInfo.copy(dst=dstX)
     )
-    val ydir = bidirectionalTorus1DShortest(nY)(nodeY)(
+    val ydir = bidirectionalTorus1DShortest(nY)(
+      nodeY,
       srcC.copy(src=(if (srcC.src == -1) -1 else srcY), dst=nodeY),
       nxtC.copy(src=nodeY, dst=nxtY),
       pInfo.copy(dst=dstY)
     )
 
-    val base = bidirectionalTorus2DDateline(nX, nY)(nodeId)(srcC, nxtC, pInfo)
+    val base = bidirectionalTorus2DDateline(nX, nY)(nodeId, srcC, nxtC, pInfo)
     val sel = if (dstX != nodeX) xdir else ydir
 
     sel && base
@@ -320,7 +309,8 @@ object RoutingRelations {
 
   // Independent virtual subnets with no resource sharing
   def nonblockingVirtualSubnetworks(f: RoutingRelation, n: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
-    (nxtC.vc % n == pInfo.vNet) && f(nodeId)(
+    (nxtC.vc % n == pInfo.vNet) && f(
+      nodeId,
       srcC.copy(vc=srcC.vc / n),
       nxtC.copy(vc=nxtC.vc / n),
       pInfo.copy(vNet=0)
@@ -333,13 +323,14 @@ object RoutingRelations {
   def sharedNonblockingVirtualSubnetworks(f: RoutingRelation, n: Int, nSharedChannels: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
     def trueVIdToVirtualVId(vId: Int) = if (vId < n) 0 else vId - n
     if (nxtC.vc < n) {
-      nxtC.vc == pInfo.vNet && f(nodeId)(
+      nxtC.vc == pInfo.vNet && f(
+        nodeId,
         srcC.copy(vc=trueVIdToVirtualVId(srcC.vc)),
         nxtC.copy(vc=0),
         pInfo.copy(vNet=0)
       )
     } else {
-      f(nodeId)(
+      f(nodeId,
         srcC.copy(vc=trueVIdToVirtualVId(srcC.vc)),
         nxtC.copy(vc=trueVIdToVirtualVId(nxtC.vc)),
         pInfo.copy(vNet=0)
@@ -355,7 +346,7 @@ object RoutingRelations {
     if (lNxtV < 0) {
       false
     } else {
-      f(nodeId)(srcC, nxtC.copy(vc=lNxtV), pInfo.copy(vNet=0))
+      f(nodeId, srcC, nxtC.copy(vc=lNxtV), pInfo.copy(vNet=0))
     }
   }, (c, v) => {
     c.vc >= v && f.isEscape(c.copy(vc=c.vc - v), 0)

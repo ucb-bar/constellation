@@ -7,7 +7,6 @@ import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
 import constellation._
-import constellation.routing.{PacketInfoForRouting, NodeRoutingRelation}
 
 class AbstractInputUnitIO(
   val cParam: BaseChannelParams,
@@ -37,8 +36,7 @@ class AbstractInputUnitIO(
 abstract class AbstractInputUnit(
   val cParam: BaseChannelParams,
   val outParams: Seq[ChannelParams],
-  val egressParams: Seq[EgressChannelParams],
-  routingRelation: NodeRoutingRelation
+  val egressParams: Seq[EgressChannelParams]
 )(implicit val p: Parameters) extends Module with HasRouterOutputParams with HasChannelParams {
   val nodeId = cParam.destId
 
@@ -50,10 +48,11 @@ abstract class AbstractInputUnit(
       outParams.zipWithIndex.map { case (oP, oI) =>
         (0 until oP.nVirtualChannels).map { oV =>
           val allow = virtualChannelParams(srcV).possiblePackets.map { pI =>
-            routingRelation(
-              virtualChannelParams(srcV).asChannelInfoForRouting,
-              oP.virtualChannelParams(oV).asChannelInfoForRouting,
-              pI.asPacketInfoForRouting
+            p(NoCKey).routingRelation(
+              nodeId,
+              virtualChannelParams(srcV).asChannelRoutingInfo,
+              oP.virtualChannelParams(oV).asChannelRoutingInfo,
+              pI
             )
           }.reduce(_||_)
           if (!allow)
@@ -72,10 +71,9 @@ abstract class AbstractInputUnit(
 
 class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   egressParams: Seq[EgressChannelParams],
-  combineRCVA: Boolean, combineSAST: Boolean,
-  routingRel: NodeRoutingRelation
+  combineRCVA: Boolean, combineSAST: Boolean
 )
-  (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, egressParams, routingRel)(p) {
+  (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, egressParams)(p) {
 
   val io = IO(new AbstractInputUnitIO(cParam, outParams, egressParams) {
     val in = Flipped(new Channel(cParam.asInstanceOf[ChannelParams]))

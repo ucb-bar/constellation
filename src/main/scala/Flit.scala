@@ -4,16 +4,6 @@ import chisel3._
 import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
-import constellation.routing.PacketInfoForRouting
-
-case class PacketInfo(
-  egressId: Int,
-  vNetId: Int) {
-  def asPacketInfoForRouting(implicit p: Parameters): PacketInfoForRouting = {
-    val egressSrcIds = p(NoCKey).egresses.map(_.srcId)
-    PacketInfoForRouting(egressSrcIds(egressId), vNetId)
-  }
-}
 
 
 class IOFlit(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
