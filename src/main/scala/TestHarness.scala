@@ -118,6 +118,7 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
   val rob_ingress_id = Reg(Vec(robSz, UInt(log2Ceil(nInputs).W)))
   val rob_n_flits = Reg(Vec(robSz, UInt(flitIdBits.W)))
   val rob_flits_returned = Reg(Vec(robSz, UInt(flitIdBits.W)))
+  val rob_tscs = Reg(Vec(robSz, UInt(64.W)))
   val rob_valids = RegInit(0.U(robSz.W))
   var rob_allocs = 0.U(robSz.W)
   var rob_frees = 0.U(robSz.W)
@@ -141,11 +142,12 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
     igen.io.tsc := tsc
     i.flit <> igen.io.out
     when (igen.io.fire) {
-      rob_payload(rob_idx) := igen.io.out.bits.payload
-      rob_egress_id(rob_idx) := igen.io.out.bits.egress_id
-      rob_ingress_id(rob_idx) := idx.U
-      rob_n_flits(rob_idx) := igen.io.n_flits
-      rob_flits_returned(rob_idx) := 0.U
+      rob_payload        (rob_idx) := igen.io.out.bits.payload
+      rob_egress_id      (rob_idx) := igen.io.out.bits.egress_id
+      rob_ingress_id     (rob_idx) := idx.U
+      rob_n_flits        (rob_idx) := igen.io.n_flits
+      rob_flits_returned (rob_idx) := 0.U
+      rob_tscs           (rob_idx) := tsc
     }
     tx_fire(idx) := igen.io.fire
     rob_allocs = rob_allocs | (igen.io.fire << rob_idx)
@@ -181,6 +183,12 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
   idle := rob_allocs === 0.U && rob_frees === 0.U
   flits := flits + io.from_noc.map(_.flit.fire().asUInt).reduce(_+&_)
   txs := txs + PopCount(tx_fire)
+
+  for (i <- 0 until robSz) {
+    when (rob_valids(i)) {
+      assert(tsc - rob_tscs(i) < (1 << 10).U, s"ROB Entry $i took too long")
+    }
+  }
 }
 
 
