@@ -189,7 +189,7 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
 
   for (i <- 0 until robSz) {
     when (rob_valids(i)) {
-      assert(tsc - rob_tscs(i) < (1 << 10).U, s"ROB Entry $i took too long")
+      assert(tsc - rob_tscs(i) < (16 << 10).U, s"ROB Entry $i took too long")
     }
   }
 }
