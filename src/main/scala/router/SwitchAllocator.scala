@@ -6,7 +6,8 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
-import constellation._
+import constellation.channel.{ChannelParams, IngressChannelParams, EgressChannelParams}
+import constellation.util.{GrantHoldArbiter}
 
 class SwitchAllocReq(val outParams: Seq[ChannelParams], val egressParams: Seq[EgressChannelParams])
   (implicit val p: Parameters) extends Bundle with HasRouterOutputParams {

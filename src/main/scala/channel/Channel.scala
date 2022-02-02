@@ -1,4 +1,4 @@
-package constellation
+package constellation.channel
 
 import chisel3._
 import chisel3.util._
@@ -6,6 +6,7 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.diplomacy.{OutwardNodeHandle}
 import constellation.routing.{ChannelRoutingInfo, PacketRoutingInfo}
+import constellation.{HasNoCParams}
 
 
 // User-facing params, for adjusting config options

@@ -6,7 +6,7 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
-import constellation._
+import constellation.channel._
 
 class IngressUnit(
   cParam: IngressChannelParams,

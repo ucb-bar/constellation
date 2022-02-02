@@ -5,7 +5,7 @@ import constellation.{NoCKey}
 
 class WithNNonblockingVirtualNetworks(n: Int) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
-    routingRelation = RoutingRelations.nonblockingVirtualSubnetworks(
+    routingRelation = RoutingRelation.nonblockingVirtualSubnetworks(
       up(NoCKey, site).routingRelation, n),
     nVirtualNetworks = n
   )
@@ -13,7 +13,7 @@ class WithNNonblockingVirtualNetworks(n: Int) extends Config((site, here, up) =>
 
 class WithNBlockingVirtualNetworks(n: Int) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
-    routingRelation = RoutingRelations.blockingVirtualSubnetworks(
+    routingRelation = RoutingRelation.blockingVirtualSubnetworks(
       up(NoCKey, site).routingRelation, n),
     nVirtualNetworks = n,
     vNetBlocking = (blocker: Int, blockee: Int) => blocker < blockee
@@ -22,7 +22,7 @@ class WithNBlockingVirtualNetworks(n: Int) extends Config((site, here, up) => {
 
 class WithNNonblockingVirtualNetworksWithSharing(n: Int, nSharedChannels: Int = 1) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
-    routingRelation = RoutingRelations.sharedNonblockingVirtualSubnetworks(
+    routingRelation = RoutingRelation.sharedNonblockingVirtualSubnetworks(
       up(NoCKey, site).routingRelation, n, nSharedChannels),
     nVirtualNetworks = n
   )

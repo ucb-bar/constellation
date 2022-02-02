@@ -2,9 +2,10 @@ package constellation.topology
 
 import scala.math.pow
 import freechips.rocketchip.config.{Field, Parameters, Config}
-import constellation.{NoCKey, UserIngressParams, UserEgressParams}
-import constellation.routing.{RoutingRelations, RoutingRelation}
 
+import constellation.{NoCKey}
+import constellation.routing.{RoutingRelation}
+import constellation.channel.{UserIngressParams, UserEgressParams}
 
 class UnidirectionalLineConfig(
   nNodes: Int = 2,
@@ -25,7 +26,7 @@ class BidirectionalLineConfig(
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     topology = new BidirectionalLine(nNodes),
-    routingRelation = RoutingRelations.bidirectionalLine,
+    routingRelation = RoutingRelation.bidirectionalLine,
     ingresses = ingressNodes.map(i => UserIngressParams(i, (0 until egressNodes.size).toSet)),
     egresses = egressNodes.map(i => UserEgressParams(i))
   )
@@ -38,7 +39,7 @@ class UnidirectionalTorus1DConfig(
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     topology = new UnidirectionalTorus1D(nNodes),
-    routingRelation = RoutingRelations.unidirectionalTorus1DDateline(nNodes),
+    routingRelation = RoutingRelation.unidirectionalTorus1DDateline(nNodes),
     ingresses = ingressNodes.map(i => UserIngressParams(i, (0 until egressNodes.size).toSet)),
     egresses = egressNodes.map(i => UserEgressParams(i))
   )
@@ -53,9 +54,9 @@ class BidirectionalTorus1DConfig(
   case NoCKey => up(NoCKey, site).copy(
     topology = new BidirectionalTorus1D(nNodes),
     routingRelation = if (randomRoute) {
-      RoutingRelations.bidirectionalTorus1DRandom(nNodes)
+      RoutingRelation.bidirectionalTorus1DRandom(nNodes)
     } else {
-      RoutingRelations.bidirectionalTorus1DShortest(nNodes)
+      RoutingRelation.bidirectionalTorus1DShortest(nNodes)
     },
     ingresses = ingressNodes.map(i => UserIngressParams(i, (0 until egressNodes.size).toSet)),
     egresses = egressNodes.map(i => UserEgressParams(i))
@@ -70,7 +71,7 @@ class ButterflyConfig(
     val height = pow(kAry,nFly-1).toInt
     up(NoCKey, site).copy(
       topology = new Butterfly(kAry, nFly),
-      routingRelation = RoutingRelations.butterfly(kAry, nFly),
+      routingRelation = RoutingRelation.butterfly(kAry, nFly),
       ingresses = ((0 until height) ++ (0 until height)).map(
         i => UserIngressParams(i, (0 until 2*height).toSet, 0)),
       egresses = ((0 until height) ++ (0 until height)).map(
@@ -82,7 +83,7 @@ class ButterflyConfig(
 class Mesh2DConfig(
   nX: Int = 3,
   nY: Int = 3,
-  routingRelation: (Int, Int) => RoutingRelation = RoutingRelations.mesh2DDimensionOrdered()
+  routingRelation: (Int, Int) => RoutingRelation = RoutingRelation.mesh2DDimensionOrdered()
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     topology = new Mesh2D(nX, nY),
@@ -98,7 +99,7 @@ class UnidirectionalTorus2DConfig(
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     topology = new UnidirectionalTorus2D(nX, nY),
-    routingRelation = RoutingRelations.dimensionOrderedUnidirectionalTorus2DDateline(nX, nY),
+    routingRelation = RoutingRelation.dimensionOrderedUnidirectionalTorus2DDateline(nX, nY),
     ingresses = (0 until nX * nY).map(i => UserIngressParams(i, (0 until nX * nY).toSet, 0)),
     egresses = (0 until nX * nY).map(i => UserEgressParams(i))
   )
@@ -111,7 +112,7 @@ class BidirectionalTorus2DConfig(
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     topology = new BidirectionalTorus2D(nX, nY),
-    routingRelation = RoutingRelations.dimensionOrderedBidirectionalTorus2DDateline(nX, nY),
+    routingRelation = RoutingRelation.dimensionOrderedBidirectionalTorus2DDateline(nX, nY),
     ingresses = (0 until nX * nY).map(i => UserIngressParams(i, (0 until nX * nY).toSet, 0)),
     egresses = (0 until nX * nY).map(i => UserEgressParams(i))
   )

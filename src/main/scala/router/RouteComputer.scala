@@ -7,7 +7,8 @@ import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 import freechips.rocketchip.rocket.DecodeLogic
 
-import constellation._
+import constellation.channel._
+import constellation.{NoCKey}
 
 class RouteComputerReq(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   val src_virt_id = UInt(virtualChannelBits.W)

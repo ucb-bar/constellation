@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
-import constellation._
+import constellation.channel._
 
 class AbstractOutputUnitIO(
   val inParams: Seq[ChannelParams],

@@ -9,6 +9,8 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.subsystem._
 import freechips.rocketchip.util._
 
+import constellation.channel.{IOFlit, UserIngressParams, UserEgressParams, TerminalChannel}
+
 class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int], nocName: String)(implicit p: Parameters) extends TLXbar {
   override lazy val module = new LazyModuleImp(this) {
     val (io_in, edgesIn) = node.in.unzip

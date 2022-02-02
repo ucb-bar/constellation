@@ -7,8 +7,10 @@ import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp}
 import freechips.rocketchip.util.ElaborationArtefacts
 import constellation.router._
-import constellation.routing._
-import constellation.topology._
+import constellation.channel._
+import constellation.routing.{RoutingRelation, PacketRoutingInfo, ChannelRoutingInfo}
+import constellation.topology.{PhysicalTopology, UnidirectionalLine}
+
 
 case class NoCConfig(
   nVirtualNetworks: Int = 1,
@@ -17,7 +19,7 @@ case class NoCConfig(
   channelParamGen: (Int, Int) => UserChannelParams = (a: Int, b: Int) => UserChannelParams(),
   ingresses: Seq[UserIngressParams] = Nil,
   egresses: Seq[UserEgressParams] = Nil,
-  routingRelation: RoutingRelation = RoutingRelations.allLegal,
+  routingRelation: RoutingRelation = RoutingRelation.allLegal,
   routerParams: Int => UserRouterParams = (i: Int) => UserRouterParams(),
   vcAllocator: VCAllocatorParams => Parameters => VCAllocator = (vP) => (p) => new SimpleVCAllocator(vP)(p),
   // (blocker, blockee) => bool

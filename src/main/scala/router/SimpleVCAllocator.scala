@@ -6,7 +6,7 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
-import constellation._
+import constellation.util.{GrantHoldArbiter}
 
 class Allocator(d0: Int, d1: Int,
   revD0: Boolean = false, revD1: Boolean = false,

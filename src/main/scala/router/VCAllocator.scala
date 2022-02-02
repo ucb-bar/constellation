@@ -7,7 +7,7 @@ import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 import freechips.rocketchip.rocket.{DecodeLogic}
 
-import constellation._
+import constellation.channel._
 
 class VCAllocReq(val cParam: BaseChannelParams, val outParams: Seq[ChannelParams], val egressParams: Seq[EgressChannelParams])
   (implicit val p: Parameters) extends Bundle with HasChannelParams with HasRouterOutputParams{

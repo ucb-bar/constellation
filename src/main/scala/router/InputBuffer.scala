@@ -5,7 +5,8 @@ import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 
-import constellation._
+import constellation.channel.{ChannelParams, HasChannelParams, Flit}
+import constellation.util.{WrapInc}
 
 class InputBuffer(val cParam: ChannelParams)(implicit val p: Parameters) extends Module with HasChannelParams {
   val io = IO(new Bundle {

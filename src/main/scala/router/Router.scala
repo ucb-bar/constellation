@@ -7,8 +7,9 @@ import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp}
 import freechips.rocketchip.util.{PlusArg}
 
-import constellation._
-import constellation.routing._
+import constellation.channel._
+import constellation.routing.{RoutingRelation}
+import constellation.{NoCKey, HasNoCParams}
 
 case class UserRouterParams(
   payloadBits: Int = 64,

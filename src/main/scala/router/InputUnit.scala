@@ -6,7 +6,9 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
-import constellation._
+import constellation.channel._
+import constellation.{NoCKey}
+import constellation.util.{GrantHoldArbiter, WrapInc}
 
 class AbstractInputUnitIO(
   val cParam: BaseChannelParams,

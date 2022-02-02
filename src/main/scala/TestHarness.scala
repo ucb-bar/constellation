@@ -9,6 +9,9 @@ import freechips.rocketchip.config.{Field, Parameters, Config}
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.util._
 
+import constellation.channel._
+
+
 object SelectFirstNUInt
 {
   def apply(in: UInt, n: Int): (Vec[UInt], Vec[Bool]) = {
