@@ -10,6 +10,7 @@ import freechips.rocketchip.config.{Field, Parameters, Config}
 
 import constellation.topology._
 import constellation.routing._
+import constellation.router.{IterativeVCAllocator}
 
 class WithCombineRCVA extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(routerParams = (i: Int) =>
@@ -21,6 +22,11 @@ class WithCombineSAST extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(routerParams = (i: Int) =>
     up(NoCKey, site).routerParams(i).copy(combineSAST = true)
   )
+})
+
+
+class WithIterativeVCAllocator extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(vcAllocator = (vP) => (p) => new IterativeVCAllocator(vP)(p))
 })
 
 
@@ -63,8 +69,6 @@ class WithNNonblockingVirtualNetworksWithSharing(n: Int, nSharedChannels: Int = 
     nVirtualNetworks = n
   )
 })
-
-
 
 class WithVirtualChannels(v: Seq[UserVirtualChannelParams]) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(channelParamGen = (src: Int, dst: Int) =>
@@ -313,31 +317,34 @@ class TestConfig33 extends Config(
   new WithCombineRCVA ++
   new WithUniformVirtualChannels(2, UserVirtualChannelParams(2)) ++
   new Mesh2DConfig(3, 3, RoutingRelations.mesh2DEscapeRouter))
-
-
 class TestConfig34 extends Config(
-  new WithUniformVirtualChannels(1, UserVirtualChannelParams(1)) ++
-  new Mesh2DConfig(5, 5))
+  new WithIterativeVCAllocator ++
+  new WithUniformVirtualChannels(2, UserVirtualChannelParams(2)) ++
+  new Mesh2DConfig(3, 3, RoutingRelations.mesh2DEscapeRouter))
+
 class TestConfig35 extends Config(
   new WithUniformVirtualChannels(1, UserVirtualChannelParams(1)) ++
-  new Mesh2DConfig(5, 5, RoutingRelations.mesh2DWestFirst))
+  new Mesh2DConfig(5, 5))
 class TestConfig36 extends Config(
   new WithUniformVirtualChannels(1, UserVirtualChannelParams(1)) ++
-  new Mesh2DConfig(5, 5, RoutingRelations.mesh2DNorthLast))
-
+  new Mesh2DConfig(5, 5, RoutingRelations.mesh2DWestFirst))
 class TestConfig37 extends Config(
-  new constellation.WithIngressVNets((i: Int) => i % 4) ++
-  new constellation.WithNBlockingVirtualNetworks(4) ++
-  new constellation.WithUniformVirtualChannels(4, UserVirtualChannelParams(3)) ++
-  new constellation.Mesh2DConfig(3, 3, RoutingRelations.mesh2DEscapeRouter))
+  new WithUniformVirtualChannels(1, UserVirtualChannelParams(1)) ++
+  new Mesh2DConfig(5, 5, RoutingRelations.mesh2DNorthLast))
 
 class TestConfig38 extends Config(
   new constellation.WithIngressVNets((i: Int) => i % 4) ++
   new constellation.WithNBlockingVirtualNetworks(4) ++
   new constellation.WithUniformVirtualChannels(4, UserVirtualChannelParams(3)) ++
-  new constellation.Mesh2DConfig(3, 3, RoutingRelations.mesh2DAlternatingDimensionOrdered))
+  new constellation.Mesh2DConfig(3, 3, RoutingRelations.mesh2DEscapeRouter))
 
 class TestConfig39 extends Config(
+  new constellation.WithIngressVNets((i: Int) => i % 4) ++
+  new constellation.WithNBlockingVirtualNetworks(4) ++
+  new constellation.WithUniformVirtualChannels(4, UserVirtualChannelParams(3)) ++
+  new constellation.Mesh2DConfig(3, 3, RoutingRelations.mesh2DAlternatingDimensionOrdered))
+
+class TestConfig40 extends Config(
   new constellation.WithIngressVNets((i: Int) => i % 4) ++
   new constellation.WithNNonblockingVirtualNetworks(4) ++
   new constellation.WithUniformVirtualChannels(4, UserVirtualChannelParams(3)) ++
@@ -345,17 +352,17 @@ class TestConfig39 extends Config(
 
 
 // 2D Torus
-class TestConfig40 extends Config(
+class TestConfig41 extends Config(
   new WithUniformVirtualChannels(2, UserVirtualChannelParams(1)) ++
   new UnidirectionalTorus2DConfig(3, 3))
-class TestConfig41 extends Config(
+class TestConfig42 extends Config(
   new WithUniformVirtualChannels(3, UserVirtualChannelParams(3)) ++
   new UnidirectionalTorus2DConfig(3, 3))
-class TestConfig42 extends Config(
+class TestConfig43 extends Config(
   new WithUniformVirtualChannels(4, UserVirtualChannelParams(4)) ++
   new UnidirectionalTorus2DConfig(5, 5))
 
-class TestConfig43 extends Config(
+class TestConfig44 extends Config(
   new WithUniformVirtualChannels(2, UserVirtualChannelParams(1)) ++
   new BidirectionalTorus2DConfig(3, 3))
 

@@ -22,8 +22,8 @@ case class RouterParams(
 )
 
 trait HasRouterOutputParams extends HasNoCParams {
-  val outParams: Seq[ChannelParams]
-  val egressParams: Seq[EgressChannelParams]
+  def outParams: Seq[ChannelParams]
+  def egressParams: Seq[EgressChannelParams]
 
   def allOutParams = outParams ++ egressParams
 
@@ -33,8 +33,8 @@ trait HasRouterOutputParams extends HasNoCParams {
 }
 
 trait HasRouterInputParams extends HasNoCParams {
-  val inParams: Seq[ChannelParams]
-  val ingressParams: Seq[IngressChannelParams]
+  def inParams: Seq[ChannelParams]
+  def ingressParams: Seq[IngressChannelParams]
 
   def allInParams = inParams ++ ingressParams
 
@@ -45,8 +45,8 @@ trait HasRouterInputParams extends HasNoCParams {
 
 trait HasRouterParams extends HasRouterOutputParams with HasRouterInputParams
 {
-  val routerParams: RouterParams
-  val nodeId = routerParams.nodeId
+  def routerParams: RouterParams
+  def nodeId = routerParams.nodeId
 }
 
 class Router(
@@ -101,8 +101,15 @@ class Router(
 
     val switch = Module(new Switch(routerParams, inParams, outParams, ingressParams, egressParams))
     val switch_allocator = Module(new SwitchAllocator(routerParams, inParams, outParams, ingressParams, egressParams))
-    val vc_allocator = Module(new VCAllocator(routerParams, inParams, outParams, ingressParams, egressParams))
+    val vc_allocator = Module(p(NoCKey).vcAllocator(
+      VCAllocatorParams(routerParams, inParams, outParams, ingressParams, egressParams)
+    )(p))
     val route_computer = Module(new RouteComputer(routerParams, inParams, outParams, ingressParams, egressParams))
+
+
+    val fires_count = WireInit(PopCount(vc_allocator.io.req.map(_.fire())))
+    dontTouch(fires_count)
+
 
     (io_in zip input_units).foreach {
     case (i,u) => u.io.in <> i }

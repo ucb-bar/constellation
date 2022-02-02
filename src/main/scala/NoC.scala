@@ -19,6 +19,7 @@ case class NoCConfig(
   egresses: Seq[UserEgressParams] = Nil,
   routingRelation: RoutingRelation = RoutingRelations.allLegal,
   routerParams: Int => UserRouterParams = (i: Int) => UserRouterParams(),
+  vcAllocator: VCAllocatorParams => Parameters => VCAllocator = (vP) => (p) => new SimpleVCAllocator(vP)(p),
   // (blocker, blockee) => bool
   // If true, then blocker must be able to proceed when blockee is blocked
   vNetBlocking: (Int, Int) => Boolean = (_: Int, _: Int) => true,
