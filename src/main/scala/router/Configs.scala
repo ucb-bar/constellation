@@ -15,6 +15,11 @@ class WithCombineSAST extends Config((site, here, up) => {
   )
 })
 
+class WithEarlyRC extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(routerParams = (i: Int) =>
+    up(NoCKey, site).routerParams(i).copy(earlyRC = true)
+  )
+})
 
 
 class WithIterativeVCAllocator extends Config((site, here, up) => {

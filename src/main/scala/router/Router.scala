@@ -14,7 +14,8 @@ import constellation.{NoCKey, HasNoCParams}
 case class UserRouterParams(
   payloadBits: Int = 64,
   combineSAST: Boolean = false,
-  combineRCVA: Boolean = false
+  combineRCVA: Boolean = false,
+  earlyRC: Boolean = false
 )
 
 case class RouterParams(
@@ -84,7 +85,7 @@ class Router(
 
     val input_units = inParams.zipWithIndex.map { case (u,i) =>
       Module(new InputUnit(u, outParams, egressParams,
-        routerParams.user.combineRCVA, routerParams.user.combineSAST))
+        routerParams.user.combineRCVA, routerParams.user.combineSAST, routerParams.user.earlyRC))
         .suggestName(s"input_unit_${i}_from_${u.srcId}") }
     val ingress_units = ingressParams.zipWithIndex.map { case (u,i) =>
       Module(new IngressUnit(u, outParams, egressParams,

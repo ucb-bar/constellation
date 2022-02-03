@@ -71,7 +71,7 @@ abstract class AbstractInputUnit(
 
 class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   egressParams: Seq[EgressChannelParams],
-  combineRCVA: Boolean, combineSAST: Boolean
+  combineRCVA: Boolean, combineSAST: Boolean, earlyRC: Boolean
 )
   (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, egressParams)(p) {
 
@@ -89,6 +89,17 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     val r = new PacketRoutingBundle
     val tail_seen = Bool()
   }
+
+  val route_arbiter = Module(new GrantHoldArbiter(
+    new RouteComputerReq(cParam), nVirtualChannels,
+    (t: RouteComputerReq) => true.B, rr = true))
+  val early_route_arbiter = Module(new Arbiter(
+    new RouteComputerReq(cParam), 2))
+  early_route_arbiter.io.in(0) <> route_arbiter.io.out
+  early_route_arbiter.io.in(1).valid := false.B
+  early_route_arbiter.io.in(1).bits := DontCare
+  io.router_req <> early_route_arbiter.io.out
+
   val states = Reg(Vec(nVirtualChannels, new InputState))
   val buffer = Module(new InputBuffer(cParam))
   buffer.io.in := io.in.flit
@@ -108,8 +119,8 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     val id = io.in.flit.bits.virt_channel_id
     assert(id < nVirtualChannels.U)
     assert(states(id).g === g_i)
-
-    states(id).g := Mux(atDest(io.in.flit.bits.egress_id), g_v, g_r)
+    val at_dest = atDest(io.in.flit.bits.egress_id)
+    states(id).g := Mux(at_dest, g_v, g_r)
     states(id).vc_sel.foreach(_.foreach(_ := false.B))
     for (o <- 0 until nEgress) {
       when (egressParams(o).egressId.U === io.in.flit.bits.egress_id) {
@@ -119,6 +130,15 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     states(id).ptr := buffer.io.head
     states(id).r := io.in.flit.bits.route_info
     states(id).tail_seen := io.in.flit.bits.tail
+    if (earlyRC) {
+      val rreq = early_route_arbiter.io.in(1)
+      when (!at_dest) {
+        rreq.valid := true.B
+        rreq.bits.route_info := io.in.flit.bits.route_info
+        rreq.bits.src_virt_id := io.in.flit.bits.virt_channel_id
+        states(id).g := Mux(rreq.ready, g_r_stall, g_r)
+      }
+    }
   } .elsewhen (io.in.flit.fire()) {
     val id = io.in.flit.bits.virt_channel_id
     when (io.in.flit.bits.tail) {
@@ -126,9 +146,6 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     }
   }
 
-  val route_arbiter = Module(new GrantHoldArbiter(
-    new RouteComputerReq(cParam), nVirtualChannels,
-    (t: RouteComputerReq) => true.B, rr = true))
   (route_arbiter.io.in zip states).zipWithIndex.map { case ((i,s),idx) =>
     if (virtualChannelParams(idx).traversable) {
       i.valid := s.g === g_r
@@ -140,11 +157,12 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
       i.bits := DontCare
     }
   }
-  io.router_req <> route_arbiter.io.out
 
   when (io.router_resp.fire()) {
     val id = io.router_resp.bits.src_virt_id
-    assert(states(id).g.isOneOf(g_r, g_r_stall))
+    assert(states(id).g.isOneOf(g_r, g_r_stall) || (
+      earlyRC.B && io.in.flit.valid && io.in.flit.bits.head && io.in.flit.bits.virt_channel_id === id)
+    )
     states(id).g := g_v
     for (i <- 0 until nVirtualChannels) {
       when (i.U === id) {
@@ -156,26 +174,36 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   val vcalloc_arbiter = Module(new GrantHoldArbiter(
     new VCAllocReq(cParam, outParams, egressParams), nVirtualChannels,
     (x: VCAllocReq) => true.B, rr = true))
+  val early_vcalloc_arbiter = Module(new Arbiter(
+    new VCAllocReq(cParam, outParams, egressParams), 2))
+  early_vcalloc_arbiter.io.in(0) <> vcalloc_arbiter.io.out
+  early_vcalloc_arbiter.io.in(1).valid := false.B
+  early_vcalloc_arbiter.io.in(1).bits := DontCare
+  io.vcalloc_req <> early_vcalloc_arbiter.io.out
   (vcalloc_arbiter.io.in zip states).zipWithIndex.map { case ((i,s),idx) =>
     if (virtualChannelParams(idx).traversable) {
       i.valid := s.g === g_v
       i.bits.in_virt_channel := idx.U
       i.bits.vc_sel := s.vc_sel
-
-      if (combineRCVA) {
-        when (io.router_resp.fire() && io.router_resp.bits.src_virt_id === idx.U) {
-          i.valid := true.B
-          i.bits.vc_sel := io.router_resp.bits.vc_sel
-        }
-      }
-
       when (i.fire()) { s.g := g_v_stall }
     } else {
       i.valid := false.B
       i.bits := DontCare
     }
   }
-  io.vcalloc_req <> vcalloc_arbiter.io.out
+
+  if (combineRCVA) {
+    when (io.router_resp.fire()) {
+      val vcreq = early_vcalloc_arbiter.io.in(1)
+      vcreq.valid := true.B
+      vcreq.bits.in_virt_channel := io.router_resp.bits.src_virt_id
+      vcreq.bits.vc_sel := io.router_resp.bits.vc_sel
+      when (vcreq.fire()) {
+        states(io.router_resp.bits.src_virt_id).g := g_v_stall
+      }
+    }
+  }
+
   io.debug.va_stall := PopCount(vcalloc_arbiter.io.in.map { i => i.valid && !i.ready })
 
   when (io.vcalloc_resp.fire()) {
