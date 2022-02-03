@@ -7,6 +7,7 @@ import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
 import constellation.channel._
+import constellation.routing.{PacketRoutingBundle}
 import constellation.{NoCKey}
 import constellation.util.{GrantHoldArbiter, WrapInc}
 
@@ -65,10 +66,7 @@ abstract class AbstractInputUnit(
     out
   }
 
-  def egressIdToNodeId(egressId: UInt): UInt = MuxLookup(egressId, 0.U(nodeIdBits.W),
-    cParam.possiblePackets.toSeq.map(u => u.egressId.U -> egressSrcIds(u.egressId).U)
-  )
-
+  def atDest(egress: UInt) = egressSrcIds.zipWithIndex.filter(_._1 == nodeId).map(_._2.U === egress).orR
 }
 
 class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
@@ -86,11 +84,10 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   class InputState extends Bundle {
     val g = UInt(3.W)
     val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
-    val p = UInt(log2Up(maxBufferSize).W)
+    val ptr = UInt(log2Up(maxBufferSize).W)
     val c = UInt(log2Up(1+maxBufferSize).W)
-    val vnet_id = UInt(vNetBits.W)
+    val r = new PacketRoutingBundle
     val tail_seen = Bool()
-    val dest_id = UInt(nodeIdBits.W)
   }
   val states = Reg(Vec(nVirtualChannels, new InputState))
   val buffer = Module(new InputBuffer(cParam))
@@ -112,19 +109,16 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     assert(id < nVirtualChannels.U)
     assert(states(id).g === g_i)
 
-    val dest_id = egressIdToNodeId(io.in.flit.bits.egress_id)
-    states(id).g := Mux(dest_id === nodeId.U, g_v, g_r)
-    states(id).dest_id := dest_id
+    states(id).g := Mux(atDest(io.in.flit.bits.egress_id), g_v, g_r)
     states(id).vc_sel.foreach(_.foreach(_ := false.B))
     for (o <- 0 until nEgress) {
       when (egressParams(o).egressId.U === io.in.flit.bits.egress_id) {
         states(id).vc_sel(o+nOutputs)(0) := true.B
       }
     }
-    states(id).p := buffer.io.head
+    states(id).ptr := buffer.io.head
+    states(id).r := io.in.flit.bits.route_info
     states(id).tail_seen := io.in.flit.bits.tail
-    states(id).vnet_id := io.in.flit.bits.vnet_id
-
   } .elsewhen (io.in.flit.fire()) {
     val id = io.in.flit.bits.virt_channel_id
     when (io.in.flit.bits.tail) {
@@ -138,9 +132,8 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   (route_arbiter.io.in zip states).zipWithIndex.map { case ((i,s),idx) =>
     if (virtualChannelParams(idx).traversable) {
       i.valid := s.g === g_r
-      i.bits.dest_id := s.dest_id
+      i.bits.route_info := s.r
       i.bits.src_virt_id := idx.U
-      i.bits.src_vnet_id := s.vnet_id
       when (i.fire()) { s.g := g_r_stall }
     } else {
       i.valid := false.B
@@ -205,10 +198,10 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
       }
       r.valid := s.g === g_a && credit_available && (s.c =/= 0.U || bypass_input)
       r.bits.vc_sel := s.vc_sel
-      buffer.io.tail_read_req(i) := s.p
+      buffer.io.tail_read_req(i) := s.ptr
       r.bits.tail := buffer.io.tail_read_resp(i)
       when (r.fire()) {
-        s.p := WrapInc(s.p, virtualChannelParams(i).bufferSize)
+        s.ptr := WrapInc(s.ptr, virtualChannelParams(i).bufferSize)
       }
       when (r.fire() && buffer.io.tail_read_resp(i)) {
         s.g := g_i
@@ -234,7 +227,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
 
   class OutBundle extends Bundle {
     val valid = Bool()
-    val p = UInt(log2Up(maxBufferSize).W)
+    val ptr = UInt(log2Up(maxBufferSize).W)
     val vid = UInt(virtualChannelBits.W)
     val out_vid = UInt(log2Up(allOutParams.map(_.nVirtualChannels).max).W)
     val out_id = Vec(nAllOutputs, Bool())
@@ -246,7 +239,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     Reg(new OutBundle)
   }
   salloc_out.valid := salloc_fire
-  salloc_out.p := Mux1H(salloc_fires, states.map(_.p))
+  salloc_out.ptr := Mux1H(salloc_fires, states.map(_.ptr))
   salloc_out.vid := salloc_fire_id
   val vc_sel = Mux1H(salloc_fires, states.map(_.vc_sel))
   val channel_oh = vc_sel.map(_.reduce(_||_))
@@ -255,7 +248,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   salloc_out.out_id := VecInit(channel_oh)
 
   buffer.io.read_req.valid := salloc_out.valid
-  buffer.io.read_req.bits.addr := salloc_out.p
+  buffer.io.read_req.bits.addr := salloc_out.ptr
   buffer.io.read_req.bits.channel := salloc_out.vid
 
   io.out.valid := buffer.io.read_req.valid

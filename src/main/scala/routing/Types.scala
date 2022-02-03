@@ -32,9 +32,11 @@ case class PacketRoutingInfoInternal(
   vNet: Int
 )
 
-class PacketRoutingBundle(implicit p: Parameters) extends Bundle {
-  val egress_id = UInt()
-  val vnet = UInt()
-  def dst = VecInit(p(NoCKey).egresses.map(_.srcId.U))(egress_id)
+class PacketRoutingBundle(implicit val p: Parameters) extends Bundle with HasNoCParams{
+  val egress = UInt(egressIdBits.W)
+  val vnet = UInt(vNetBits.W)
+  def dst(possible: Set[PacketRoutingInfo]) = MuxLookup(egress, 0.U(nodeIdBits.W),
+    possible.toSeq.map(u => u.egressId.U -> egressSrcIds(u.egressId).U)
+  )(nodeIdBits-1,0)
 }
 

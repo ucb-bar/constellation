@@ -4,6 +4,7 @@ import chisel3._
 import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
+import constellation.routing.{PacketRoutingBundle}
 
 
 class IOFlit(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
@@ -16,4 +17,10 @@ class IOFlit(val cParam: BaseChannelParams)(implicit val p: Parameters) extends 
 class Flit(cParam: BaseChannelParams)(implicit p: Parameters) extends IOFlit(cParam)(p) {
   val vnet_id = UInt(vNetBits.W)
   val virt_channel_id = UInt(virtualChannelBits.W)
+  def route_info = {
+    val info = Wire(new PacketRoutingBundle)
+    info.egress := egress_id
+    info.vnet := vnet_id
+    info
+  }
 }

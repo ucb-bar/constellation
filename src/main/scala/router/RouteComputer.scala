@@ -8,12 +8,12 @@ import freechips.rocketchip.util._
 import freechips.rocketchip.rocket.DecodeLogic
 
 import constellation.channel._
+import constellation.routing.{PacketRoutingBundle}
 import constellation.{NoCKey}
 
 class RouteComputerReq(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   val src_virt_id = UInt(virtualChannelBits.W)
-  val src_vnet_id = UInt(vNetBits.W)
-  val dest_id = UInt(nodeIdBits.W)
+  val route_info = new PacketRoutingBundle
 }
 
 class RouteComputerResp(val cParam: BaseChannelParams,
@@ -63,7 +63,10 @@ class RouteComputer(
             }.flatten
             val trues = table.filter(_._2).map(_._1.U)
             val falses = table.filter(!_._2).map(_._1.U)
-            val addr = Cat(req.bits.src_virt_id, req.bits.src_vnet_id, req.bits.dest_id)
+            val addr = Cat(
+              req.bits.src_virt_id,
+              req.bits.route_info.vnet,
+              req.bits.route_info.dst(allInParams(i).possiblePackets))
 
             resp.bits.vc_sel(o)(outVId) := (if (falses.size == 0) {
               true.B

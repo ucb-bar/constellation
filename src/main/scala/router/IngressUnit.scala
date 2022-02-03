@@ -27,19 +27,19 @@ class IngressUnit(
 
   route_buffer.io.enq.bits := io.in.bits
   io.router_req.bits.src_virt_id := 0.U
-  io.router_req.bits.src_vnet_id := cParam.vNetId.U
-  io.router_req.bits.dest_id := egressIdToNodeId(io.in.bits.egress_id)
+  io.router_req.bits.route_info.vnet := cParam.vNetId.U
+  io.router_req.bits.route_info.egress := io.in.bits.egress_id
 
-  val out_is_in = io.router_req.bits.dest_id === nodeId.U
+  val at_dest = atDest(io.in.bits.egress_id)
   route_buffer.io.enq.valid := io.in.valid && (
-    io.router_req.ready || !io.in.bits.head || (out_is_in && !io.router_resp.valid))
-  io.router_req.valid := io.in.valid && route_buffer.io.enq.ready && io.in.bits.head && !out_is_in
+    io.router_req.ready || !io.in.bits.head || (at_dest && !io.router_resp.valid))
+  io.router_req.valid := io.in.valid && route_buffer.io.enq.ready && io.in.bits.head && !at_dest
   io.in.ready := route_buffer.io.enq.ready && (
-    io.router_req.ready || !io.in.bits.head || (out_is_in && !io.router_resp.valid))
+    io.router_req.ready || !io.in.bits.head || (at_dest && !io.router_resp.valid))
 
   route_q.io.enq.valid := io.router_resp.valid
   route_q.io.enq.bits := io.router_resp.bits
-  when (io.in.fire() && io.in.bits.head && out_is_in) {
+  when (io.in.fire() && io.in.bits.head && at_dest) {
     route_q.io.enq.valid := true.B
     route_q.io.enq.bits.src_virt_id := 0.U
     route_q.io.enq.bits.vc_sel.foreach(_.foreach(_ := false.B))
