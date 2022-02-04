@@ -6,15 +6,16 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
-import constellation.util.{GrantHoldArbiter}
+import constellation.util.{GrantHoldArbiter, ArbiterPolicy}
 
 class IterativeVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) extends VCAllocator(vP)(p) {
-
-  val arb = Module(new GrantHoldArbiter(Bool(), allInParams.size, (_: Bool) => true.B, rr=true))
+  val arb = Module(new GrantHoldArbiter(Bool(), allInParams.size, (_: Bool) => true.B,
+    policy = ArbiterPolicy.Random
+  ))
   arb.io.in.foreach(_.bits := false.B)
-  (arb.io.in zip io.req).foreach { case (l,r) =>
-    l.valid := r.valid
-    r.ready := l.ready
+  arb.io.in.zipWithIndex.map { case (in,i) =>
+    in.valid := io.req(i).valid
+    io.req(i).ready := in.ready
   }
 
 
@@ -25,6 +26,7 @@ class IterativeVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) extend
 
   val allocator = Module(new GrantHoldArbiter(Bool(), nOutChannels, (_: Bool) => true.B))
   allocator.io.in.foreach(_.bits := false.B)
+  allocator.io.prios.foreach(_ := 0.U)
   allocator.io.out.ready := true.B
   for (outId <- 0 until nAllOutputs) {
     for (outVirtId <- 0 until allOutParams(outId).nVirtualChannels) {

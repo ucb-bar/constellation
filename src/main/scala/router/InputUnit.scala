@@ -9,7 +9,7 @@ import freechips.rocketchip.util._
 import constellation.channel._
 import constellation.routing.{PacketRoutingBundle}
 import constellation.{NoCKey}
-import constellation.util.{GrantHoldArbiter, WrapInc}
+import constellation.util.{GrantHoldArbiter, WrapInc, ArbiterPolicy}
 
 class AbstractInputUnitIO(
   val cParam: BaseChannelParams,
@@ -92,7 +92,8 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
 
   val route_arbiter = Module(new GrantHoldArbiter(
     new RouteComputerReq(cParam), nVirtualChannels,
-    (t: RouteComputerReq) => true.B, rr = true))
+    (t: RouteComputerReq) => true.B,
+    policy = ArbiterPolicy.RoundRobin))
   val early_route_arbiter = Module(new Arbiter(
     new RouteComputerReq(cParam), 2))
   early_route_arbiter.io.in(0) <> route_arbiter.io.out
@@ -173,7 +174,8 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
 
   val vcalloc_arbiter = Module(new GrantHoldArbiter(
     new VCAllocReq(cParam, outParams, egressParams), nVirtualChannels,
-    (x: VCAllocReq) => true.B, rr = true))
+    (x: VCAllocReq) => true.B,
+    policy = ArbiterPolicy.RoundRobin))
   val early_vcalloc_arbiter = Module(new Arbiter(
     new VCAllocReq(cParam, outParams, egressParams), 2))
   early_vcalloc_arbiter.io.in(0) <> vcalloc_arbiter.io.out

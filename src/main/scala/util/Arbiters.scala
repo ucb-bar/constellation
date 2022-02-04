@@ -2,6 +2,7 @@ package constellation.util
 
 import chisel3._
 import chisel3.util._
+import chisel3.util.random.LFSR
 
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
@@ -12,10 +13,13 @@ class GrantHoldArbiter[T <: Data](
       typ: T, arbN: Int,
       canUnlock: T => Bool,
       needsLock: Option[T => Bool] = None,
-      rr: Boolean = false)
-    extends Module {
+      prioBits: Int = 0,
+      policy: ArbiterPolicy.ArbiterPolicy = ArbiterPolicy.LowestFirst
+) extends Module {
 
-  val io = IO(new ArbiterIO(typ, arbN))
+  val io = IO(new ArbiterIO(typ, arbN) {
+    val prios = (prioBits > 0).option(Input(Vec(arbN, UInt(prioBits.W))))
+  })
 
   def rotateLeft[T <: Data](norm: Vec[T], rot: UInt): Seq[T] = {
     val n = norm.size
@@ -26,13 +30,25 @@ class GrantHoldArbiter[T <: Data](
 
   val lockIdx = RegInit(0.U(log2Up(arbN).W))
   val locked = RegInit(false.B)
-
-  val choice = if (rr) {
-    PriorityMux(
-      rotateLeft(VecInit(io.in.map(_.valid)), lockIdx + 1.U),
-      rotateLeft(VecInit((0 until arbN).map(_.U)), lockIdx + 1.U))
+  val prio_valids = if (prioBits > 0) {
+    val prios_oh = (io.in zip io.prios.get).map { case (i,p) => i.valid << p }
+    val lowest_prio = PriorityEncoder(prios_oh.reduce(_|_))
+    (io.in zip io.prios.get).map { case (i,p) => i.valid && p === lowest_prio }
   } else {
-    PriorityEncoder(io.in.map(_.valid))
+    io.in.map(_.valid)
+  }
+
+  val choice = if (policy == ArbiterPolicy.RoundRobin) {
+    PriorityMux(
+      rotateLeft(VecInit(prio_valids), lockIdx + 1.U),
+      rotateLeft(VecInit((0 until arbN).map(_.U)), lockIdx + 1.U))
+  } else if (policy == ArbiterPolicy.Random) {
+    val rand = LFSR(16)(log2Up(arbN)-1,0)
+    PriorityMux(
+      rotateLeft(VecInit(prio_valids), rand + 1.U),
+      rotateLeft(VecInit((0 until arbN).map(_.U)), rand + 1.U))
+  } else {
+    PriorityEncoder(prio_valids)
   }
 
   val chosen = Mux(locked && io.in(lockIdx).valid, lockIdx, choice)

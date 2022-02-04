@@ -7,7 +7,7 @@ import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
 import constellation.channel.{ChannelParams, IngressChannelParams, EgressChannelParams}
-import constellation.util.{GrantHoldArbiter}
+import constellation.util.{GrantHoldArbiter, ArbiterPolicy}
 
 class SwitchAllocReq(val outParams: Seq[ChannelParams], val egressParams: Seq[EgressChannelParams])
   (implicit val p: Parameters) extends Bundle with HasRouterOutputParams {
@@ -34,7 +34,7 @@ class SwitchAllocator(
       new SwitchAllocReq(outParams, egressParams),
       r.size,
       (d: SwitchAllocReq) => d.tail,
-      rr = true
+      policy = ArbiterPolicy.RoundRobin
     ))
     arb.io.in <> r
     arb
@@ -43,7 +43,7 @@ class SwitchAllocator(
     new SwitchAllocReq(outParams, egressParams),
     nAllInputs,
     (d: SwitchAllocReq) => d.tail,
-    rr = true
+    policy = ArbiterPolicy.RoundRobin
   )) }
   arbs.foreach(_.io.out.ready := true.B)
 

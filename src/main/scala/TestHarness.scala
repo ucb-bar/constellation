@@ -207,6 +207,7 @@ class TestHarness(implicit val p: Parameters) extends Module {
   noc.io.ingress <> noc_tester.io.to_noc
   noc_tester.io.from_noc <> noc.io.egress
   io.success := noc_tester.io.success
+  ElaborationArtefacts.add("plusArgs", PlusArgArtefacts.serialize_cHeader)
 }
 
 case class TLNoCTesterParams(

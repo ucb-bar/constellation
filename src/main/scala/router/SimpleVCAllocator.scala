@@ -6,7 +6,7 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
-import constellation.util.{GrantHoldArbiter}
+import constellation.util.{GrantHoldArbiter, ArbiterPolicy}
 
 class Allocator(d0: Int, d1: Int,
   revD0: Boolean = false, revD1: Boolean = false,
@@ -31,8 +31,10 @@ class Allocator(d0: Int, d1: Int,
     }
   }
 
-  val rank_1_arbs = Seq.fill(d0) { Module(new GrantHoldArbiter(Bool(), d1, (_: Bool) => true.B, rr = rrD0)) }
-  val rank_2_arbs = Seq.fill(d1) { Module(new GrantHoldArbiter(Bool(), d0, (_: Bool) => true.B, rr = rrD1)) }
+  val rank_1_arbs = Seq.fill(d0) { Module(new GrantHoldArbiter(Bool(), d1, (_: Bool) => true.B,
+    policy = if (rrD0) ArbiterPolicy.RoundRobin else ArbiterPolicy.LowestFirst)) }
+  val rank_2_arbs = Seq.fill(d1) { Module(new GrantHoldArbiter(Bool(), d0, (_: Bool) => true.B,
+    policy = if (rrD1) ArbiterPolicy.RoundRobin else ArbiterPolicy.LowestFirst)) }
 
   Seq.tabulate(d0, d1) { case (y, x) =>
     rank_1_arbs(y).io.in(x).valid := in(y)(x).valid

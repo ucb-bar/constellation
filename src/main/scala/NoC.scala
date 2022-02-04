@@ -96,7 +96,7 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
 
   def checkConnectivity(vNetId: Int, routingRel: RoutingRelation) = {
     // Loop through accessible ingress/egress pairs
-    globalIngressParams.filter(_.vNetId == vNetId).zipWithIndex.map { case (iP,iIdx) =>
+    globalIngressParams.zipWithIndex.filter(_._1.vNetId == vNetId).map { case (iP,iIdx) =>
       val iId = iP.destId
       iP.possibleEgresses.map { oIdx =>
         val oP = globalEgressParams(oIdx)

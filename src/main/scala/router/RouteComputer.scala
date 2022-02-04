@@ -51,15 +51,15 @@ class RouteComputer(
         if (o < nOutputs) {
           (0 until outParams(o).nVirtualChannels).map { outVId =>
             val table = allInParams(i).possiblePackets.toSeq.distinct.map { pI =>
-                allInParams(i).channelRoutingInfos.map { cI =>
-                  val v = p(NoCKey).routingRelation(
-                    nodeId,
-                    cI,
-                    outParams(o).virtualChannelParams(outVId).asChannelRoutingInfo,
-                    pI
-                  )
-                  ((((cI.vc << vNetBits) + pI.vNet) << nodeIdBits) + pI.dst, v)
-                }
+              allInParams(i).channelRoutingInfos.map { cI =>
+                val v = p(NoCKey).routingRelation(
+                  nodeId,
+                  cI,
+                  outParams(o).virtualChannelParams(outVId).asChannelRoutingInfo,
+                  pI
+                )
+                ((((cI.vc << vNetBits) + pI.vNet) << nodeIdBits) + pI.dst, v)
+              }
             }.flatten
             val trues = table.filter(_._2).map(_._1.U)
             val falses = table.filter(!_._2).map(_._1.U)
