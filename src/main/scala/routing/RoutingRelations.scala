@@ -347,12 +347,21 @@ object RoutingRelation {
 
   // Independent virtual subnets with no resource sharing
   def nonblockingVirtualSubnetworks(f: RoutingRelation, n: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
-    (nxtC.vc % n == pInfo.vNet) && f(
-      nodeId,
-      srcC.copy(vc=srcC.vc / n, n_vc=srcC.n_vc / n),
-      nxtC.copy(vc=nxtC.vc / n, n_vc=nxtC.n_vc / n),
-      pInfo.copy(vNet=0)
-    )
+    if (srcC.isIngress) {
+      (nxtC.vc % n == pInfo.vNet) && f(
+        nodeId,
+        srcC,
+        nxtC.copy(vc=nxtC.vc / n, n_vc=nxtC.n_vc / n),
+        pInfo.copy(vNet=0)
+      )
+    } else {
+      (nxtC.vc % n == pInfo.vNet) && f(
+        nodeId,
+        srcC.copy(vc=srcC.vc / n, n_vc=srcC.n_vc / n),
+        nxtC.copy(vc=nxtC.vc / n, n_vc=nxtC.n_vc / n),
+        pInfo.copy(vNet=0)
+      )
+    }
   }, (c, v) => {
     f.isEscape(c.copy(vc=c.vc / n, n_vc=c.n_vc / n), 0)
   })
