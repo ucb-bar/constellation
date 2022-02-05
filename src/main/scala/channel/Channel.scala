@@ -44,7 +44,6 @@ case class VirtualChannelParams(
   uniqueId: Int,
 ) {
   val traversable = possiblePackets.size > 0
-  def asChannelRoutingInfo(implicit p: Parameters): ChannelRoutingInfo = ChannelRoutingInfo(src, vc, dst)
 }
 
 trait BaseChannelParams {
@@ -73,7 +72,7 @@ case class ChannelParams(
   def possiblePackets = virtualChannelParams.map(_.possiblePackets).reduce(_++_)
   val traversable = virtualChannelParams.map(_.traversable).reduce(_||_)
 
-  def channelRoutingInfos = virtualChannelParams.map(_.asChannelRoutingInfo)
+  def channelRoutingInfos = (0 until nVirtualChannels).map(i => ChannelRoutingInfo(srcId, i, destId, nVirtualChannels))
 }
 
 case class IngressChannelParams(
@@ -86,7 +85,7 @@ case class IngressChannelParams(
 )(implicit p: Parameters) extends TerminalChannelParams {
   def srcId = -1
   def possiblePackets = possibleEgresses.map { e => PacketRoutingInfo(e, vNetId) }
-  def channelRoutingInfos = Seq(ChannelRoutingInfo(-1, 0, destId))
+  def channelRoutingInfos = Seq(ChannelRoutingInfo(-1, 0, destId, 1))
 }
 
 object IngressChannelParams {
@@ -114,7 +113,7 @@ case class EgressChannelParams(
   payloadBits: Int
 )(implicit p: Parameters) extends TerminalChannelParams {
   def destId = -1
-  def channelRoutingInfos = Seq(ChannelRoutingInfo(srcId, 0, -1))
+  def channelRoutingInfos = Seq(ChannelRoutingInfo(srcId, 0, -1, 1))
 }
 
 object EgressChannelParams {

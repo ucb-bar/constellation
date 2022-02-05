@@ -55,7 +55,7 @@ class RouteComputer(
                 val v = p(NoCKey).routingRelation(
                   nodeId,
                   cI,
-                  outParams(o).virtualChannelParams(outVId).asChannelRoutingInfo,
+                  outParams(o).channelRoutingInfos(outVId),
                   pI
                 )
                 ((((cI.vc << vNetBits) + pI.vNet) << nodeIdBits) + pI.dst, v)

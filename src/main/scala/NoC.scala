@@ -114,10 +114,10 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
                 val can_transition = routingRel(
                   cI.dst,
                   cI,
-                  nxtC.virtualChannelParams(nxtV).asChannelRoutingInfo,
+                  nxtC.channelRoutingInfos(nxtV),
                   PacketRoutingInfo(oIdx, vNetId)
                 )
-                if (can_transition) Some(nxtC.virtualChannelParams(nxtV).asChannelRoutingInfo) else None
+                if (can_transition) Some(nxtC.channelRoutingInfos(nxtV)) else None
               }.flatten
             }.flatten
             require(nexts.size > 0,
@@ -208,11 +208,11 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
   // Also set possible nodes for each channel
   val channelParams = fullChannelParams.map { cP => cP.copy(
     virtualChannelParams=cP.virtualChannelParams.zipWithIndex.map { case (vP,vId) =>
-      val traversable = possiblePacketMap(vP.asChannelRoutingInfo).size != 0
+      val traversable = possiblePacketMap(cP.channelRoutingInfos(vId)).size != 0
       if (!traversable) {
         println(s"Constellation WARNING: virtual channel $vId from ${cP.srcId} to ${cP.destId} appears to be untraversable")
       }
-      vP.copy(possiblePackets=possiblePacketMap(vP.asChannelRoutingInfo))
+      vP.copy(possiblePackets=possiblePacketMap(cP.channelRoutingInfos(vId)))
     }
   )}
   channelParams.map(cP => if (!cP.traversable)

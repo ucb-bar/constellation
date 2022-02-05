@@ -58,9 +58,25 @@ class Allocator(d0: Int, d1: Int,
 
 class SimpleVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) extends VCAllocator(vP)(p) {
 
+  val per_input_qs = allInParams.map { u => Module(new GrantHoldArbiter(
+    new VCAllocReq(inParams, ingressParams, outParams, egressParams), u.nVirtualChannels,
+    (x: VCAllocReq) => true.B,
+    policy = ArbiterPolicy.RoundRobin))
+  }
+  (per_input_qs zip io.req).zipWithIndex.map { case ((q,req),i) =>
+    (q.io.in zip req).zipWithIndex.map { case ((l,r),v) =>
+      l.bits.vc_sel := r.bits
+      l.bits.in_virt_channel := v.U
+      l.bits.in_id := i.U
+      l.valid := r.valid
+      r.ready := l.ready
+    }
+  }
+  val reqs = per_input_qs.map(_.io.out)
+
   io.resp.foreach(_.bits := DontCare)
-  (io.resp zip io.req).map { case (o,i) => o.bits.in_virt_channel := i.bits.in_virt_channel }
-  io.req.foreach { r => when (r.valid) { assert(r.bits.vc_sel.asUInt =/= 0.U) } }
+  (io.resp zip reqs).map { case (o,i) => o.bits.in_virt_channel := i.bits.in_virt_channel }
+  reqs.foreach { r => when (r.valid) { assert(r.bits.vc_sel.asUInt =/= 0.U) } }
 
   val allocator = Module(new Allocator(nOutChannels, nAllInputs))
   allocator.io.in.foreach(_.foreach(_.valid := false.B))
@@ -69,7 +85,7 @@ class SimpleVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) extends V
     for (outVirtId <- 0 until allOutParams(outId).nVirtualChannels) {
       val idx = getIdx(outId, outVirtId)
       for (inId <- 0 until nAllInputs) {
-        val r = io.req(inId)
+        val r = reqs(inId)
 
         allocator.io.in(idx)(inId).valid := (r.valid &&
           r.bits.vc_sel(outId)(outVirtId) &&
@@ -80,7 +96,7 @@ class SimpleVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) extends V
     }
   }
 
-  (io.req zip io.resp).zipWithIndex.map { case ((req,resp),i) =>
+  (reqs zip io.resp).zipWithIndex.map { case ((req,resp),i) =>
     val fires = allocator.io.in.map(_(i).fire())
     val fire_id = OHToUInt(fires)
     val (out_id, out_virt_id) = getOutChannelInfo(fire_id)

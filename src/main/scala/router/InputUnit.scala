@@ -22,7 +22,7 @@ class AbstractInputUnitIO(
   val router_req = Decoupled(new RouteComputerReq(cParam))
   val router_resp = Flipped(Valid(new RouteComputerResp(cParam, outParams, egressParams)))
 
-  val vcalloc_req = Decoupled(new VCAllocReq(cParam, outParams, egressParams))
+  val vcalloc_req = Vec(nVirtualChannels, Decoupled(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })))
   val vcalloc_resp = Flipped(Valid(new VCAllocResp(cParam, outParams, egressParams)))
 
   val out_credit_available = Input(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) }))
@@ -53,8 +53,8 @@ abstract class AbstractInputUnit(
           val allow = virtualChannelParams(srcV).possiblePackets.map { pI =>
             p(NoCKey).routingRelation(
               nodeId,
-              virtualChannelParams(srcV).asChannelRoutingInfo,
-              oP.virtualChannelParams(oV).asChannelRoutingInfo,
+              cParam.channelRoutingInfos(srcV),
+              oP.channelRoutingInfos(oV),
               pI
             )
           }.reduce(_||_)
@@ -172,41 +172,60 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     }
   }
 
-  val vcalloc_arbiter = Module(new GrantHoldArbiter(
-    new VCAllocReq(cParam, outParams, egressParams), nVirtualChannels,
-    (x: VCAllocReq) => true.B,
-    policy = ArbiterPolicy.RoundRobin))
-  val early_vcalloc_arbiter = Module(new Arbiter(
-    new VCAllocReq(cParam, outParams, egressParams), 2))
-  early_vcalloc_arbiter.io.in(0) <> vcalloc_arbiter.io.out
-  early_vcalloc_arbiter.io.in(1).valid := false.B
-  early_vcalloc_arbiter.io.in(1).bits := DontCare
-  io.vcalloc_req <> early_vcalloc_arbiter.io.out
-  (vcalloc_arbiter.io.in zip states).zipWithIndex.map { case ((i,s),idx) =>
+  (io.vcalloc_req zip states).zipWithIndex.map { case ((i,s),idx) =>
     if (virtualChannelParams(idx).traversable) {
       i.valid := s.g === g_v
-      i.bits.in_virt_channel := idx.U
-      i.bits.vc_sel := s.vc_sel
+      i.bits := s.vc_sel
       when (i.fire()) { s.g := g_v_stall }
+      if (combineRCVA) {
+        when (io.router_resp.valid && io.router_resp.bits.src_virt_id === idx.U) {
+          i.valid := true.B
+          i.bits := io.router_resp.bits.vc_sel
+        }
+      }
     } else {
       i.valid := false.B
       i.bits := DontCare
     }
   }
 
-  if (combineRCVA) {
-    when (io.router_resp.fire()) {
-      val vcreq = early_vcalloc_arbiter.io.in(1)
-      vcreq.valid := true.B
-      vcreq.bits.in_virt_channel := io.router_resp.bits.src_virt_id
-      vcreq.bits.vc_sel := io.router_resp.bits.vc_sel
-      when (vcreq.fire()) {
-        states(io.router_resp.bits.src_virt_id).g := g_v_stall
-      }
-    }
-  }
+  // val vcalloc_arbiter = Module(new GrantHoldArbiter(
+  //   new VCAllocReq(cParam, outParams, egressParams), nVirtualChannels,
+  //   (x: VCAllocReq) => true.B,
+  //   policy = ArbiterPolicy.RoundRobin))
+  // val early_vcalloc_arbiter = Module(new Arbiter(
+  //   new VCAllocReq(cParam, outParams, egressParams), 2))
+  // early_vcalloc_arbiter.io.in(0) <> vcalloc_arbiter.io.out
+  // early_vcalloc_arbiter.io.in(1).valid := false.B
+  // early_vcalloc_arbiter.io.in(1).bits := DontCare
+  // io.vcalloc_req <> early_vcalloc_arbiter.io.out
+  // (vcalloc_arbiter.io.in zip states).zipWithIndex.map { case ((i,s),idx) =>
+  //   if (virtualChannelParams(idx).traversable) {
+  //     i.valid := s.g === g_v
+  //     i.bits.in_virt_channel := idx.U
+  //     i.bits.vc_sel := s.vc_sel
+  //     when (i.fire()) { s.g := g_v_stall }
+  //   } else {
+  //     i.valid := false.B
+  //     i.bits := DontCare
+  //   }
+  // }
 
-  io.debug.va_stall := PopCount(vcalloc_arbiter.io.in.map { i => i.valid && !i.ready })
+  // if (combineRCVA) {
+  //   when (io.router_resp.fire()) {
+  //     val vcreq = early_vcalloc_arbiter.io.in(1)
+  //     vcreq.valid := true.B
+  //     vcreq.bits.in_virt_channel := io.router_resp.bits.src_virt_id
+  //     vcreq.bits.vc_sel := io.router_resp.bits.vc_sel
+  //     when (vcreq.fire()) {
+  //       states(io.router_resp.bits.src_virt_id).g := g_v_stall
+  //     }
+  //   }
+  // }
+  
+  // io.debug.va_stall := PopCount(vcalloc_arbiter.io.in.map { i => i.valid && !i.ready })
+
+  io.debug.va_stall := PopCount(io.vcalloc_req.map { i => i.valid && !i.ready })
 
   when (io.vcalloc_resp.fire()) {
     val id = io.vcalloc_resp.bits.in_virt_channel

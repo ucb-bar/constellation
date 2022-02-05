@@ -9,20 +9,26 @@ import freechips.rocketchip.util._
 import constellation.util.{GrantHoldArbiter, ArbiterPolicy}
 
 class IterativeVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) extends VCAllocator(vP)(p) {
-  val arb = Module(new GrantHoldArbiter(Bool(), allInParams.size, (_: Bool) => true.B,
-    policy = ArbiterPolicy.Random
+  val arb = Module(new GrantHoldArbiter(
+    new VCAllocReq(inParams, ingressParams, outParams, egressParams),
+    allInParams.map(_.nVirtualChannels).sum,
+    (_: VCAllocReq) => true.B,
+    policy = ArbiterPolicy.RoundRobin
   ))
-  arb.io.in.foreach(_.bits := false.B)
-  arb.io.in.zipWithIndex.map { case (in,i) =>
-    in.valid := io.req(i).valid
-    io.req(i).ready := in.ready
+
+  var t = 0
+  io.req.zipWithIndex.map { case (req,i) =>
+    req.zipWithIndex.map { case (r,v) =>
+      arb.io.in(t).valid := r.valid
+      r.ready := arb.io.in(t).ready
+      arb.io.in(t).bits.in_id := i.U
+      arb.io.in(t).bits.in_virt_channel := v.U
+      arb.io.in(t).bits.vc_sel := r.bits
+      t += 1
+    }
   }
 
 
-  val sel = arb.io.chosen
-  val sel_oh = UIntToOH(sel)
-  val req_virt_channel = Mux1H(sel_oh, io.req.map(_.bits.in_virt_channel))
-  val req_vc_sel = Mux1H(sel_oh, io.req.map(_.bits.vc_sel))
 
   val allocator = Module(new GrantHoldArbiter(Bool(), nOutChannels, (_: Bool) => true.B))
   allocator.io.in.foreach(_.bits := false.B)
@@ -32,7 +38,7 @@ class IterativeVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) extend
     for (outVirtId <- 0 until allOutParams(outId).nVirtualChannels) {
       val idx = getIdx(outId, outVirtId)
       allocator.io.in(idx).valid := (arb.io.out.valid &&
-        req_vc_sel(outId)(outVirtId) &&
+        arb.io.out.bits.vc_sel(outId)(outVirtId) &&
         io.channel_available(outId)(outVirtId))
       io.out_allocs(outId)(outVirtId) := allocator.io.in(idx).fire()
     }
@@ -40,17 +46,19 @@ class IterativeVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) extend
 
   arb.io.out.ready := allocator.io.out.valid
 
-  (io.req zip io.resp).zipWithIndex.map { case ((req,resp),i) =>
+  t = 0
+  io.resp.zipWithIndex.map { case (resp,i) =>
     val fire_id = allocator.io.chosen
     val (out_id, out_virt_id) = getOutChannelInfo(fire_id)
 
-    resp.valid := sel === i.U && allocator.io.out.valid
-    resp.bits.in_virt_channel := req_virt_channel
+    resp.valid := allocator.io.out.valid && arb.io.out.bits.in_id === i.U
+    resp.bits.in_virt_channel := arb.io.out.bits.in_virt_channel
     resp.bits.vc_sel.foreach(_.foreach(_ := false.B))
     for (o <- 0 until nAllOutputs) {
       when (out_id === o.U) {
         resp.bits.vc_sel(o)(out_virt_id) := true.B
       }
     }
+    t += allInParams(i).nVirtualChannels
   }
 }

@@ -57,20 +57,19 @@ class IngressUnit(
 
   vcalloc_buffer.io.enq.bits := route_buffer.io.deq.bits
 
-  io.vcalloc_req.bits.in_virt_channel := 0.U
-  io.vcalloc_req.bits.vc_sel := route_q.io.deq.bits.vc_sel
+  io.vcalloc_req(0).bits := route_q.io.deq.bits.vc_sel
 
   val head = route_buffer.io.deq.bits.head
   val tail = route_buffer.io.deq.bits.tail
   vcalloc_buffer.io.enq.valid := (route_buffer.io.deq.valid &&
     (route_q.io.deq.valid || !head) &&
-    (io.vcalloc_req.ready || !head)
+    (io.vcalloc_req(0).ready || !head)
   )
-  io.vcalloc_req.valid := (route_buffer.io.deq.valid && route_q.io.deq.valid &&
+  io.vcalloc_req(0).valid := (route_buffer.io.deq.valid && route_q.io.deq.valid &&
     head && vcalloc_buffer.io.enq.ready && vcalloc_q.io.enq.ready)
   route_buffer.io.deq.ready := (vcalloc_buffer.io.enq.ready &&
     (route_q.io.deq.valid || !head) &&
-    (io.vcalloc_req.ready || !head) &&
+    (io.vcalloc_req(0).ready || !head) &&
     (vcalloc_q.io.enq.ready || !head))
   route_q.io.deq.ready := (route_buffer.io.deq.fire() && tail)
 
@@ -106,6 +105,6 @@ class IngressUnit(
   out_bundle.bits.out_virt_channel := Mux1H(out_channel_oh, vcalloc_q.io.deq.bits.vc_sel.map(v => OHToUInt(v)))
   out_bundle.bits.out_channel_oh := VecInit(out_channel_oh)
 
-  io.debug.va_stall := io.vcalloc_req.valid && !io.vcalloc_req.ready
+  io.debug.va_stall := io.vcalloc_req(0).valid && !io.vcalloc_req(0).ready
   io.debug.sa_stall := io.salloc_req(0).valid && !io.salloc_req(0).ready
 }

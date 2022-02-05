@@ -109,7 +109,7 @@ class Router(
     val route_computer = Module(new RouteComputer(routerParams, inParams, outParams, ingressParams, egressParams))
 
 
-    val fires_count = WireInit(PopCount(vc_allocator.io.req.map(_.fire())))
+    val fires_count = WireInit(PopCount(vc_allocator.io.req.flatten.map(_.fire())))
     dontTouch(fires_count)
 
 

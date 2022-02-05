@@ -9,9 +9,14 @@ import freechips.rocketchip.rocket.{DecodeLogic}
 
 import constellation.channel._
 
-class VCAllocReq(val cParam: BaseChannelParams, val outParams: Seq[ChannelParams], val egressParams: Seq[EgressChannelParams])
-  (implicit val p: Parameters) extends Bundle with HasChannelParams with HasRouterOutputParams{
-  val in_virt_channel = UInt(virtualChannelBits.W)
+class VCAllocReq(
+  val inParams: Seq[ChannelParams],
+  val ingressParams: Seq[IngressChannelParams],
+  val outParams: Seq[ChannelParams],
+  val egressParams: Seq[EgressChannelParams])
+  (implicit val p: Parameters) extends Bundle with HasRouterOutputParams with HasRouterInputParams {
+  val in_id = UInt(log2Ceil(allInParams.size).W)
+  val in_virt_channel = UInt(log2Ceil(allInParams.map(_.nVirtualChannels).max).W)
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
 }
 
@@ -38,7 +43,8 @@ abstract class VCAllocator(val vP: VCAllocatorParams)(implicit val p: Parameters
 
   val io = IO(new Bundle {
     val req = MixedVec(allInParams.map { u =>
-      Flipped(Decoupled(new VCAllocReq(u, outParams, egressParams))) })
+      Flipped(Vec(u.nVirtualChannels, Decoupled(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) }))))
+    })
     val resp = MixedVec(allInParams.map { u =>
       Valid(new VCAllocResp(u, outParams, egressParams)) })
 
