@@ -381,11 +381,18 @@ object RoutingRelation {
 
   def blockingVirtualSubnetworks(f: RoutingRelation, n: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
     val lNxtV = nxtC.vc - pInfo.vNet
-    if (lNxtV < 0) {
+    val lSrcV = srcC.vc - pInfo.vNet
+    if (srcC.isIngress && lNxtV >= 0) {
+      f(nodeId,
+        srcC,
+        nxtC.copy(n_vc = nxtC.n_vc - pInfo.vNet, vc = lNxtV),
+        pInfo.copy(vNet=0)
+      )
+    } else if (lNxtV < 0 || lSrcV < 0) {
       false
     } else {
       f(nodeId,
-        srcC.copy(n_vc = srcC.n_vc - pInfo.vNet),
+        srcC.copy(n_vc = srcC.n_vc - pInfo.vNet, vc = lSrcV),
         nxtC.copy(n_vc = nxtC.n_vc - pInfo.vNet, vc = lNxtV),
         pInfo.copy(vNet=0)
       )
