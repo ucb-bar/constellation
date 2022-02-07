@@ -388,25 +388,25 @@ object RoutingRelation {
     f.isEscape(c.copy(vc=trueVIdToVirtualVId(c.vc), n_vc = 1 + nSharedChannels), 0)
   })
 
-  def blockingVirtualSubnetworks(f: RoutingRelation, n: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
-    val lNxtV = nxtC.vc - pInfo.vNet
-    val lSrcV = srcC.vc - pInfo.vNet
+  def blockingVirtualSubnetworks(f: RoutingRelation, n: Int, nDedicated: Int = 1) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
+    val lNxtV = nxtC.vc - pInfo.vNet * nDedicated
+    val lSrcV = srcC.vc - pInfo.vNet * nDedicated
     if (srcC.isIngress && lNxtV >= 0) {
       f(nodeId,
         srcC,
-        nxtC.copy(n_vc = nxtC.n_vc - pInfo.vNet, vc = lNxtV),
+        nxtC.copy(n_vc = nxtC.n_vc - pInfo.vNet * nDedicated, vc = lNxtV),
         pInfo.copy(vNet=0)
       )
     } else if (lNxtV < 0 || lSrcV < 0) {
       false
     } else {
       f(nodeId,
-        srcC.copy(n_vc = srcC.n_vc - pInfo.vNet, vc = lSrcV),
-        nxtC.copy(n_vc = nxtC.n_vc - pInfo.vNet, vc = lNxtV),
+        srcC.copy(n_vc = srcC.n_vc - pInfo.vNet * nDedicated, vc = lSrcV),
+        nxtC.copy(n_vc = nxtC.n_vc - pInfo.vNet * nDedicated, vc = lNxtV),
         pInfo.copy(vNet=0)
       )
     }
   }, (c, v) => {
-    c.vc >= v && f.isEscape(c.copy(vc=c.vc - v, n_vc=c.n_vc - v), 0)
+    c.vc >= v && f.isEscape(c.copy(vc=c.vc - v * nDedicated, n_vc=c.n_vc - v * nDedicated), 0)
   })
 }

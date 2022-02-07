@@ -121,7 +121,7 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
               }.flatten
             }.flatten
             require(nexts.size > 0,
-              s"Failed to route from $iId to $oId at $cI")
+              s"Failed to route from $iId to $oId at $cI for vnet $vNetId")
             nexts
           }.flatten.toSet
         }

@@ -6,7 +6,7 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.diplomacy.{OutwardNodeHandle}
 import constellation.routing.{ChannelRoutingInfo, PacketRoutingInfo}
-import constellation.{HasNoCParams}
+import constellation.{HasNoCParams, NoCKey}
 
 
 // User-facing params, for adjusting config options
@@ -92,7 +92,8 @@ object IngressChannelParams {
   def apply(
     ingressId: Int,
     uniqueId: Int,
-    user: UserIngressParams)(implicit p: Parameters): IngressChannelParams =
+    user: UserIngressParams)(implicit p: Parameters): IngressChannelParams = {
+    require(user.destId < p(NoCKey).topology.nNodes)
     IngressChannelParams(
       ingressId = ingressId,
       uniqueId = uniqueId,
@@ -101,6 +102,7 @@ object IngressChannelParams {
       vNetId = user.vNetId,
       payloadBits = user.payloadBits
     )
+  }
 }
 
 
@@ -121,7 +123,8 @@ object EgressChannelParams {
     egressId: Int,
     uniqueId: Int,
     possiblePackets: Set[PacketRoutingInfo],
-    user: UserEgressParams)(implicit p: Parameters): EgressChannelParams =
+    user: UserEgressParams)(implicit p: Parameters): EgressChannelParams = {
+    require(user.srcId < p(NoCKey).topology.nNodes)
     EgressChannelParams(
       egressId = egressId,
       uniqueId = uniqueId,
@@ -129,6 +132,7 @@ object EgressChannelParams {
       srcId = user.srcId,
       payloadBits = user.payloadBits
     )
+  }
 }
 
 

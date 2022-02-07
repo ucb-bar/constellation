@@ -11,7 +11,7 @@ case class ChannelRoutingInfo(
 ) {
   require (src >= -1 && dst >= -1 && vc >= 0)
   require (!(src == -1 && dst == -1))
-  require (vc < n_vc)
+  require (vc < n_vc, s"$this invalid")
   val isIngress = src == -1
   val isEgress = dst == -1
 }

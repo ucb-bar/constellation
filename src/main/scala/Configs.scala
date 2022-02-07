@@ -200,3 +200,8 @@ class TLTestConfig02 extends Config(
   new constellation.channel.WithUniformVirtualChannels(5, UserVirtualChannelParams(3)) ++
   new constellation.topology.Mesh2DConfig(4, 3, RoutingRelation.mesh2DEscapeRouter))
 
+class TLTestConfig03 extends Config(
+  new WithTLNoCTesterParams(TLNoCTesterParams(Seq(0, 1, 2), Seq(3, 4, 5))) ++
+  new constellation.routing.WithNNonblockingVirtualNetworks(5) ++
+  new constellation.channel.WithUniformVirtualChannels(10, UserVirtualChannelParams(3)) ++
+  new constellation.topology.UnidirectionalTorus1DConfig(6))
