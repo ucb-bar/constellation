@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import chisel3.util.random.LFSR
 
-import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImpLike, LazyModuleImp, AddressSet}
+import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.config.{Field, Parameters, Config}
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.util._
@@ -239,7 +239,7 @@ class TLNoCTester(implicit p: Parameters) extends LazyModule {
 
   (0 until nManagers) foreach { n =>
     val ram = LazyModule(new TLRAM(AddressSet(0x0+0x400*n, 0x3ff)))
-    ram.node := TLFragmenter(4, 256) := TLDelayer(0.1) := xbar.node
+    DisableMonitors { implicit p => ram.node := TLFragmenter(4, 256) } := TLDelayer(0.1) := xbar.node
   }
 
   lazy val module = new LazyModuleImp(this) {
