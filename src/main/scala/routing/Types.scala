@@ -6,6 +6,13 @@ import freechips.rocketchip.config.{Parameters}
 
 import constellation._
 
+/** A representation for 1 specific virtual channel in wormhole routing
+ *  
+ * @param src the source node
+ * @param vc ID for the virtual channel
+ * @param dst the destination node
+ * @param n_vc the number of virtual channels
+ */
 case class ChannelRoutingInfo(
   src: Int, vc: Int, dst: Int, n_vc: Int
 ) {
@@ -22,6 +29,11 @@ class ChannelRoutingBundle extends Bundle {
   val dst = UInt()
 }
 
+/** Represnets the properties of a packet that are reelvant for routing
+ * 
+ * @param egressId packet's destination egress point
+ * vNet virtual subnetwork identifier
+ */
 case class PacketRoutingInfo(
   egressId: Int, vNet: Int
 )(implicit val p: Parameters) {
