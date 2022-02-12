@@ -59,9 +59,8 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
         srcId = i,
         destId = j,
         payloadBits = payloadBits,
-        virtualChannelParams = cP.virtualChannelParams.zipWithIndex.map { case (vP, vc) =>
-          VirtualChannelParams(i, j, vc, vP.bufferSize, Set[PacketRoutingInfo](), getUniqueChannelId())
-        }
+        user = cP,
+        uniqueId = getUniqueChannelId()
       ))
     } else {
       None
