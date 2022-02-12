@@ -22,15 +22,13 @@ class ChannelBuffer(depth: Int)(implicit p: Parameters) extends LazyModule {
 
     if (cParam.traversable) {
       out.flit := Pipe(in.flit, depth)
-      in.credit_return := Pipe(out.credit_return, depth)
-      in.vc_free := Pipe(out.vc_free, depth)
+      in.credit_return := ShiftRegister(out.credit_return, depth)
+      in.vc_free := ShiftRegister(out.vc_free, depth)
     } else {
       out.flit.valid := false.B
       out.flit.bits := DontCare
-      in.credit_return.valid := false.B
-      in.credit_return.bits := DontCare
-      in.vc_free.valid := false.B
-      in.vc_free.bits := DontCare
+      in.credit_return := 0.U
+      in.vc_free := 0.U
     }
   }
 }

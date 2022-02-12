@@ -263,16 +263,13 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   }
   io.debug.sa_stall := PopCount(io.salloc_req.map(r => r.valid && !r.ready))
 
-  val salloc_fires = io.salloc_req.map(_.fire())
+  val salloc_fires = VecInit(io.salloc_req.map(_.fire())).asUInt
   val salloc_fire_id = OHToUInt(salloc_fires)
-  val salloc_fire = salloc_fires.reduce(_||_)
+  val salloc_fire = salloc_fires =/= 0.U
   assert(PopCount(salloc_fires) <= 1.U)
 
-  io.in.credit_return.valid := salloc_fire
-  io.in.credit_return.bits := salloc_fire_id
-  io.in.vc_free.valid := salloc_fire && buffer.io.tail_read_resp(salloc_fire_id)
-  io.in.vc_free.bits := salloc_fire_id
-
+  io.in.credit_return := salloc_fires
+  io.in.vc_free := Mux(buffer.io.tail_read_resp(salloc_fire_id), salloc_fires, 0.U)
 
   class OutBundle extends Bundle {
     val valid = Bool()

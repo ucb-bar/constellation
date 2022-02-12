@@ -177,8 +177,8 @@ trait HasChannelParams extends HasNoCParams {
 
 class Channel(val cParam: ChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   val flit = Valid(new Flit(cParam))
-  val credit_return = Input(Valid(UInt(virtualChannelBits.W)))
-  val vc_free = Input(Valid(UInt(virtualChannelBits.W)))
+  val credit_return = Input(UInt(nVirtualChannels.W))
+  val vc_free = Input(UInt(nVirtualChannels.W))
 }
 
 class TerminalChannel(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
