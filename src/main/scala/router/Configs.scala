@@ -23,9 +23,13 @@ class WithEarlyRC extends Config((site, here, up) => {
 
 
 class WithIterativeVCAllocator extends Config((site, here, up) => {
-  case NoCKey => up(NoCKey, site).copy(vcAllocator = (vP) => (p) => new IterativeVCAllocator(vP)(p))
+  case NoCKey => up(NoCKey, site).copy(routerParams = (i: Int) =>
+    up(NoCKey, site).routerParams(i).copy(vcAllocator = (vP) => (p) => new IterativeVCAllocator(vP)(p))
+  )
 })
 
 class WithSimpleVCAllocator extends Config((site, here, up) => {
-  case NoCKey => up(NoCKey, site).copy(vcAllocator = (vP) => (p) => new SimpleVCAllocator(vP)(p))
+  case NoCKey => up(NoCKey, site).copy(routerParams = (i: Int) =>
+    up(NoCKey, site).routerParams(i).copy(vcAllocator = (vP) => (p) => new SimpleVCAllocator(vP)(p))
+  )
 })

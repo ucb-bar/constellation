@@ -15,7 +15,8 @@ case class UserRouterParams(
   payloadBits: Int = 64,
   combineSAST: Boolean = false,
   combineRCVA: Boolean = false,
-  earlyRC: Boolean = false
+  earlyRC: Boolean = false,
+  vcAllocator: VCAllocatorParams => Parameters => VCAllocator = (vP) => (p) => new IterativeVCAllocator(vP)(p)
 )
 
 case class RouterParams(
@@ -103,7 +104,7 @@ class Router(
 
     val switch = Module(new Switch(routerParams, inParams, outParams, ingressParams, egressParams))
     val switch_allocator = Module(new SwitchAllocator(routerParams, inParams, outParams, ingressParams, egressParams))
-    val vc_allocator = Module(p(NoCKey).vcAllocator(
+    val vc_allocator = Module(routerParams.user.vcAllocator(
       VCAllocatorParams(routerParams, inParams, outParams, ingressParams, egressParams)
     )(p))
     val route_computer = Module(new RouteComputer(routerParams, inParams, outParams, ingressParams, egressParams))
