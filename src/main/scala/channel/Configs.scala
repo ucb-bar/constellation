@@ -3,31 +3,42 @@ package constellation.channel
 import freechips.rocketchip.config.{Field, Parameters, Config}
 import constellation.{NoCKey}
 
-class WithUniformChannelDepth(depth: Int) extends Config((site, here, up) => {
+class WithUniformChannels(f: UserChannelParams => UserChannelParams) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(channelParamGen = (src: Int, dst: Int) => {
-    up(NoCKey, site).channelParamGen(src, dst).copy(channel = (u: Parameters) => {
-      implicit val p: Parameters = u
-      ChannelBuffer(depth) := _
-    })
+    f(up(NoCKey, site).channelParamGen(src, dst))
   })
 })
 
-class WithUniformVirtualChannelBufferSize(size: Int) extends Config((site, here, up) => {
-  case NoCKey => up(NoCKey, site).copy(channelParamGen = (src: Int, dst: Int) => {
-    val cp = up(NoCKey, site).channelParamGen(src, dst)
-    cp.copy(virtualChannelParams = cp.virtualChannelParams.map(_.copy(bufferSize = size)))
+class WithUniformVirtualChannels(f: Seq[UserVirtualChannelParams] => Seq[UserVirtualChannelParams]) extends WithUniformChannels(p => {
+  p.copy(virtualChannelParams = f(p.virtualChannelParams))
+})
+
+class WithUniformUniformVirtualChannels(f: UserVirtualChannelParams => UserVirtualChannelParams)
+  extends WithUniformVirtualChannels(v => v.map(vc => f(vc)))
+
+class WithUniformNVirtualChannels(n: Int, p: UserVirtualChannelParams) extends WithUniformVirtualChannels(_ => {
+  Seq.fill(n) { p }
+})
+
+class WithUniformChannelDepth(depth: Int) extends WithUniformChannels(p => {
+  p.copy(channel = (u: Parameters) => {
+    implicit val p: Parameters = u
+    ChannelBuffer(depth) := _
   })
 })
 
-class WithVirtualChannels(v: Seq[UserVirtualChannelParams]) extends Config((site, here, up) => {
-  case NoCKey => up(NoCKey, site).copy(channelParamGen = (src: Int, dst: Int) =>
-    up(NoCKey, site).channelParamGen(src, dst).copy(
-      virtualChannelParams = v
-    )
-  )
+class WithUniformVirtualChannelBufferSize(size: Int) extends WithUniformUniformVirtualChannels(v => {
+  v.copy(bufferSize = size)
 })
 
-class WithUniformVirtualChannels(n: Int, v: UserVirtualChannelParams) extends WithVirtualChannels(Seq.fill(n)(v))
+class WithUniformChannelSrcMultiplier(mult: Int) extends WithUniformChannels(p => {
+  p.copy(srcMultiplier = mult)
+})
+
+class WithUniformChannelDestMultiplier(mult: Int) extends WithUniformChannels(p => {
+  p.copy(destMultiplier = mult)
+})
+
 
 class WithIngressVNets(f: Int => Int) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(ingresses = up(NoCKey, site).ingresses.zipWithIndex.map { case (u,i) =>
