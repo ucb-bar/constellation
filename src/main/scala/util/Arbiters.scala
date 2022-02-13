@@ -70,10 +70,11 @@ class GrantHoldArbiter[T <: Data](
   io.in.foreach(_.ready := false.B)
   var chosens = 0.U(arbN.W)
   for (i <- 0 until nOut) {
-    val chosen = Mux(locked(i) && io.in(lockIdx(i)).valid, lockIdx(i), choices(i))
+    val in_valids = (0 until arbN).map { j => io.in(j).valid && !chosens(j) }
+    val chosen = Mux(locked(i) && in_valids(lockIdx(i)), lockIdx(i), choices(i))
     io.chosen(i) := chosen
     io.chosen_oh(i) := UIntToOH(chosen)
-    io.out(i).valid := io.in(chosen).valid && !chosens(chosen)
+    io.out(i).valid := in_valids(chosen)
     io.out(i).bits := io.in(chosen).bits
 
     for (j <- 0 until arbN) {

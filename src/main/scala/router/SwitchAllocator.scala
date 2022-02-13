@@ -25,17 +25,20 @@ class SwitchAllocator(
   val io = IO(new Bundle {
     val req = MixedVec(allInParams.map(u =>
       Vec(u.destMultiplier, Flipped(Decoupled(new SwitchAllocReq(outParams, egressParams))))))
-    val credit_alloc = MixedVec(outParams.map { u => Valid(UInt(log2Up(u.nVirtualChannels).W)) })
+    val credit_alloc = MixedVec(outParams.map { u => Vec(u.nVirtualChannels, Output(Bool())) })
+    val switch_sel = MixedVec(allOutParams.map { o => Vec(o.srcMultiplier,
+      MixedVec(allInParams.map { i => Vec(i.destMultiplier, Output(Bool())) })) })
   })
   val nInputChannels = allInParams.map(_.nVirtualChannels).sum
 
-  val arbs = Seq.fill(nAllOutputs) { Module(new GrantHoldArbiter(
+  val arbs = allOutParams.map { oP => Module(new GrantHoldArbiter(
     new SwitchAllocReq(outParams, egressParams),
     allInParams.map(_.destMultiplier).reduce(_+_),
     (d: SwitchAllocReq) => d.tail,
-    policy = ArbiterPolicy.RoundRobin
+    policy = ArbiterPolicy.RoundRobin,
+    nOut = oP.srcMultiplier
   )) }
-  arbs.foreach(_.io.out(0).ready := true.B)
+  arbs.foreach(_.io.out.foreach(_.ready := true.B))
 
   var idx = 0
   io.req.foreach(_.foreach { o =>
@@ -49,9 +52,26 @@ class SwitchAllocator(
     idx += 1
   })
 
-  (arbs.take(nOutputs) zip io.credit_alloc).map { case (a,i) =>
-    i.valid := a.io.out(0).fire()
-    val sel = a.io.out(0).bits.vc_sel.map(_.reduce(_||_))
-    i.bits := Mux1H(sel, a.io.out(0).bits.vc_sel.map(v => OHToUInt(v)))
+  for (i <- 0 until nAllOutputs) {
+    for (j <- 0 until allOutParams(i).srcMultiplier) {
+      idx = 0
+      for (m <- 0 until nAllInputs) {
+        for (n <- 0 until allInParams(m).destMultiplier) {
+          io.switch_sel(i)(j)(m)(n) := arbs(i).io.in(idx).valid && arbs(i).io.chosen(j) === idx.U && arbs(i).io.out(j).valid
+          idx += 1
+        }
+      }
+    }
+  }
+
+  io.credit_alloc.foreach(_.foreach(_ := false.B))
+  (arbs.take(nOutputs) zip io.credit_alloc).zipWithIndex.map { case ((a,i),t) =>
+    for (j <- 0 until i.size) {
+      for (k <- 0 until a.io.out.size) {
+        when (a.io.out(k).valid && a.io.out(k).bits.vc_sel(t)(j)) {
+          i(j) := true.B
+        }
+      }
+    }
   }
 }

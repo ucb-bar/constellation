@@ -11,21 +11,22 @@ class NoCMonitor(val cParam: ChannelParams)(implicit val p: Parameters) extends 
     val in = Input(new Channel(cParam))
   })
 
-  val in_flight = RegInit(0.U(nVirtualChannels.W))
-  when (io.in.flit.valid) {
-    when (io.in.flit.bits.head) {
-      in_flight := in_flight | (1.U << io.in.flit.bits.virt_channel_id)
-      assert (!in_flight(io.in.flit.bits.virt_channel_id), "Flit head/tail sequencing is broken")
+  val in_flight = RegInit(VecInit(Seq.fill(nVirtualChannels) { false.B }))
+  for (i <- 0 until cParam.srcMultiplier) {
+    val flit = io.in.flit(i)
+    when (flit.valid) {
+      when (flit.bits.head) {
+        in_flight(flit.bits.virt_channel_id) := true.B
+        assert (!in_flight(flit.bits.virt_channel_id), "Flit head/tail sequencing is broken")
+      }
+      when (flit.bits.tail) {
+        in_flight(flit.bits.virt_channel_id) := false.B
+      }
     }
-    when (io.in.flit.bits.tail) {
-      in_flight := in_flight & ~(1.U << io.in.flit.bits.virt_channel_id)
+    val possiblePackets = cParam.possiblePackets.map(p => Cat(p.egressId.U, p.vNet.U(vNetBits-1,0)))
+    when (flit.valid && flit.bits.head) {
+      assert (Cat(flit.bits.egress_id, flit.bits.vnet_id).isOneOf(possiblePackets.toSeq),
+        "Illegal packet found")
     }
   }
-
-  val possiblePackets = cParam.possiblePackets.map(p => Cat(p.egressId.U, p.vNet.U(vNetBits-1,0)))
-  when (io.in.flit.valid && io.in.flit.bits.head) {
-    assert (Cat(io.in.flit.bits.egress_id, io.in.flit.bits.vnet_id).isOneOf(possiblePackets.toSeq),
-      "Illegal packet found")
-  }
-
 }

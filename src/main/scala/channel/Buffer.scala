@@ -21,12 +21,12 @@ class ChannelBuffer(depth: Int)(implicit p: Parameters) extends LazyModule {
     val cParam = node.in(0)._2.cp
 
     if (cParam.traversable) {
-      out.flit := Pipe(in.flit, depth)
+      (out.flit zip in.flit).map(t => t._1 := Pipe(t._2))
       in.credit_return := ShiftRegister(out.credit_return, depth)
       in.vc_free := ShiftRegister(out.vc_free, depth)
     } else {
-      out.flit.valid := false.B
-      out.flit.bits := DontCare
+      out.flit.foreach(_.valid := false.B)
+      out.flit.foreach(_.bits := DontCare)
       in.credit_return := 0.U
       in.vc_free := 0.U
     }

@@ -89,8 +89,9 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   }
   val qs = virtualChannelParams.map { vP => Module(new Queue(new Flit(cParam), vP.bufferSize)) }
   qs.zipWithIndex.foreach { case (q,i) =>
-    q.io.enq.valid := io.in.flit.valid && io.in.flit.bits.virt_channel_id === i.U
-    q.io.enq.bits := io.in.flit.bits
+    val sel = io.in.flit.map(f => f.valid && f.bits.virt_channel_id === i.U)
+    q.io.enq.valid := sel.reduce(_||_)
+    q.io.enq.bits := Mux1H(sel, io.in.flit.map(_.bits))
     assert(!(q.io.enq.valid && !q.io.enq.ready))
     q.io.deq.ready := false.B
   }
@@ -100,41 +101,43 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     (t: RouteComputerReq) => true.B,
     policy = ArbiterPolicy.RoundRobin))
   val early_route_arbiter = Module(new Arbiter(
-    new RouteComputerReq(cParam), 2))
+    new RouteComputerReq(cParam), 1 + cParam.srcMultiplier))
+  early_route_arbiter.io.in.foreach(_.valid := false.B)
+  early_route_arbiter.io.in.foreach(_.bits := DontCare)
   early_route_arbiter.io.in(0) <> route_arbiter.io.out(0)
-  early_route_arbiter.io.in(1).valid := false.B
-  early_route_arbiter.io.in(1).bits := DontCare
   io.router_req <> early_route_arbiter.io.out
 
   val states = Reg(Vec(nVirtualChannels, new InputState))
 
-  when (io.in.flit.fire() && io.in.flit.bits.head) {
-    val id = io.in.flit.bits.virt_channel_id
-    assert(id < nVirtualChannels.U)
-    assert(states(id).g === g_i)
-    val at_dest = atDest(io.in.flit.bits.egress_id)
-    states(id).g := Mux(at_dest, g_v, g_r)
-    states(id).vc_sel.foreach(_.foreach(_ := false.B))
-    for (o <- 0 until nEgress) {
-      when (egressParams(o).egressId.U === io.in.flit.bits.egress_id) {
-        states(id).vc_sel(o+nOutputs)(0) := true.B
+  for (i <- 0 until cParam.srcMultiplier) {
+    when (io.in.flit(i).fire() && io.in.flit(i).bits.head) {
+      val id = io.in.flit(i).bits.virt_channel_id
+      assert(id < nVirtualChannels.U)
+      assert(states(id).g === g_i)
+      val at_dest = atDest(io.in.flit(i).bits.egress_id)
+      states(id).g := Mux(at_dest, g_v, g_r)
+      states(id).vc_sel.foreach(_.foreach(_ := false.B))
+      for (o <- 0 until nEgress) {
+        when (egressParams(o).egressId.U === io.in.flit(i).bits.egress_id) {
+          states(id).vc_sel(o+nOutputs)(0) := true.B
+        }
       }
-    }
-    states(id).r := io.in.flit.bits.route_info
-    states(id).tail_seen := io.in.flit.bits.tail
-    if (earlyRC) {
-      val rreq = early_route_arbiter.io.in(1)
-      when (!at_dest) {
-        rreq.valid := true.B
-        rreq.bits.route_info := io.in.flit.bits.route_info
-        rreq.bits.src_virt_id := io.in.flit.bits.virt_channel_id
-        states(id).g := Mux(rreq.ready, g_r_stall, g_r)
+      states(id).r := io.in.flit(i).bits.route_info
+      states(id).tail_seen := io.in.flit(i).bits.tail
+      if (earlyRC) {
+        val rreq = early_route_arbiter.io.in(i+1)
+        when (!at_dest) {
+          rreq.valid := true.B
+          rreq.bits.route_info := io.in.flit(i).bits.route_info
+          rreq.bits.src_virt_id := io.in.flit(i).bits.virt_channel_id
+          states(id).g := Mux(rreq.ready, g_r_stall, g_r)
+        }
       }
-    }
-  } .elsewhen (io.in.flit.fire()) {
-    val id = io.in.flit.bits.virt_channel_id
-    when (io.in.flit.bits.tail) {
-      states(id).tail_seen := true.B
+    } .elsewhen (io.in.flit(i).fire()) {
+      val id = io.in.flit(i).bits.virt_channel_id
+      when (io.in.flit(i).bits.tail) {
+        states(id).tail_seen := true.B
+      }
     }
   }
 
@@ -153,8 +156,8 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   when (io.router_resp.fire()) {
     val id = io.router_resp.bits.src_virt_id
     assert(states(id).g.isOneOf(g_r, g_r_stall) || (
-      earlyRC.B && io.in.flit.valid && io.in.flit.bits.head && io.in.flit.bits.virt_channel_id === id)
-    )
+      earlyRC.B && io.in.flit.map(f => f.valid && f.bits.head && f.bits.virt_channel_id === id).reduce(_||_)
+    ))
     states(id).g := g_v
     for (i <- 0 until nVirtualChannels) {
       when (i.U === id) {
@@ -221,7 +224,6 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     val valid = Bool()
     val vid = UInt(virtualChannelBits.W)
     val out_vid = UInt(log2Up(allOutParams.map(_.nVirtualChannels).max).W)
-    val out_id = Vec(nAllOutputs, Bool())
     val flit = new Flit(cParam)
   }
 
@@ -247,13 +249,11 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     val channel_oh = vc_sel.map(_.reduce(_||_))
     val virt_channel = Mux1H(channel_oh, vc_sel.map(v => OHToUInt(v)))
     salloc_out.out_vid := virt_channel
-    salloc_out.out_id := VecInit(channel_oh)
     salloc_out.flit := Mux1H(salloc_arb.io.chosen_oh(i), qs.map(_.io.deq.bits))
 
     io.out(i).valid := salloc_out.valid
     io.out(i).bits.flit := salloc_out.flit
     io.out(i).bits.out_virt_channel := salloc_out.out_vid
-    io.out(i).bits.out_channel_oh := salloc_out.out_id
   }
 
   (0 until nVirtualChannels).map { i =>

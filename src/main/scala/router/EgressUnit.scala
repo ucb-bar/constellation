@@ -19,17 +19,17 @@ class EgressUnit(inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannel
 
   val channel_empty = RegInit(true.B)
   val q = Module(new Queue(new IOFlit(cParam), 3, flow=true))
-  q.io.enq.valid := io.in.valid
-  q.io.enq.bits.head := io.in.bits.head
-  q.io.enq.bits.tail := io.in.bits.tail
-  q.io.enq.bits.egress_id := io.in.bits.egress_id
-  q.io.enq.bits.payload := io.in.bits.payload
+  q.io.enq.valid := io.in(0).valid
+  q.io.enq.bits.head := io.in(0).bits.head
+  q.io.enq.bits.tail := io.in(0).bits.tail
+  q.io.enq.bits.egress_id := io.in(0).bits.egress_id
+  q.io.enq.bits.payload := io.in(0).bits.payload
   io.out <> q.io.deq
   assert(!(q.io.enq.valid && !q.io.enq.ready))
 
   io.credit_available(0) := q.io.count === 0.U
   io.channel_available(0) := channel_empty
-  when (io.in.fire() && io.in.bits.tail) {
+  when (io.in(0).fire() && io.in(0).bits.tail) {
     channel_empty := true.B
     io.channel_available(0) := true.B
   }

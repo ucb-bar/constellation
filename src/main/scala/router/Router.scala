@@ -151,6 +151,11 @@ class Router(
       case (i,u) => i <> u.io.out }
     (all_output_units zip switch.io.out).foreach {
       case (u,o) => u.io.in <> o }
+    switch.io.sel := (if (routerParams.user.combineSAST) {
+      switch_allocator.io.switch_sel
+    } else {
+      RegNext(switch_allocator.io.switch_sel)
+    })
 
     (io.debug.va_stall zip all_input_units.map(_.io.debug.va_stall)).map { case (l,r) => l := r }
     (io.debug.sa_stall zip all_input_units.map(_.io.debug.sa_stall)).map { case (l,r) => l := r }
@@ -173,9 +178,9 @@ class Router(
       }
     }
 
-    destNodes.map(_.in(0)).foreach { case (in, edge) =>
-      sample(in.flit.fire(), s"${edge.cp.srcId} $nodeId")
-    }
+    destNodes.map(_.in(0)).foreach { case (in, edge) => in.flit.map { f =>
+      sample(f.fire(), s"${edge.cp.srcId} $nodeId")
+    } }
     ingressNodes.map(_.in(0)).foreach { case (in, edge) =>
       sample(in.flit.fire(), s"i${edge.cp.asInstanceOf[IngressChannelParams].ingressId} $nodeId")
     }

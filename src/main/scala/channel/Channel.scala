@@ -180,7 +180,7 @@ trait HasChannelParams extends HasNoCParams {
 }
 
 class Channel(val cParam: ChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
-  val flit = Valid(new Flit(cParam))
+  val flit = Vec(cParam.srcMultiplier, Valid(new Flit(cParam)))
   val credit_return = Input(UInt(nVirtualChannels.W))
   val vc_free = Input(UInt(nVirtualChannels.W))
 }

@@ -13,7 +13,7 @@ class AbstractOutputUnitIO(
 )(implicit val p: Parameters) extends Bundle with HasRouterInputParams with HasChannelParams {
   val nodeId = cParam.srcId
 
-  val in = Flipped(Valid(new Flit(cParam)))
+  val in = Flipped(Vec(cParam.srcMultiplier, Valid(new Flit(cParam))))
   val credit_available = Output(Vec(nVirtualChannels, Bool()))
   val channel_available = Output(Vec(nVirtualChannels, Bool()))
   val allocs = Input(Vec(nVirtualChannels, Bool()))
@@ -34,7 +34,7 @@ class OutputUnit(inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannel
 
   val io = IO(new AbstractOutputUnitIO(inParams, ingressParams, cParam) {
     val out = new Channel(cParam.asInstanceOf[ChannelParams])
-    val credit_alloc = Input(Valid(UInt(virtualChannelBits.W)))
+    val credit_alloc = Input(Vec(nVirtualChannels, Bool()))
   })
 
   val g_i :: g_a :: g_c :: Nil = Enum(3)
@@ -56,6 +56,7 @@ class OutputUnit(inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannel
     }
   } }
 
+
   (states zip io.allocs).zipWithIndex.map { case ((s,a),i) => if (virtualChannelParams(i).traversable) {
     when (a) { s.g := g_a }
   } }
@@ -66,7 +67,7 @@ class OutputUnit(inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannel
 
   states.zipWithIndex.map { case (s,i) =>
     val free = io.out.credit_return(i)
-    val alloc = (io.credit_alloc.valid && io.credit_alloc.bits === i.U)
+    val alloc = io.credit_alloc(i)
     if (virtualChannelParams(i).traversable) {
       s.c := s.c +& free - alloc
     }

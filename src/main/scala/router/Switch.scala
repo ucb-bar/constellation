@@ -10,7 +10,6 @@ import constellation.channel.{ChannelParams, IngressChannelParams, EgressChannel
 
 class SwitchBundle(val outParams: Seq[ChannelParams], val egressParams: Seq[EgressChannelParams])(implicit val p: Parameters) extends Bundle with HasRouterOutputParams{
   val flit = new Flit(allOutParams(0))
-  val out_channel_oh = Vec(nAllOutputs, Bool())
   val out_virt_channel = UInt(log2Up(allOutParams.map(_.nVirtualChannels).max).W)
 }
 
@@ -25,7 +24,10 @@ class Switch(
   val io = IO(new Bundle {
     val in = MixedVec(allInParams.map { u => Vec(u.destMultiplier,
       Input(Valid(new SwitchBundle(outParams, egressParams)))) })
-    val out = MixedVec(allOutParams.map { u => Output(Valid(new Flit(u))) })
+    val out = MixedVec(allOutParams.map { u => Vec(u.srcMultiplier,
+      Output(Valid(new Flit(u)))) })
+    val sel = MixedVec(allOutParams.map { o => Vec(o.srcMultiplier,
+      MixedVec(allInParams.map { i => Vec(i.destMultiplier, Input(Bool())) })) })
   })
 
   val in_flat = Wire(Vec(allInParams.map(_.destMultiplier).reduce(_+_),
@@ -36,11 +38,12 @@ class Switch(
     idx += 1
   })
 
-  io.out.zipWithIndex.map { case (o,x) =>
-    val oh = in_flat.map(i => i.valid && i.bits.out_channel_oh(x))
-    assert(PopCount(oh) <= 1.U)
-    o.valid := oh.reduce(_||_)
-    o.bits := Mux1H(oh, in_flat.map(_.bits.flit))
-    o.bits.virt_channel_id := Mux1H(oh, in_flat.map(_.bits.out_virt_channel))
+  for (i <- 0 until nAllOutputs) {
+    for (j <- 0 until allOutParams(i).srcMultiplier) {
+      val sel_flat = io.sel(i)(j).asUInt
+      io.out(i)(j).valid := Mux1H(sel_flat, in_flat.map(_.valid))
+      io.out(i)(j).bits  := Mux1H(sel_flat, in_flat.map(_.bits.flit))
+      io.out(i)(j).bits.virt_channel_id := Mux1H(sel_flat, in_flat.map(_.bits.out_virt_channel))
+    }
   }
 }
