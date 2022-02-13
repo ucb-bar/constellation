@@ -29,7 +29,7 @@ class SwitchAllocator(
   })
   val nInputChannels = allInParams.map(_.nVirtualChannels).sum
 
-  val in_arbs = io.req.map { r =>
+  val in_arbs = (allInParams zip io.req).map { case (iP, r) =>
     val arb = Module(new GrantHoldArbiter(
       new SwitchAllocReq(outParams, egressParams),
       r.size,
@@ -45,21 +45,21 @@ class SwitchAllocator(
     (d: SwitchAllocReq) => d.tail,
     policy = ArbiterPolicy.RoundRobin
   )) }
-  arbs.foreach(_.io.out.ready := true.B)
+  arbs.foreach(_.io.out(0).ready := true.B)
 
   in_arbs.zipWithIndex.foreach { case (o,j) =>
     val fires = Wire(Vec(arbs.size, Bool()))
     arbs.zipWithIndex.foreach { case (a,i) =>
-      a.io.in(j).valid := o.io.out.valid && o.io.out.bits.vc_sel(i).reduce(_||_)
-      a.io.in(j).bits := o.io.out.bits
+      a.io.in(j).valid := o.io.out(0).valid && o.io.out(0).bits.vc_sel(i).reduce(_||_)
+      a.io.in(j).bits := o.io.out(0).bits
       fires(i) := a.io.in(j).fire()
     }
-    o.io.out.ready := fires.reduce(_||_)
+    o.io.out(0).ready := fires.reduce(_||_)
   }
 
   (arbs.take(nOutputs) zip io.credit_alloc).map { case (a,i) =>
-    i.valid := a.io.out.fire()
-    val sel = a.io.out.bits.vc_sel.map(_.reduce(_||_))
-    i.bits := Mux1H(sel, a.io.out.bits.vc_sel.map(v => OHToUInt(v)))
+    i.valid := a.io.out(0).fire()
+    val sel = a.io.out(0).bits.vc_sel.map(_.reduce(_||_))
+    i.bits := Mux1H(sel, a.io.out(0).bits.vc_sel.map(v => OHToUInt(v)))
   }
 }

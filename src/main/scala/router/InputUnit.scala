@@ -96,7 +96,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     policy = ArbiterPolicy.RoundRobin))
   val early_route_arbiter = Module(new Arbiter(
     new RouteComputerReq(cParam), 2))
-  early_route_arbiter.io.in(0) <> route_arbiter.io.out
+  early_route_arbiter.io.in(0) <> route_arbiter.io.out(0)
   early_route_arbiter.io.in(1).valid := false.B
   early_route_arbiter.io.in(1).bits := DontCare
   io.router_req <> early_route_arbiter.io.out

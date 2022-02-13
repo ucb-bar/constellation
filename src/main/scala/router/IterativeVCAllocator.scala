@@ -33,26 +33,26 @@ class IterativeVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) extend
   val allocator = Module(new GrantHoldArbiter(Bool(), nOutChannels, (_: Bool) => true.B))
   allocator.io.in.foreach(_.bits := false.B)
   allocator.io.prios.foreach(_ := 0.U)
-  allocator.io.out.ready := true.B
+  allocator.io.out(0).ready := true.B
   for (outId <- 0 until nAllOutputs) {
     for (outVirtId <- 0 until allOutParams(outId).nVirtualChannels) {
       val idx = getIdx(outId, outVirtId)
-      allocator.io.in(idx).valid := (arb.io.out.valid &&
-        arb.io.out.bits.vc_sel(outId)(outVirtId) &&
+      allocator.io.in(idx).valid := (arb.io.out(0).valid &&
+        arb.io.out(0).bits.vc_sel(outId)(outVirtId) &&
         io.channel_available(outId)(outVirtId))
       io.out_allocs(outId)(outVirtId) := allocator.io.in(idx).fire()
     }
   }
 
-  arb.io.out.ready := allocator.io.out.valid
+  arb.io.out(0).ready := allocator.io.out(0).valid
 
   t = 0
   io.resp.zipWithIndex.map { case (resp,i) =>
-    val fire_id = allocator.io.chosen
+    val fire_id = allocator.io.chosen(0)
     val (out_id, out_virt_id) = getOutChannelInfo(fire_id)
 
-    resp.valid := allocator.io.out.valid && arb.io.out.bits.in_id === i.U
-    resp.bits.in_virt_channel := arb.io.out.bits.in_virt_channel
+    resp.valid := allocator.io.out(0).valid && arb.io.out(0).bits.in_id === i.U
+    resp.bits.in_virt_channel := arb.io.out(0).bits.in_virt_channel
     resp.bits.vc_sel.foreach(_.foreach(_ := false.B))
     for (o <- 0 until nAllOutputs) {
       when (out_id === o.U) {

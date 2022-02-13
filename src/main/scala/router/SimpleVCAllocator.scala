@@ -41,14 +41,14 @@ class Allocator(d0: Int, d1: Int,
     rank_1_arbs(y).io.in(x).bits := DontCare
     in(y)(x).ready := rank_1_arbs(y).io.in(x).ready
 
-    rank_2_arbs(x).io.in(y).valid := (rank_1_arbs(y).io.out.valid &&
-      rank_1_arbs(y).io.chosen === x.U)
+    rank_2_arbs(x).io.in(y).valid := (rank_1_arbs(y).io.out(0).valid &&
+      rank_1_arbs(y).io.chosen(0) === x.U)
     rank_2_arbs(x).io.in(y).bits := DontCare
   }
   rank_1_arbs.zipWithIndex.map { case (a,y) =>
-    a.io.out.ready := rank_2_arbs.map(_.io.in(y).fire()).reduce(_||_)
+    a.io.out(0).ready := rank_2_arbs.map(_.io.in(y).fire()).reduce(_||_)
   }
-  rank_2_arbs.foreach(_.io.out.ready := true.B)
+  rank_2_arbs.foreach(_.io.out(0).ready := true.B)
 
   assert((0 until d0).map { y => PopCount(
     (0 until d1).map { x => io.in(y)(x).fire() }) <= 1.U }.reduce(_&&_))
@@ -72,7 +72,7 @@ class SimpleVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) extends V
       r.ready := l.ready
     }
   }
-  val reqs = per_input_qs.map(_.io.out)
+  val reqs = per_input_qs.map(_.io.out(0))
 
   io.resp.foreach(_.bits := DontCare)
   (io.resp zip reqs).map { case (o,i) => o.bits.in_virt_channel := i.bits.in_virt_channel }

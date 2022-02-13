@@ -14,10 +14,14 @@ class GrantHoldArbiter[T <: Data](
       canUnlock: T => Bool,
       needsLock: Option[T => Bool] = None,
       prioBits: Int = 0,
-      policy: ArbiterPolicy.ArbiterPolicy = ArbiterPolicy.LowestFirst
+      policy: ArbiterPolicy.ArbiterPolicy = ArbiterPolicy.LowestFirst,
+      nOut: Int = 1
 ) extends Module {
 
-  val io = IO(new ArbiterIO(typ, arbN) {
+  val io = IO(new Bundle {
+    val in = Flipped(Vec(arbN, Decoupled(typ)))
+    val out = Vec(nOut, Decoupled(typ))
+    val chosen = Vec(nOut, Output(UInt(log2Ceil(arbN).W)))
     val prios = (prioBits > 0).option(Input(Vec(arbN, UInt(prioBits.W))))
   })
 
@@ -28,8 +32,8 @@ class GrantHoldArbiter[T <: Data](
     }
   }
 
-  val lockIdx = RegInit(0.U(log2Up(arbN).W))
-  val locked = RegInit(false.B)
+  val lockIdx = Seq.fill(nOut) { RegInit(0.U(log2Up(arbN).W)) }
+  val locked = Seq.fill(nOut) { RegInit(false.B) }
   val prio_valids = if (prioBits > 0) {
     val prios_oh = (io.in zip io.prios.get).map { case (i,p) => i.valid << p }
     val lowest_prio = PriorityEncoder(prios_oh.reduce(_|_))
@@ -37,11 +41,11 @@ class GrantHoldArbiter[T <: Data](
   } else {
     io.in.map(_.valid)
   }
-
-  val choice = if (policy == ArbiterPolicy.RoundRobin) {
+  val choices = Wire(Vec(nOut, UInt(log2Ceil(arbN).W)))
+  choices(0) := (if (policy == ArbiterPolicy.RoundRobin) {
     PriorityMux(
-      rotateLeft(VecInit(prio_valids), lockIdx + 1.U),
-      rotateLeft(VecInit((0 until arbN).map(_.U)), lockIdx + 1.U))
+      rotateLeft(VecInit(prio_valids), lockIdx(0) + 1.U),
+      rotateLeft(VecInit((0 until arbN).map(_.U)), lockIdx(0) + 1.U))
   } else if (policy == ArbiterPolicy.Random) {
     val rand = LFSR(16)(log2Up(arbN)-1,0)
     PriorityMux(
@@ -49,31 +53,45 @@ class GrantHoldArbiter[T <: Data](
       rotateLeft(VecInit((0 until arbN).map(_.U)), rand + 1.U))
   } else {
     PriorityEncoder(prio_valids)
+  })
+
+  var valids = prio_valids.asUInt
+  for (i <- 1 until nOut) {
+    val sel = PriorityEncoderOH(valids)
+    choices(i) := OHToUInt(sel)
+    valids = valids & ~sel
   }
-
-  val chosen = Mux(locked && io.in(lockIdx).valid, lockIdx, choice)
-  io.chosen := chosen
-
-  for (i <- 0 until arbN) {
-    io.in(i).ready := io.out.ready && chosen === i.U
-  }
-
-  io.out.valid := io.in(chosen).valid
-  io.out.bits := io.in(chosen).bits
 
   def realNeedsLock(data: T): Bool =
     needsLock.map(_(data)).getOrElse(true.B)
 
-  when (io.out.fire() && realNeedsLock(io.out.bits)) {
-    lockIdx := choice
-    locked := true.B
-  } .elsewhen (!locked) {
-    lockIdx := WrapInc(lockIdx, arbN)
-  }
 
-  // the unlock statement takes precedent
-  when (io.out.fire() && canUnlock(io.out.bits)) {
-    locked := false.B
+  io.in.foreach(_.ready := false.B)
+  var chosens = 0.U(arbN.W)
+  for (i <- 0 until nOut) {
+    val chosen = Mux(locked(i) && io.in(lockIdx(i)).valid, lockIdx(i), choices(i))
+    io.chosen(i) := chosen
+    io.out(i).valid := io.in(chosen).valid && !chosens(chosen)
+    io.out(i).bits := io.in(chosen).bits
+
+    for (j <- 0 until arbN) {
+      when (chosen === j.U && io.out(i).ready) {
+        io.in(j).ready := true.B
+      }
+    }
+    chosens = chosens | (1.U << chosen)
+
+    when (io.out(i).fire() && realNeedsLock(io.out(i).bits)) {
+      lockIdx(i) := choices(i)
+      locked(i) := true.B
+    } .elsewhen (!locked(i)) {
+      lockIdx(i) := WrapInc(lockIdx(i), arbN)
+    }
+
+    // the unlock statement takes precedence
+    when (io.out(i).fire && canUnlock(io.out(i).bits)) {
+      locked(i) := false.B
+    }
   }
 
 }
