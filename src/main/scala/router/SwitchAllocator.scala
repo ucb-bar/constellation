@@ -6,7 +6,7 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
-import constellation.channel.{ChannelParams, IngressChannelParams, EgressChannelParams}
+import constellation.channel._
 import constellation.util.{GrantHoldArbiter, ArbiterPolicy}
 
 class SwitchAllocReq(val outParams: Seq[ChannelParams], val egressParams: Seq[EgressChannelParams])
@@ -24,38 +24,30 @@ class SwitchAllocator(
 )(implicit val p: Parameters) extends Module with HasRouterParams {
   val io = IO(new Bundle {
     val req = MixedVec(allInParams.map(u =>
-      Vec(u.nVirtualChannels, Flipped(Decoupled(new SwitchAllocReq(outParams, egressParams))))))
+      Vec(u.destMultiplier, Flipped(Decoupled(new SwitchAllocReq(outParams, egressParams))))))
     val credit_alloc = MixedVec(outParams.map { u => Valid(UInt(log2Up(u.nVirtualChannels).W)) })
   })
   val nInputChannels = allInParams.map(_.nVirtualChannels).sum
 
-  val in_arbs = (allInParams zip io.req).map { case (iP, r) =>
-    val arb = Module(new GrantHoldArbiter(
-      new SwitchAllocReq(outParams, egressParams),
-      r.size,
-      (d: SwitchAllocReq) => d.tail,
-      policy = ArbiterPolicy.RoundRobin
-    ))
-    arb.io.in <> r
-    arb
-  }
   val arbs = Seq.fill(nAllOutputs) { Module(new GrantHoldArbiter(
     new SwitchAllocReq(outParams, egressParams),
-    nAllInputs,
+    allInParams.map(_.destMultiplier).reduce(_+_),
     (d: SwitchAllocReq) => d.tail,
     policy = ArbiterPolicy.RoundRobin
   )) }
   arbs.foreach(_.io.out(0).ready := true.B)
 
-  in_arbs.zipWithIndex.foreach { case (o,j) =>
+  var idx = 0
+  io.req.foreach(_.foreach { o =>
     val fires = Wire(Vec(arbs.size, Bool()))
     arbs.zipWithIndex.foreach { case (a,i) =>
-      a.io.in(j).valid := o.io.out(0).valid && o.io.out(0).bits.vc_sel(i).reduce(_||_)
-      a.io.in(j).bits := o.io.out(0).bits
-      fires(i) := a.io.in(j).fire()
+      a.io.in(idx).valid := o.valid && o.bits.vc_sel(i).reduce(_||_)
+      a.io.in(idx).bits := o.bits
+      fires(i) := a.io.in(idx).fire()
     }
-    o.io.out(0).ready := fires.reduce(_||_)
-  }
+    o.ready := fires.reduce(_||_)
+    idx += 1
+  })
 
   (arbs.take(nOutputs) zip io.credit_alloc).map { case (a,i) =>
     i.valid := a.io.out(0).fire()

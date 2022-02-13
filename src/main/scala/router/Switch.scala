@@ -23,15 +23,24 @@ class Switch(
 )(implicit val p: Parameters) extends Module with HasRouterParams {
 
   val io = IO(new Bundle {
-    val in = Vec(nAllInputs, Input(Valid(new SwitchBundle(outParams, egressParams))))
+    val in = MixedVec(allInParams.map { u => Vec(u.destMultiplier,
+      Input(Valid(new SwitchBundle(outParams, egressParams)))) })
     val out = MixedVec(allOutParams.map { u => Output(Valid(new Flit(u))) })
   })
 
+  val in_flat = Wire(Vec(allInParams.map(_.destMultiplier).reduce(_+_),
+    Valid(new SwitchBundle(outParams, egressParams))))
+  var idx = 0
+  io.in.foreach(_.foreach { i =>
+    in_flat(idx) := i
+    idx += 1
+  })
+
   io.out.zipWithIndex.map { case (o,x) =>
-    val oh = io.in.map(i => i.valid && i.bits.out_channel_oh(x))
+    val oh = in_flat.map(i => i.valid && i.bits.out_channel_oh(x))
     assert(PopCount(oh) <= 1.U)
     o.valid := oh.reduce(_||_)
-    o.bits := Mux1H(oh, io.in.map(_.bits.flit))
-    o.bits.virt_channel_id := Mux1H(oh, io.in.map(_.bits.out_virt_channel))
+    o.bits := Mux1H(oh, in_flat.map(_.bits.flit))
+    o.bits.virt_channel_id := Mux1H(oh, in_flat.map(_.bits.out_virt_channel))
   }
 }

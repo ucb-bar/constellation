@@ -92,7 +92,7 @@ class IngressUnit(
   } else {
     Reg(Valid(new SwitchBundle(outParams, egressParams)))
   }
-  io.out := out_bundle
+  io.out(0) := out_bundle
 
   out_bundle.valid := vcalloc_buffer.io.deq.fire()
   out_bundle.bits.flit.head := vcalloc_buffer.io.deq.bits.head

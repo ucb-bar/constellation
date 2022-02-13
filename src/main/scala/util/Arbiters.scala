@@ -22,6 +22,7 @@ class GrantHoldArbiter[T <: Data](
     val in = Flipped(Vec(arbN, Decoupled(typ)))
     val out = Vec(nOut, Decoupled(typ))
     val chosen = Vec(nOut, Output(UInt(log2Ceil(arbN).W)))
+    val chosen_oh = Vec(nOut, Output(UInt(arbN.W)))
     val prios = (prioBits > 0).option(Input(Vec(arbN, UInt(prioBits.W))))
   })
 
@@ -71,6 +72,7 @@ class GrantHoldArbiter[T <: Data](
   for (i <- 0 until nOut) {
     val chosen = Mux(locked(i) && io.in(lockIdx(i)).valid, lockIdx(i), choices(i))
     io.chosen(i) := chosen
+    io.chosen_oh(i) := UIntToOH(chosen)
     io.out(i).valid := io.in(chosen).valid && !chosens(chosen)
     io.out(i).bits := io.in(chosen).bits
 

@@ -55,10 +55,14 @@ trait BaseChannelParams {
   def nVirtualChannels: Int
   def channelRoutingInfos: Seq[ChannelRoutingInfo]
   def payloadBits: Int
+  def srcMultiplier: Int
+  def destMultiplier: Int
 }
 
 trait TerminalChannelParams extends BaseChannelParams {
   def nVirtualChannels = 1
+  def srcMultiplier = 1
+  def destMultiplier = 1
 }
 
 
