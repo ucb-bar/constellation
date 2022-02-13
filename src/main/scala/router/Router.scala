@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
-import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp}
+import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp, BundleBridgeSource}
 import freechips.rocketchip.util.{PlusArg}
 
 import constellation.channel._
@@ -52,6 +52,11 @@ trait HasRouterParams extends HasRouterOutputParams with HasRouterInputParams
   def nodeId = routerParams.nodeId
 }
 
+class DebugBundle(nIn: Int) extends Bundle {
+  val va_stall = Vec(nIn, UInt())
+  val sa_stall = Vec(nIn, UInt())
+}
+
 class Router(
   val routerParams: RouterParams,
   val inParams: Seq[ChannelParams],
@@ -67,18 +72,14 @@ class Router(
   val ingressNodes = ingressParams.map(u => TerminalChannelDestNode(u))
   val egressNodes = egressParams.map(u => TerminalChannelSourceNode(u))
 
+  val debugNode = BundleBridgeSource(() => new DebugBundle(nAllInputs))
+
   lazy val module = new LazyModuleImp(this) {
-    val io = IO(new Bundle {
-      val debug = Output(new Bundle {
-        val va_stall = Vec(nAllInputs, UInt())
-        val sa_stall = Vec(nAllInputs, UInt())
-      })
-    })
-    dontTouch(io.debug)
     val io_in = destNodes.map(_.in(0)._1)
     val io_out = sourceNodes.map(_.out(0)._1)
     val io_ingress = ingressNodes.map(_.in(0)._1)
     val io_egress = egressNodes.map(_.out(0)._1)
+    val io_debug = debugNode.out(0)._1
 
     require(nAllInputs >= 1)
     require(nAllOutputs >= 1)
@@ -157,8 +158,8 @@ class Router(
       RegNext(switch_allocator.io.switch_sel)
     })
 
-    (io.debug.va_stall zip all_input_units.map(_.io.debug.va_stall)).map { case (l,r) => l := r }
-    (io.debug.sa_stall zip all_input_units.map(_.io.debug.sa_stall)).map { case (l,r) => l := r }
+    (io_debug.va_stall zip all_input_units.map(_.io.debug.va_stall)).map { case (l,r) => l := r }
+    (io_debug.sa_stall zip all_input_units.map(_.io.debug.sa_stall)).map { case (l,r) => l := r }
 
     val debug_tsc = RegInit(0.U(64.W))
     debug_tsc := debug_tsc + 1.U

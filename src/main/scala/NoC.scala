@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
-import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp}
+import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp, BundleBridgeSink}
 import freechips.rocketchip.util.ElaborationArtefacts
 import constellation.router._
 import constellation.channel._
@@ -244,8 +244,12 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
     dst.egressNodes.foreach(n =>
       egressNodes(n.sourceParams.asInstanceOf[EgressChannelParams].egressId) := n
     )
+  }
 
-
+  val debugNodes = routers.map { r =>
+    val sink = BundleBridgeSink[DebugBundle]()
+    sink := r.debugNode
+    sink
   }
 
   println("Constellation: Starting NoC RTL generation")
@@ -263,8 +267,8 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
     val debug_va_stall_ctr = RegInit(0.U(64.W))
     val debug_sa_stall_ctr = RegInit(0.U(64.W))
     val debug_any_stall_ctr = debug_va_stall_ctr + debug_sa_stall_ctr
-    debug_va_stall_ctr := debug_va_stall_ctr + routerModules.map(_.io.debug.va_stall.reduce(_+_)).reduce(_+_)
-    debug_sa_stall_ctr := debug_sa_stall_ctr + routerModules.map(_.io.debug.sa_stall.reduce(_+_)).reduce(_+_)
+    debug_va_stall_ctr := debug_va_stall_ctr + debugNodes.map(_.in(0)._1.va_stall.reduce(_+_)).reduce(_+_)
+    debug_sa_stall_ctr := debug_sa_stall_ctr + debugNodes.map(_.in(0)._1.sa_stall.reduce(_+_)).reduce(_+_)
 
     dontTouch(debug_va_stall_ctr)
     dontTouch(debug_sa_stall_ctr)
