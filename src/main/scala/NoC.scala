@@ -244,7 +244,10 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
     val sourceNodes = routers(i).sourceNodes.filter(_.sourceParams.destId == j)
     val destNodes = routers(j).destNodes.filter(_.destParams.srcId == i)
     require (sourceNodes.size == destNodes.size)
-    (sourceNodes zip destNodes).foreach { t => t._2 := p(NoCKey).channelParamGen(i, j).channel(p)(t._1) }
+    val channelParam = p(NoCKey).channelParamGen(i, j)
+    (sourceNodes zip destNodes).foreach { case (src, dst) =>
+      router_sink_domains(j) { dst := channelParam.channelGen(p)(src) }
+    }
   }}
 
   routers.zipWithIndex.map { case (dst,dstId) =>
@@ -276,6 +279,7 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
 
     val routerModules = routers.map(r => r.module)
 
+    // TODO: These assume a single clock-domain across the entire noc
     val debug_va_stall_ctr = RegInit(0.U(64.W))
     val debug_sa_stall_ctr = RegInit(0.U(64.W))
     val debug_any_stall_ctr = debug_va_stall_ctr + debug_sa_stall_ctr

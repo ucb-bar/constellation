@@ -21,7 +21,7 @@ class WithUniformNVirtualChannels(n: Int, p: UserVirtualChannelParams) extends W
 })
 
 class WithUniformChannelDepth(depth: Int) extends WithUniformChannels(p => {
-  p.copy(channel = (u: Parameters) => {
+  p.copy(channelGen = (u: Parameters) => {
     implicit val p: Parameters = u
     ChannelBuffer(depth) := _
   })
