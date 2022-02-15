@@ -52,7 +52,7 @@ trait HasRouterParams extends HasRouterOutputParams with HasRouterInputParams
   def nodeId = routerParams.nodeId
 }
 
-class DebugBundle(nIn: Int) extends Bundle {
+class DebugBundle(val nIn: Int) extends Bundle {
   val va_stall = Vec(nIn, UInt())
   val sa_stall = Vec(nIn, UInt())
 }
