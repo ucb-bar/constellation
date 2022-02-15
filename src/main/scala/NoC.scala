@@ -4,8 +4,9 @@ import chisel3._
 import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
-import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp, BundleBridgeSink}
+import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp, BundleBridgeSink, InModuleBody}
 import freechips.rocketchip.util.ElaborationArtefacts
+import freechips.rocketchip.prci._
 import constellation.router._
 import constellation.channel._
 import constellation.routing.{RoutingRelation, PacketRoutingInfo, ChannelRoutingInfo}
@@ -216,7 +217,16 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
   channelParams.map(cP => if (!cP.traversable)
     println(s"Constellation WARNING: physical channel from ${cP.srcId} to ${cP.destId} appears to be untraversable"))
 
-  val routers = Seq.tabulate(nNodes) { i => LazyModule(new Router(
+  val clockSourceNodes = Seq.tabulate(nNodes) { i => ClockSourceNode(Seq(ClockSourceParameters())) }
+  val router_sink_domains = Seq.tabulate(nNodes) { i =>
+    val router_sink_domain = LazyModule(new ClockSinkDomain(ClockSinkParameters(
+      name = Some(s"${p(NoCKey).prefix}_router_$i")
+    )))
+    router_sink_domain.clockNode := clockSourceNodes(i)
+    router_sink_domain
+  }
+
+  val routers = Seq.tabulate(nNodes) { i => router_sink_domains(i) { LazyModule(new Router(
     routerParams = RouterParams(
       nodeId = i,
       user = p(NoCKey).routerParams(i)
@@ -225,7 +235,7 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
     outParams = channelParams.filter(_.srcId == i),
     ingressParams = globalIngressParams.filter(_.destId == i),
     egressParams = globalEgressParams.filter(_.srcId == i)
-  )) }
+  ))}}
 
   val ingressNodes = globalIngressParams.map { u => TerminalChannelSourceNode(u) }
   val egressNodes = globalEgressParams.map { u => TerminalChannelDestNode(u) }
@@ -257,10 +267,12 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
     val io = IO(new Bundle {
       val ingress = MixedVec(globalIngressParams.map { u => Flipped(new TerminalChannel(u)) })
       val egress = MixedVec(globalEgressParams.map { u => new TerminalChannel(u) })
+      val router_clocks = Vec(nNodes, Input(new ClockBundle(ClockBundleParameters())))
     })
 
     (io.ingress zip ingressNodes.map(_.out(0)._1)).foreach { case (l,r) => r <> l }
     (io.egress  zip egressNodes .map(_.in (0)._1)).foreach { case (l,r) => l <> r }
+    (io.router_clocks zip clockSourceNodes.map(_.out(0)._1)).foreach { case (l,r) => l <> r }
 
     val routerModules = routers.map(r => r.module)
 

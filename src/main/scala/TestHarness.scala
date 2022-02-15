@@ -156,6 +156,8 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
     rob_allocs = rob_allocs | (igen.io.fire << rob_idx)
   }
 
+  val enable_print_latency = PlusArg("noctest_enable_print", default=0, width=1)(0)
+
   io.from_noc.zipWithIndex map { case (o,i) =>
     o.flit.ready := LFSR(20) >= (outputStallProbability * (1 << 10)).toInt.U
     val rob_idx = o.flit.bits.payload(15,8)
@@ -170,7 +172,7 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
       assert(rob_flits_returned(rob_idx) < rob_n_flits(rob_idx), s"out[$i] too many flits returned")
       assert((!packet_valid && o.flit.bits.head) || rob_idx === packet_rob_idx)
 
-      when (o.flit.bits.head) {
+      when (o.flit.bits.head && enable_print_latency) {
         printf(s"%d, $i, %d\n", rob_ingress_id(rob_idx), tsc - (o.flit.bits.payload >> 16))
       }
 
@@ -200,9 +202,10 @@ class TestHarness(implicit val p: Parameters) extends Module {
   val io = IO(new Bundle {
     val success = Output(Bool())
   })
-
   val lazyNoC = LazyModule(new NoC)
   val noc = Module(lazyNoC.module)
+  noc.io.router_clocks.foreach(_.clock := clock)
+  noc.io.router_clocks.foreach(_.reset := reset)
   val noc_tester = Module(new NoCTester(lazyNoC.globalIngressParams, lazyNoC.globalEgressParams))
   noc.io.ingress <> noc_tester.io.to_noc
   noc_tester.io.from_noc <> noc.io.egress

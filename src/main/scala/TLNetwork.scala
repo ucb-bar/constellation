@@ -364,6 +364,8 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int], nocName: String)(
           prefix = Some(nocName)
         )
     }))).module)
+    noc.io.router_clocks.foreach(_.clock := clock)
+    noc.io.router_clocks.foreach(_.reset := reset)
 
     val tsc = RegInit(0.U(32.W))
     tsc := tsc + 1.U
