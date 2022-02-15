@@ -13,6 +13,10 @@ The Constellation NoC Generator
 
 etc.
 
+You can also run all tests with
+
+`CONSTELLATION_CI=1 sbt "testOnly constellation.NoCTest*"`
+
 ## Generating Topology Diagrams
 A GUI is required to view the diagram.
 
