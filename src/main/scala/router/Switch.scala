@@ -41,7 +41,8 @@ class Switch(
   for (i <- 0 until nAllOutputs) {
     for (j <- 0 until allOutParams(i).srcMultiplier) {
       val sel_flat = io.sel(i)(j).asUInt
-      io.out(i)(j).valid := Mux1H(sel_flat, in_flat.map(_.valid))
+      assert(PopCount(sel_flat) <= 1.U)
+      io.out(i)(j).valid := Mux1H(sel_flat, in_flat.map(_.valid)) && sel_flat =/= 0.U
       io.out(i)(j).bits  := Mux1H(sel_flat, in_flat.map(_.bits.flit))
       io.out(i)(j).bits.virt_channel_id := Mux1H(sel_flat, in_flat.map(_.bits.out_virt_channel))
     }
