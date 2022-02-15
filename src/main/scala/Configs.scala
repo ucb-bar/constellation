@@ -95,7 +95,7 @@ class TestConfig25 extends Config(
   new constellation.topology.Mesh2DConfig(3, 3))
 class TestConfig26 extends Config(
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.topology.Mesh2DConfig(10, 10))
+  new constellation.topology.Mesh2DConfig(3, 6))
 class TestConfig27 extends Config(
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.topology.Mesh2DConfig(5, 5))
