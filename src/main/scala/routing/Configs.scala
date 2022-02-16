@@ -17,7 +17,8 @@ class WithNNonblockingVirtualNetworks(n: Int) extends Config((site, here, up) =>
 })
 
 /** Creates N blocking virtual networks. blocking virtual networks can share all the
- *  resources of the NoC. This means that if one virtual network is blocked, the others are also blocked.
+ *  resources of the NoC. This means that if one virtual network i is blocked,
+ * all virtual networks j > i are blocked while virtual networks j < i are not.
  *
  * @param n number of blocking virtual sub-networks
  */

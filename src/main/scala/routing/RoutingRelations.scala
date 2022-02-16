@@ -8,8 +8,9 @@ import scala.math.pow
  *          Returns True if packet can acquire/proceed to this next channel, False if not. An example
  *          is the bidirectionalLine method; see its docstring.
  * @param isEscape function that takes in ChannelRoutingInfo and a virtual network ID. Returns True if the
- * channel represented by ChannelRoutingInfo is an escape channel and False if it is not. The default
- * value for isEscape is True since every channel can be an escape channel in deadlock-free networks.
+ *                 channel represented by ChannelRoutingInfo is an escape channel and False if it is not.
+ *                 By default, we ignore the escape-channel-based deadlock-free properties, and just check
+ *                 for deadlock-freedom by verifying lack of a cyclic dependency.
  */
 class RoutingRelation(
   f: (Int, ChannelRoutingInfo, ChannelRoutingInfo, PacketRoutingInfoInternal) => Boolean,
