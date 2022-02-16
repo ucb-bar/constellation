@@ -2,18 +2,6 @@ package constellation.routing
 
 import scala.math.pow
 
-/* Questions
- * - many routing relations seem topology-specific (Ex: bidirectionalTorus1DRandom) but doesn't seem
- *   like relations require a specific topology to be set? A: verification test will complain
- * - why do routing relations need to take in the node as an int? Shouldn't source channel contain
-     that information A: this is true, could be gotten rid of
- * - what kind of docs are wanted for RoutingRelations?
- * - n_vc in ChannelRoutingInfo (Types.scala)? A: number of vc
- * - how does the dateline in unidirectionalTorus1DDateline work
- *   - textbook: change buffer index after you cross the dateline
- * - what are the virtual subnetworks? Don't remember this from the textbook A: see later
- */
-
 /** Routing and channel allocation policy
  *
  * @param f function that takes in a nodeId, source channel, next channel, and packet routing info.
