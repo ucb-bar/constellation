@@ -32,7 +32,7 @@ class ChannelRoutingBundle extends Bundle {
 /** Represents the properties of a packet that are relevant for routing
  *
  * @param egressId packet's destination egress point
- * @param vNet virtual subnetwork identifier (todo: see protocol deadlock)s
+ * @param vNet virtual subnetwork identifier
  */
 case class PacketRoutingInfo(
   egressId: Int, vNet: Int

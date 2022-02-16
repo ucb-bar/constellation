@@ -6,25 +6,22 @@ import scala.math.pow
  * - many routing relations seem topology-specific (Ex: bidirectionalTorus1DRandom) but doesn't seem
  *   like relations require a specific topology to be set? A: verification test will complain
  * - why do routing relations need to take in the node as an int? Shouldn't source channel contain
-     that information A: this is true, could be gotten rid of (todo)
+     that information A: this is true, could be gotten rid of
  * - what kind of docs are wanted for RoutingRelations?
  * - n_vc in ChannelRoutingInfo (Types.scala)? A: number of vc
  * - how does the dateline in unidirectionalTorus1DDateline work
  *   - textbook: change buffer index after you cross the dateline
- * - what are the virtual subnetworks? Don't remember this from the textbook A: see todo
+ * - what are the virtual subnetworks? Don't remember this from the textbook A: see later
  */
 
 /** Routing and channel allocation policy
  *
  * @param f function that takes in a nodeId, source channel, next channel, and packet routing info.
-            Returns True if packet can acquire/proceed to this next channel, False if not. An example
-            is bidirectionalLine.
- * @param isEscape TODO -- escape channels from textbook. Routing may not be a deadlokc free relation but
- there's a set of virtual networks in a deadlock free escape channel. Nodes in deadlock can always take the
- escape channels to break deadlock and reach their destination. What is the purpose of isEscape though, since
- this is still a topology thats valid under RoutingRelation. isEscape takes in a channelroutinginfo and a virtual
- network ID and returns True if the channel is an escape channel, and the default value is true because on deadlock free networks
- every channel can be an escape channel
+ *          Returns True if packet can acquire/proceed to this next channel, False if not. An example
+ *          is the bidirectionalLine method; see its docstring.
+ * @param isEscape function that takes in ChannelRoutingInfo and a virtual network ID. Returns True if the
+ * channel represented by ChannelRoutingInfo is an escape channel and False if it is not. The default
+ * value for isEscape is True since every channel can be an escape channel in deadlock-free networks.
  */
 class RoutingRelation(
   f: (Int, ChannelRoutingInfo, ChannelRoutingInfo, PacketRoutingInfoInternal) => Boolean,
@@ -63,9 +60,12 @@ class RoutingRelation(
 
 object RoutingRelation {
 
-  /** TODO -- takes in two routing relations, first is escape relation, second is deadlock-possible option,
-  constructs one overall routing relation that combines the two. delete comments on this method
-  this doesn't detect deadlock, just plugs escape channels into the regular routing relation
+  /** Given a deadlock-prone routing relation and a routing relation representing the network's escape
+   *  channels, returns a routing relation that adds the escape channels to the deadlock-prone relation.
+   *
+   *  @param escapeRouter routing relation representing the network's escape channels
+   *  @param normalrouter deadlock-prone routing relation
+   *  @param nEscapeChannels number of escape channels
    */
   def escapeChannels(escapeRouter: RoutingRelation, normalRouter: RoutingRelation, nEscapeChannels: Int = 1) = {
     new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
@@ -96,12 +96,19 @@ object RoutingRelation {
   // Usable policies
   val allLegal = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => true)
 
-  // todo: document this one only to explain how `f` works in class RoutingRelation
+  /** An example of the parameter `f` for the RoutingRelation class that routes traffic along a
+   * straight-line network in the direction of the packet's destination. Returns true if the selected
+   * next channel moves the packet in the direction of the destination node and false if it does not.
+   *
+   * @param nodeId ID of the node the packet is currently at
+   * @param srcC the source channel that brought the packet to nodeId
+   * @param nxtC the channel proposed for the packet's next hop along the network
+   * @param pInfo the packet's routing info, including its destination node
+   */
   val bidirectionalLine = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
     if (nodeId < nxtC.dst) pInfo.dst >= nxtC.dst else pInfo.dst <= nxtC.dst
   }) && noRoutingAtEgress
 
-  // todo: lower index vc is higher priority
   def unidirectionalTorus1DDateline(nNodes: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
     if (srcC.src == -1)  {
       nxtC.vc == nxtC.n_vc - 1
@@ -375,11 +382,11 @@ object RoutingRelation {
   // NOTE: The topology must have sufficient virtual channels for these to work correctly
   // TODO: Write assertions to check this
 
-  // Independent virtual subnets with no resource sharing
-
-  // todo: produces a system with support for n virtual subnetworks. Output routing relation ensures that
-  // the virtual subnetworks do not block each other. Do this by allocating a portion of the virtual channels
-  // to each virtual subnetwork. Sharing all physical resources but not sharing virtual channels and buffers
+  /** Produces a system with support for n virtual subnetworks. The output routing relation ensures that
+   * the virtual subnetworks do not block each other. This is accomplished by allocating a portion of the
+   * virtual channels to each subnetwork; all physical resources are shared between virtual subnetworks
+   * but virtual channels and buffers are not shared.
+   */
   def nonblockingVirtualSubnetworks(f: RoutingRelation, n: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
     if (srcC.isIngress) {
       (nxtC.vc % n == pInfo.vNet) && f(

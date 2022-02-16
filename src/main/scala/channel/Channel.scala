@@ -21,10 +21,13 @@ case class UserChannelParams(
   val nVirtualChannels = virtualChannelParams.size
 }
 
-// todo: destID: node identifier for the node the ingress connects to,
-// possibleEgresses: all egresses this ingress wants
-// vnetID: virtual network id
-// payloadBits: width of the wire going in
+/** Represents an ingress into the network
+ *
+ *  @param destId node identifier for the network node this ingress connects to
+ *  @param possibleEgresses set of all egresses this ingress may route to
+ *  @param vNetId virtual network id
+ *  @param payloadBits width of the wire providing the input for the ingress
+ */
 case class UserIngressParams(
   destId: Int,
   possibleEgresses: Set[Int],
