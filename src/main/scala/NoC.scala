@@ -93,6 +93,9 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
   // Tracks the set of every possible packet that might occupy each virtual channel
   val possiblePacketMap = scala.collection.mutable.Map[ChannelRoutingInfo, Set[PacketRoutingInfo]]().withDefaultValue(Set())
 
+  // todo: using routing relation to check that, under all possible circumstances, all packets can
+  // reach all egresses from all ingresses (for any ingress, all possible packets from said ingress
+  // should be able to reach all intended egresses. Not all ingresses feed to all egresses and that's okay)
   def checkConnectivity(vNetId: Int, routingRel: RoutingRelation) = {
     // Loop through accessible ingress/egress pairs
     globalIngressParams.zipWithIndex.filter(_._1.vNetId == vNetId).map { case (iP,iIdx) =>

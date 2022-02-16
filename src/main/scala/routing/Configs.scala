@@ -2,7 +2,8 @@ package constellation.routing
 
 import freechips.rocketchip.config.{Field, Parameters, Config}
 import constellation.{NoCKey}
-
+// todo: document these (explainer text for what they do -- underlying implementation might change but
+// this probably will not)
 class WithNNonblockingVirtualNetworks(n: Int) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     routingRelation = RoutingRelation.nonblockingVirtualSubnetworks(

@@ -2,6 +2,30 @@ package constellation.routing
 
 import scala.math.pow
 
+/* Questions
+ * - many routing relations seem topology-specific (Ex: bidirectionalTorus1DRandom) but doesn't seem
+ *   like relations require a specific topology to be set? A: verification test will complain
+ * - why do routing relations need to take in the node as an int? Shouldn't source channel contain
+     that information A: this is true, could be gotten rid of (todo)
+ * - what kind of docs are wanted for RoutingRelations?
+ * - n_vc in ChannelRoutingInfo (Types.scala)? A: number of vc
+ * - how does the dateline in unidirectionalTorus1DDateline work
+ *   - textbook: change buffer index after you cross the dateline
+ * - what are the virtual subnetworks? Don't remember this from the textbook A: see todo
+ */
+
+/** Routing and channel allocation policy
+ *
+ * @param f function that takes in a nodeId, source channel, next channel, and packet routing info.
+            Returns True if packet can acquire/proceed to this next channel, False if not. An example
+            is bidirectionalLine.
+ * @param isEscape TODO -- escape channels from textbook. Routing may not be a deadlokc free relation but
+ there's a set of virtual networks in a deadlock free escape channel. Nodes in deadlock can always take the
+ escape channels to break deadlock and reach their destination. What is the purpose of isEscape though, since
+ this is still a topology thats valid under RoutingRelation. isEscape takes in a channelroutinginfo and a virtual
+ network ID and returns True if the channel is an escape channel, and the default value is true because on deadlock free networks
+ every channel can be an escape channel
+ */
 class RoutingRelation(
   f: (Int, ChannelRoutingInfo, ChannelRoutingInfo, PacketRoutingInfoInternal) => Boolean,
   val isEscape: (ChannelRoutingInfo, Int) => Boolean = (_,_) => true) {
@@ -39,12 +63,16 @@ class RoutingRelation(
 
 object RoutingRelation {
 
+  /** TODO -- takes in two routing relations, first is escape relation, second is deadlock-possible option,
+  constructs one overall routing relation that combines the two. delete comments on this method
+  this doesn't detect deadlock, just plugs escape channels into the regular routing relation
+   */
   def escapeChannels(escapeRouter: RoutingRelation, normalRouter: RoutingRelation, nEscapeChannels: Int = 1) = {
     new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
       if (srcC.src == -1) {
-        if (nxtC.vc >= nEscapeChannels) {
+        if (nxtC.vc >= nEscapeChannels) { // if ingress and jumping into normal channel, use normal relation
           normalRouter(nodeId, srcC, nxtC.copy(vc=nxtC.vc-nEscapeChannels, n_vc=nxtC.n_vc-nEscapeChannels), pInfo)
-        } else {
+        } else { // else use ingress and jump into escape channel
           escapeRouter(nodeId, srcC, nxtC.copy(n_vc=nEscapeChannels), pInfo)
         }
       } else if (nxtC.vc < nEscapeChannels) {
@@ -68,10 +96,12 @@ object RoutingRelation {
   // Usable policies
   val allLegal = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => true)
 
+  // todo: document this one only to explain how `f` works in class RoutingRelation
   val bidirectionalLine = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
     if (nodeId < nxtC.dst) pInfo.dst >= nxtC.dst else pInfo.dst <= nxtC.dst
   }) && noRoutingAtEgress
 
+  // todo: lower index vc is higher priority
   def unidirectionalTorus1DDateline(nNodes: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
     if (srcC.src == -1)  {
       nxtC.vc == nxtC.n_vc - 1
@@ -346,6 +376,10 @@ object RoutingRelation {
   // TODO: Write assertions to check this
 
   // Independent virtual subnets with no resource sharing
+
+  // todo: produces a system with support for n virtual subnetworks. Output routing relation ensures that
+  // the virtual subnetworks do not block each other. Do this by allocating a portion of the virtual channels
+  // to each virtual subnetwork. Sharing all physical resources but not sharing virtual channels and buffers
   def nonblockingVirtualSubnetworks(f: RoutingRelation, n: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
     if (srcC.isIngress) {
       (nxtC.vc % n == pInfo.vNet) && f(
@@ -355,6 +389,7 @@ object RoutingRelation {
         pInfo.copy(vNet=0)
       )
     } else {
+      // only allow a virtual subnet to use virtual channel is channelID % numnetworks = virtual network ID
       (nxtC.vc % n == pInfo.vNet) && f(
         nodeId,
         srcC.copy(vc=srcC.vc / n, n_vc=srcC.n_vc / n),
