@@ -21,6 +21,7 @@ trait HasChannelParams extends HasNoCParams {
   def maxBufferSize = virtualChannelParams.map(_.bufferSize).max
 }
 
+
 class Channel(val cParam: ChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   val flit = Vec(cParam.srcMultiplier, Valid(new Flit(cParam)))
   val credit_return = Input(UInt(nVirtualChannels.W))

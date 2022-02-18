@@ -2,6 +2,16 @@ package constellation.routing
 
 import scala.math.pow
 
+/** Routing and channel allocation policy
+ *
+ * @param f function that takes in a nodeId, source channel, next channel, and packet routing info.
+ *          Returns True if packet can acquire/proceed to this next channel, False if not. An example
+ *          is the bidirectionalLine method; see its docstring.
+ * @param isEscape function that takes in ChannelRoutingInfo and a virtual network ID. Returns True if the
+ *                 channel represented by ChannelRoutingInfo is an escape channel and False if it is not.
+ *                 By default, we ignore the escape-channel-based deadlock-free properties, and just check
+ *                 for deadlock-freedom by verifying lack of a cyclic dependency.
+ */
 class RoutingRelation(
   f: (Int, ChannelRoutingInfo, ChannelRoutingInfo, PacketRoutingInfoInternal) => Boolean,
   val isEscape: (ChannelRoutingInfo, Int) => Boolean = (_,_) => true) {
@@ -39,12 +49,19 @@ class RoutingRelation(
 
 object RoutingRelation {
 
+  /** Given a deadlock-prone routing relation and a routing relation representing the network's escape
+   *  channels, returns a routing relation that adds the escape channels to the deadlock-prone relation.
+   *
+   *  @param escapeRouter routing relation representing the network's escape channels
+   *  @param normalrouter deadlock-prone routing relation
+   *  @param nEscapeChannels number of escape channels
+   */
   def escapeChannels(escapeRouter: RoutingRelation, normalRouter: RoutingRelation, nEscapeChannels: Int = 1) = {
     new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
       if (srcC.src == -1) {
-        if (nxtC.vc >= nEscapeChannels) {
+        if (nxtC.vc >= nEscapeChannels) { // if ingress and jumping into normal channel, use normal relation
           normalRouter(nodeId, srcC, nxtC.copy(vc=nxtC.vc-nEscapeChannels, n_vc=nxtC.n_vc-nEscapeChannels), pInfo)
-        } else {
+        } else { // else use ingress and jump into escape channel
           escapeRouter(nodeId, srcC, nxtC.copy(n_vc=nEscapeChannels), pInfo)
         }
       } else if (nxtC.vc < nEscapeChannels) {
@@ -68,6 +85,15 @@ object RoutingRelation {
   // Usable policies
   val allLegal = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => true)
 
+  /** An example of the parameter `f` for the RoutingRelation class that routes traffic along a
+   * straight-line network in the direction of the packet's destination. Returns true if the selected
+   * next channel moves the packet in the direction of the destination node and false if it does not.
+   *
+   * @param nodeId ID of the node the packet is currently at
+   * @param srcC the source channel that brought the packet to nodeId
+   * @param nxtC the channel proposed for the packet's next hop along the network
+   * @param pInfo the packet's routing info, including its destination node
+   */
   val bidirectionalLine = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
     if (nodeId < nxtC.dst) pInfo.dst >= nxtC.dst else pInfo.dst <= nxtC.dst
   }) && noRoutingAtEgress
@@ -345,7 +371,11 @@ object RoutingRelation {
   // NOTE: The topology must have sufficient virtual channels for these to work correctly
   // TODO: Write assertions to check this
 
-  // Independent virtual subnets with no resource sharing
+  /** Produces a system with support for n virtual subnetworks. The output routing relation ensures that
+   * the virtual subnetworks do not block each other. This is accomplished by allocating a portion of the
+   * virtual channels to each subnetwork; all physical resources are shared between virtual subnetworks
+   * but virtual channels and buffers are not shared.
+   */
   def nonblockingVirtualSubnetworks(f: RoutingRelation, n: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
     if (srcC.isIngress) {
       (nxtC.vc % n == pInfo.vNet) && f(
@@ -355,6 +385,7 @@ object RoutingRelation {
         pInfo.copy(vNet=0)
       )
     } else {
+      // only allow a virtual subnet to use virtual channel is channelID % numnetworks = virtual network ID
       (nxtC.vc % n == pInfo.vNet) && f(
         nodeId,
         srcC.copy(vc=srcC.vc / n, n_vc=srcC.n_vc / n),
