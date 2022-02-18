@@ -292,7 +292,8 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int], nocName: String)(
       Cat(getConstFields(b).filter(_.getWidth > 0).map(_.asUInt))
     )
 
-    def combine(b: Data, const: UInt, body: UInt) {
+
+    def combine(b: Data, const: UInt, body: UInt, body_valid: Bool) {
       def assign(i: UInt, sigs: Seq[Data]) = {
         var t = i
         for (s <- sigs.reverse) {
@@ -302,6 +303,13 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int], nocName: String)(
       }
       assign(const, getConstFields(b))
       assign(body, getBodyFields(b))
+      when (!body_valid) {
+        b match {
+          case b: TLBundleA => b.mask := ~(0.U(b.mask.getWidth.W))
+          case b: TLBundleB => b.mask := ~(0.U(b.mask.getWidth.W))
+          case _ =>
+        }
+      }
     }
 
     val wb = new TLBundle(wide_bundle)
@@ -312,15 +320,18 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int], nocName: String)(
     val debugPrintLatencies = false
     val actualPayloadWidth = payloadWidth + (if (debugPrintLatencies) 64 else 0)
 
-    def splitToFlit(i: DecoupledIO[Data], o: DecoupledIO[IOFlit], first: Bool, last: Bool, egress: UInt, debug: UInt) = {
+    def splitToFlit(
+      i: DecoupledIO[Data], o: DecoupledIO[IOFlit],
+      first: Bool, last: Bool, egress: UInt, has_body: Bool, debug: UInt
+    ) = {
       val is_body = RegInit(false.B)
       o.valid := i.valid
-      i.ready := o.ready && is_body
+      i.ready := o.ready && (is_body || !has_body)
 
       val (body, const) = split(i.bits)
 
       o.bits.head := first && !is_body
-      o.bits.tail := last && is_body
+      o.bits.tail := last && (is_body || !has_body)
       o.bits.egress_id := egress
       o.bits.payload := Mux(is_body, body, const) | debug << payloadWidth
 
@@ -331,9 +342,9 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int], nocName: String)(
       val is_const = RegInit(true.B)
       val const = Reg(UInt(constWidth(o.bits).W))
 
-      i.ready := is_const || o.ready
-      o.valid := !is_const && i.valid
-      combine(o.bits, const, i.bits.payload)
+      i.ready := (is_const && !i.bits.tail) || o.ready
+      o.valid := (!is_const || i.bits.tail) && i.valid
+      combine(o.bits, Mux(i.bits.head, i.bits.payload, const), i.bits.payload, !i.bits.head)
       when (i.fire() && i.bits.head) { is_const := false.B; const := i.bits.payload }
       when (i.fire() && i.bits.tail) { is_const := true.B }
     }
@@ -379,20 +390,33 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int], nocName: String)(
       }
     }
 
+
+
     for (i <- 0 until in.size) {
       val inA  = noc.io.ingress (i*3)
       val outB = noc.io.egress  (i*2)
       val inC  = noc.io.ingress (i*3+1)
       val outD = noc.io.egress  (i*2+1)
       val inE  = noc.io.ingress (i*3+2)
-      println(s"Constellation TLNoC: in  $i @ ${inNodeMapping(i)}: ingress (${i*3} ${i*3+1} ${i*3+2}) egress (${i*2} ${i*2+1})")
+      val masterNames = edgesIn(i).master.masters.map(_.name).mkString(",")
+      println(s"Constellation TLNoC: in  $i @ ${inNodeMapping(i)}: $masterNames")
+      println(s"Constellation TLNoC:   ingress (${i*3} ${i*3+1} ${i*3+2}) egress (${i*2} ${i*2+1})")
 
-      splitToFlit     (in(i).a, inA.flit, firstAI(i), lastAI(i), (in.size*2+0).U +& (requestAIIds(i) * 3.U),
-                       Cat(requestAIIds(i), i.U(16.W), tsc))
-      splitToFlit     (in(i).c, inC.flit, firstCI(i), lastCI(i), (in.size*2+1).U +& (requestCIIds(i) * 3.U),
-                       Cat(requestCIIds(i), i.U(16.W), tsc))
-      splitToFlit     (in(i).e, inE.flit, firstEI(i), lastEI(i), (in.size*2+2).U +& (requestEIIds(i) * 3.U),
-                       Cat(requestEIIds(i), i.U(16.W), tsc))
+      splitToFlit(
+        in(i).a, inA.flit, firstAI(i), lastAI(i), (in.size*2+0).U +& (requestAIIds(i) * 3.U),
+        edgesIn(i).hasData(in(i).a.bits) || (~in(i).a.bits.mask =/= 0.U),
+        Cat(requestAIIds(i), i.U(16.W), tsc)
+      )
+      splitToFlit(
+        in(i).c, inC.flit, firstCI(i), lastCI(i), (in.size*2+1).U +& (requestCIIds(i) * 3.U),
+        edgesIn(i).hasData(in(i).c.bits),
+        Cat(requestCIIds(i), i.U(16.W), tsc)
+      )
+      splitToFlit(
+        in(i).e, inE.flit, firstEI(i), lastEI(i), (in.size*2+2).U +& (requestEIIds(i) * 3.U),
+        edgesIn(i).hasData(in(i).e.bits),
+        Cat(requestEIIds(i), i.U(16.W), tsc)
+      )
 
       combineFromFlit (outB.flit, in(i).b)
       combineFromFlit (outD.flit, in(i).d)
@@ -409,16 +433,24 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int], nocName: String)(
       val outC  = noc.io.egress  (in.size*2+i*3+1)
       val inD   = noc.io.ingress (in.size*3+i*2+1)
       val outE  = noc.io.egress  (in.size*2+i*3+2)
-      println(s"Constellation TLNoC: out $i @ ${outNodeMapping(i)}: ingress (${in.size*3+i*2} ${in.size*3+i*2+1}) egress (${in.size*2+i*3} ${in.size*2+i*3+1} ${in.size*2+i*3+2})")
+      val slaveNames = edgesOut(i).slave.slaves.map(_.name).mkString(",")
+      println(s"Constellation TLNoC: out $i @ ${outNodeMapping(i)}: $slaveNames")
+      println(s"Constellation TLNoC:   ingress (${in.size*3+i*2} ${in.size*3+i*2+1}) egress (${in.size*2+i*3} ${in.size*2+i*3+1} ${in.size*2+i*3+2})")
 
       combineFromFlit (outA.flit, out(i).a)
       combineFromFlit (outC.flit, out(i).c)
       combineFromFlit (outE.flit, out(i).e)
 
-      splitToFlit     (out(i).b, inB.flit, firstBO(i), lastBO(i), 0.U +& (requestBOIds(i) * 2.U),
-                       Cat(requestBOIds(i), i.U(16.W), tsc))
-      splitToFlit     (out(i).d, inD.flit, firstDO(i), lastDO(i), 1.U +& (requestDOIds(i) * 2.U),
-                       Cat(requestDOIds(i), i.U(16.W), tsc))
+      splitToFlit(
+        out(i).b, inB.flit, firstBO(i), lastBO(i), 0.U +& (requestBOIds(i) * 2.U),
+        edgesOut(i).hasData(out(i).b.bits) || (~out(i).b.bits.mask =/= 0.U),
+        Cat(requestBOIds(i), i.U(16.W), tsc)
+      )
+      splitToFlit(
+        out(i).d, inD.flit, firstDO(i), lastDO(i), 1.U +& (requestDOIds(i) * 2.U),
+        edgesOut(i).hasData(out(i).d.bits),
+        Cat(requestDOIds(i), i.U(16.W), tsc)
+      )
 
       if (debugPrintLatencies) {
         debugPrint("A", outA)
