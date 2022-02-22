@@ -25,7 +25,7 @@ case class NoCConfig(
   // (blocker, blockee) => bool
   // If true, then blocker must be able to proceed when blockee is blocked
   vNetBlocking: (Int, Int) => Boolean = (_: Int, _: Int) => true,
-  prefix: Option[String] = None
+  nocName: String = "test"
 )
 case object NoCKey extends Field[NoCConfig](NoCConfig())
 
@@ -35,6 +35,7 @@ trait HasNoCParams {
 
   val nNodes = params.topology.nNodes
   val nVirtualNetworks = params.nVirtualNetworks
+  val nocName = params.nocName
 
   val nodeIdBits = log2Ceil(nNodes)
   val vNetBits = log2Up(params.nVirtualNetworks)
@@ -167,13 +168,13 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
   }
 
   // Check connectivity, ignoring blocking properties of virtual subnets
-  println("Constellation: Checking full connectivity")
+  println(s"Constellation: $nocName Checking full connectivity")
   for (vNetId <- 0 until nVirtualNetworks) {
     checkConnectivity(vNetId, p(NoCKey).routingRelation)
   }
 
   // Connectivity for each virtual subnet
-  println("Constellation: Checking virtual subnet connectivity")
+  println(s"Constellation: $nocName Checking virtual subnet connectivity")
   for (vNetId <- 0 until nVirtualNetworks) {
     // blockees are vNets which the current vNet can block without affecting its own forwards progress
     val blockees = (0 until nVirtualNetworks).filter(v => v != vNetId && p(NoCKey).vNetBlocking(vNetId, v))
@@ -189,7 +190,7 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
   }
 
   // Check for deadlock in escape channels
-  println("Constellation: Checking for possibility of deadlock")
+  println(s"Constellation: $nocName Checking for possibility of deadlock")
   for (vNetId <- 0 until nVirtualNetworks) {
     // blockees are vNets which the current vNet can block without affecting its own forwards progress
     val blockees = (0 until nVirtualNetworks).filter(v => v != vNetId && p(NoCKey).vNetBlocking(vNetId, v))
@@ -203,7 +204,7 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
         && new RoutingRelation((nodeId, srcC, nxtC, pInfo) => routingRel.isEscape(nxtC, vNetId))
       )
       acyclicPath.foreach { path =>
-        println(s"Constellation WARNING: cyclic path on virtual network $vNetId may cause deadlock: ${acyclicPath.get}")
+        println(s"Constellation WARNING: $nocName cyclic path on virtual network $vNetId may cause deadlock: ${acyclicPath.get}")
       }
     }
   }
@@ -215,18 +216,18 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
     virtualChannelParams=cP.virtualChannelParams.zipWithIndex.map { case (vP,vId) =>
       val traversable = possiblePacketMap(cP.channelRoutingInfos(vId)).size != 0
       if (!traversable) {
-        println(s"Constellation WARNING: virtual channel $vId from ${cP.srcId} to ${cP.destId} appears to be untraversable")
+        println(s"Constellation WARNING: $nocName virtual channel $vId from ${cP.srcId} to ${cP.destId} appears to be untraversable")
       }
       vP.copy(possiblePackets=possiblePacketMap(cP.channelRoutingInfos(vId)))
     }
   )}
   channelParams.map(cP => if (!cP.traversable)
-    println(s"Constellation WARNING: physical channel from ${cP.srcId} to ${cP.destId} appears to be untraversable"))
+    println(s"Constellation WARNING: $nocName physical channel from ${cP.srcId} to ${cP.destId} appears to be untraversable"))
 
   val clockSourceNodes = Seq.tabulate(nNodes) { i => ClockSourceNode(Seq(ClockSourceParameters())) }
   val router_sink_domains = Seq.tabulate(nNodes) { i =>
     val router_sink_domain = LazyModule(new ClockSinkDomain(ClockSinkParameters(
-      name = Some(s"${p(NoCKey).prefix}_router_$i")
+      name = Some(s"${nocName}_router_$i")
     )))
     router_sink_domain.clockNode := clockSourceNodes(i)
     router_sink_domain
@@ -271,8 +272,9 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
     sink
   }
 
-  println("Constellation: Starting NoC RTL generation")
+  println(s"Constellation: $nocName Finished parameter validation")
   lazy val module = new LazyModuleImp(this) {
+    println(s"Constellation: $nocName Starting NoC RTL generation")
     val io = IO(new Bundle {
       val ingress = MixedVec(globalIngressParams.map { u => Flipped(new TerminalChannel(u)) })
       val egress = MixedVec(globalEgressParams.map { u => new TerminalChannel(u) })
@@ -296,7 +298,7 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
     dontTouch(debug_sa_stall_ctr)
     dontTouch(debug_any_stall_ctr)
 
-    def prepend(s: String) = (p(NoCKey).prefix ++ Seq(s)).mkString(".")
+    def prepend(s: String) = Seq(nocName, s).mkString(".")
     ElaborationArtefacts.add(prepend("noc.graphml"), graphML)
 
     val adjList = routers.map { r =>

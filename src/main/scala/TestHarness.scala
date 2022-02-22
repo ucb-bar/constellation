@@ -10,6 +10,7 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.util._
 
 import constellation.channel._
+import constellation.rc.{TLNoC, TLNoCParams}
 
 
 object SelectFirstNUInt
@@ -232,7 +233,7 @@ class TLNoCTester(implicit p: Parameters) extends LazyModule {
   val outNodeMapping = tParams.outNodeMapping
   val nManagers = outNodeMapping.size
   val nClients = inNodeMapping.size
-  val xbar = LazyModule(new TLNoC(inNodeMapping, outNodeMapping, "test"))
+  val xbar = LazyModule(new TLNoC(TLNoCParams("test", inNodeMapping, outNodeMapping, Some(p(NoCKey)))))
 
   val fuzzers = (0 until nClients) map { n =>
     val fuzz = LazyModule(new TLFuzzer(txns))

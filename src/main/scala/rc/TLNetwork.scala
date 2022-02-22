@@ -1,4 +1,4 @@
-package constellation
+package constellation.rc
 
 import chisel3._
 import chisel3.util._
@@ -9,9 +9,26 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.subsystem._
 import freechips.rocketchip.util._
 
+import constellation.{NoC, NoCKey, NoCConfig}
 import constellation.channel.{IOFlit, UserIngressParams, UserEgressParams, TerminalChannel}
 
-class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int], nocName: String)(implicit p: Parameters) extends TLXbar {
+case class TLNoCParams(
+  nocName: String,
+  inNodeMapping: Seq[Int],
+  outNodeMapping: Seq[Int],
+  // if set, generates a private noc using the config,
+  // else use globalNoC params to connect to global interconncet
+  privateNoC: Option[NoCConfig],
+  globalNoCIngressGen: Option[Int => ModuleValue[TerminalChannel]] = None,
+  globalNoCEgressGen: Option[Int => ModuleValue[TerminalChannel]] = None,
+  globalNoCVNetMapping: Int => Int = i => i)
+
+
+class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
+  val nocName = params.nocName
+  val inNodeMapping = params.inNodeMapping
+  val outNodeMapping = params.outNodeMapping
+  val privateNoC = params.privateNoC
   override lazy val module = new LazyModuleImp(this) {
     val (io_in, edgesIn) = node.in.unzip
     val (io_out, edgesOut) = node.out.unzip
@@ -353,10 +370,20 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int], nocName: String)(
 
     val nIngresses = in.size * 3 + out.size * 2
     val nEgresses = out.size * 3 + in.size * 2
-    val noc = Module(LazyModule(new NoC()(p.alterPartial({
+
+    if (privateNoC.isEmpty) {
+      // Generate connections to the global NoC, check that the global NoC params are acceptable
+      require(p(NoCKey).ingresses.map(_.payloadBits >= actualPayloadWidth).reduce(_&&_))
+      require(p(NoCKey).egresses.map(_.payloadBits >= actualPayloadWidth).reduce(_&&_))
+      require(p(NoCKey).nVirtualNetworks >= 5)
+    } else {
+      println(s"Constellation TLNoC: $nocName has width $actualPayloadWidth")
+    }
+
+    val noc = privateNoC.map { n => Module(LazyModule(new NoC()(p.alterPartial({
       case NoCKey =>
-        p(NoCKey).copy(
-          routerParams = (i: Int) => p(NoCKey).routerParams(i).copy(
+        n.copy(
+          routerParams = (i: Int) => n.routerParams(i).copy(
             payloadBits = actualPayloadWidth),
           ingresses = ((Seq.tabulate (in.size) { i => Seq.fill(3) { inNodeMapping(i) } } ++
             Seq.tabulate(out.size) { i => Seq.fill(2) { outNodeMapping(i) } }).flatten
@@ -372,11 +399,11 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int], nocName: String)(
             srcId = e,
             payloadBits = actualPayloadWidth
           )},
-          prefix = Some(nocName)
+          nocName = nocName
         )
-    }))).module)
-    noc.io.router_clocks.foreach(_.clock := clock)
-    noc.io.router_clocks.foreach(_.reset := reset)
+    }))).module)}
+    noc.map(_.io.router_clocks.foreach(_.clock := clock))
+    noc.map(_.io.router_clocks.foreach(_.reset := reset))
 
     val tsc = RegInit(0.U(32.W))
     tsc := tsc + 1.U
@@ -393,11 +420,11 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int], nocName: String)(
 
 
     for (i <- 0 until in.size) {
-      val inA  = noc.io.ingress (i*3)
-      val outB = noc.io.egress  (i*2)
-      val inC  = noc.io.ingress (i*3+1)
-      val outD = noc.io.egress  (i*2+1)
-      val inE  = noc.io.ingress (i*3+2)
+      val inA  = noc.map(_.io.ingress (i*3)  ).get
+      val outB = noc.map(_.io.egress  (i*2)  ).get
+      val inC  = noc.map(_.io.ingress (i*3+1)).get
+      val outD = noc.map(_.io.egress  (i*2+1)).get
+      val inE  = noc.map(_.io.ingress (i*3+2)).get
       val masterNames = edgesIn(i).master.masters.map(_.name).mkString(",")
       println(s"Constellation TLNoC: in  $i @ ${inNodeMapping(i)}: $masterNames")
       println(s"Constellation TLNoC:   ingress (${i*3} ${i*3+1} ${i*3+2}) egress (${i*2} ${i*2+1})")
@@ -428,11 +455,11 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int], nocName: String)(
     }
 
     for (i <- 0 until out.size) {
-      val outA  = noc.io.egress  (in.size*2+i*3)
-      val inB   = noc.io.ingress (in.size*3+i*2)
-      val outC  = noc.io.egress  (in.size*2+i*3+1)
-      val inD   = noc.io.ingress (in.size*3+i*2+1)
-      val outE  = noc.io.egress  (in.size*2+i*3+2)
+      val outA  = noc.map(_.io.egress  (in.size*2+i*3)  ).get
+      val inB   = noc.map(_.io.ingress (in.size*3+i*2)  ).get
+      val outC  = noc.map(_.io.egress  (in.size*2+i*3+1)).get
+      val inD   = noc.map(_.io.ingress (in.size*3+i*2+1)).get
+      val outE  = noc.map(_.io.egress  (in.size*2+i*3+2)).get
       val slaveNames = edgesOut(i).slave.slaves.map(_.name).mkString(",")
       println(s"Constellation TLNoC: out $i @ ${outNodeMapping(i)}: $slaveNames")
       println(s"Constellation TLNoC:   ingress (${in.size*3+i*2} ${in.size*3+i*2+1}) egress (${in.size*2+i*3} ${in.size*2+i*3+1} ${in.size*2+i*3+2})")
@@ -461,44 +488,3 @@ class TLNoC(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int], nocName: String)(
   }
 }
 
-case class ConstellationSystemBusParams(
-  params: SystemBusParams,
-  inNodeMapping: Seq[Int],
-  outNodeMapping: Seq[Int]
-) extends TLBusWrapperInstantiationLike {
-  def instantiate(context: HasTileLinkLocations, loc: Location[TLBusWrapper])(implicit p: Parameters): SystemBus = {
-    val constellation = LazyModule(new ConstellationSystemBus(params, inNodeMapping, outNodeMapping))
-    constellation.suggestName(loc.name)
-    context.tlBusWrapperLocationMap += (loc -> constellation)
-    constellation
-  }
-}
-
-
-class ConstellationSystemBus(params: SystemBusParams, inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])
-  (implicit p: Parameters) extends SystemBus(params) {
-  val system_bus_noc = LazyModule(new TLNoC(inNodeMapping, outNodeMapping, "sbus"))
-
-  override val inwardNode: TLInwardNode = system_bus_noc.node
-  override val outwardNode: TLOutwardNode = system_bus_noc.node
-  override def busView: TLEdge = system_bus_noc.node.edges.in.head
-
-}
-
-class WithConstellationNoCSystemBus(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int])
-    extends Config(
-  new Config((site, here, up) => {
-    case TLNetworkTopologyLocated(InSubsystem) =>
-      up(TLNetworkTopologyLocated(InSubsystem), site).map(topo =>
-        topo match {
-          case j: JustOneBusTopologyParams =>
-            new TLBusWrapperTopology(j.instantiations.map(inst => inst match {
-              case (SBUS, sbus_params: SystemBusParams) =>
-                (SBUS, ConstellationSystemBusParams(sbus_params, inNodeMapping, outNodeMapping))
-              case a => a
-            }), j.connections)
-          case x => x
-        }
-      )
-  })
-)
