@@ -45,3 +45,20 @@ class WithIngressVNets(f: Int => Int) extends Config((site, here, up) => {
     u.copy(vNetId = f(i))
   })
 })
+
+class WithIngressPayloadBits(width: Int) extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(ingresses = up(NoCKey, site).ingresses.map(_.copy(payloadBits = width)))
+})
+
+class WithEgressPayloadBits(width: Int) extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(egresses = up(NoCKey, site).egresses.map(_.copy(payloadBits = width)))
+})
+
+class WithFullyConnectedIngresses(ingresses: Seq[Int]) extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(ingresses = up(NoCKey, site).ingresses ++
+      ingresses.map(i => UserIngressParams(i, (0 until up(NoCKey).egresses.size).toSet)))
+})
+
+class WithEgresses(egresses: Seq[Int]) extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(egresses = up(NoCKey, site).egresses ++ egresses.map(i => UserEgressParams(i)))
+})
