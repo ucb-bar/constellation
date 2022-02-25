@@ -54,9 +54,14 @@ class WithEgressPayloadBits(width: Int) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(egresses = up(NoCKey, site).egresses.map(_.copy(payloadBits = width)))
 })
 
-class WithFullyConnectedIngresses(ingresses: Seq[Int]) extends Config((site, here, up) => {
+class WithFullyConnectedIngresses extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(ingresses = up(NoCKey, site).ingresses.map(i => i.copy(possibleEgresses =
+    i.possibleEgresses ++ (0 until up(NoCKey, site).egresses.size).toSet)))
+})
+
+class WithIngresses(ingresses: Seq[Int]) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(ingresses = up(NoCKey, site).ingresses ++
-      ingresses.map(i => UserIngressParams(i, (0 until up(NoCKey).egresses.size).toSet)))
+      ingresses.map(i => UserIngressParams(i)))
 })
 
 class WithEgresses(egresses: Seq[Int]) extends Config((site, here, up) => {

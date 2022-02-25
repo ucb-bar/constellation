@@ -33,7 +33,7 @@ case class UserChannelParams(
  */
 case class UserIngressParams(
   destId: Int,
-  possibleEgresses: Set[Int],
+  possibleEgresses: Set[Int] = Set[Int](),
   vNetId: Int = 0,
   payloadBits: Int = 64
 )
