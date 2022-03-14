@@ -1,6 +1,6 @@
 package constellation.topology
 
-import scala.math.{pow, cos, sin, Pi}
+import scala.math.{pow, cos, sin, floor, log10, Pi}
 
 /** A network where sequential nodes are connected unidirectionally */
 class UnidirectionalLine(n: Int) extends PhysicalTopology(n) {
@@ -56,6 +56,18 @@ class Butterfly(kAry: Int, nFly: Int) extends PhysicalTopology(pow(kAry, nFly-1)
   val plotter = new ButterflyPlotter(kAry, nFly)
 }
 
+/** An n-node binary tree topology. Nodes populate the tree bottom-up; the leaf layer will not be fully
+  * populated if n is not a power of two
+  */
+class BidirectionalTree(n: Int) extends PhysicalTopology(n) {
+  val height = floor(log10(n) / log10(2))).toInt
+
+  /** Given the node id, returns the level of the tree the node is placed in. Levels are 0-indexed. */
+  def level(id: Int) = height - floor(log10(id + 1) / log10(2))
+
+  def topo(src: Int, dest: Int) = ((floor(dest / 2) == src) || (floor(src / 2) == dest))
+}
+
 /** A 2D mesh network with nX * nY nodes. Bidirectional channels exist between nodes that are a
  *  Manhattan distance of 1 away from each other. Node i can be thought of as being located
  *  at euclidean coordinate (i % nX, i / nX) where nX is as described below.
@@ -87,7 +99,7 @@ class UnidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology(nX * nY) 
   val plotter = new Mesh2DPlotter(nX, nY)
 }
 
-/** A 2D bidirectional torus network with nX * nY nodes. 
+/** A 2D bidirectional torus network with nX * nY nodes.
  *
  *  @param nX maximum x-coordinate of a node
  *  @param nY maximum y-coordinate of a node
