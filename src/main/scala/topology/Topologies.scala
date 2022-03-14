@@ -60,12 +60,13 @@ class Butterfly(kAry: Int, nFly: Int) extends PhysicalTopology(pow(kAry, nFly-1)
   * populated if n is not a power of two
   */
 class BidirectionalTree(n: Int) extends PhysicalTopology(n) {
-  val height = floor(log10(n) / log10(2))).toInt
+  val height = floor(log10(n) / log10(2)).toInt
 
   /** Given the node id, returns the level of the tree the node is placed in. Levels are 0-indexed. */
   def level(id: Int) = height - floor(log10(id + 1) / log10(2))
 
   def topo(src: Int, dest: Int) = ((floor(dest / 2) == src) || (floor(src / 2) == dest))
+  val plotter = new Mesh2DPlotter(n, n) // TODO (ANIMESH): create tree plotter
 }
 
 /** A 2D mesh network with nX * nY nodes. Bidirectional channels exist between nodes that are a

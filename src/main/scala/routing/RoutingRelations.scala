@@ -189,14 +189,15 @@ object RoutingRelation {
   }
 
   def bidirectionalTree(nNodes: Int) = {
-    def canReach(src: Int, dst: Int) =
+    def canReach(src: Int, dst: Int): Boolean = {
       if (src == dst) {
         true
       } else if (src > dst) {
         false
       } else {
-        reachable(src * 2 + 1) || reachable(src * 2 + 2)
+        canReach(src * 2 + 1, dst) || canReach(src * 2 + 2, dst)
       }
+    }
 
     new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
         canReach(nxtC.dst, nodeId)

@@ -65,7 +65,7 @@ class WithBidirectionalTreeTopology(
 ) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     topology = new BidirectionalTree(nNodes),
-    routingRelation = RoutingRelation.bidirectionalTree,
+    routingRelation = RoutingRelation.bidirectionalTree(nNodes),
   )
 })
 
