@@ -188,6 +188,23 @@ object RoutingRelation {
     })
   }
 
+  def bidirectionalTree(nNodes: Int) = {
+    def canReach(src: Int, dst: Int) =
+      if (src == dst) {
+        true
+      } else if (src > dst) {
+        false
+      } else {
+        reachable(src * 2 + 1) || reachable(src * 2 + 2)
+      }
+
+    new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
+        canReach(nxtC.dst, nodeId)
+        // TODO (ANIMESH)
+    })
+  }
+
+
 
   def mesh2DDimensionOrdered(firstDim: Int = 0)(nX: Int, nY: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
     val (nxtX, nxtY)   = (nxtC.dst % nX , nxtC.dst / nX)
