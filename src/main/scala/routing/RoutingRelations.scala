@@ -200,7 +200,6 @@ object RoutingRelation {
 
     new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
         canReach(nxtC.dst, nodeId)
-        // TODO (ANIMESH)
     })
   }
 

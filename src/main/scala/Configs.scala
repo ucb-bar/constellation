@@ -345,6 +345,14 @@ class TestConfig49 extends Config(
   new constellation.channel.WithEgresses(0 until 9) ++
   new constellation.topology.WithBidirectionalTorus2DTopology(3, 3))
 
+// Tree
+class TestConfig50 extends Config(
+  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
+  new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngresses(0 until 10 by 2) ++
+  new constellation.channel.WithEgresses(1 until 10 by 2) ++
+  new constellation.topology.WithBidirectionalTreeTopology(10))
+
 class TLTestConfig00 extends Config(
   new WithTLNoCTesterParams(TLNoCTesterParams(Seq(0), Seq(1))) ++
   new constellation.routing.WithNNonblockingVirtualNetworks(5) ++
