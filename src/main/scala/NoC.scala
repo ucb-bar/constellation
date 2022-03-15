@@ -44,6 +44,13 @@ trait HasNoCParams {
   val egressSrcIds = params.egresses.map(_.srcId)
 }
 
+class NoCTerminalIO(
+  val ingressParams: Seq[IngressChannelParams],
+  val egressParams: Seq[EgressChannelParams])(implicit val p: Parameters) extends Bundle {
+  val ingress = MixedVec(ingressParams.map { u => Flipped(new TerminalChannel(u)) })
+  val egress = MixedVec(egressParams.map { u => new TerminalChannel(u) })
+}
+
 class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
   var uniqueChannelId = 0
   def getUniqueChannelId(): Int = {
@@ -275,9 +282,7 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
   println(s"Constellation: $nocName Finished parameter validation")
   lazy val module = new LazyModuleImp(this) {
     println(s"Constellation: $nocName Starting NoC RTL generation")
-    val io = IO(new Bundle {
-      val ingress = MixedVec(globalIngressParams.map { u => Flipped(new TerminalChannel(u)) })
-      val egress = MixedVec(globalEgressParams.map { u => new TerminalChannel(u) })
+    val io = IO(new NoCTerminalIO(globalIngressParams, globalEgressParams)(p) {
       val router_clocks = Vec(nNodes, Input(new ClockBundle(ClockBundleParameters())))
     })
 

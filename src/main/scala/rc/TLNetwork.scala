@@ -9,7 +9,7 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.subsystem._
 import freechips.rocketchip.util._
 
-import constellation.{NoC, NoCKey, NoCConfig}
+import constellation.{NoC, NoCKey, NoCConfig, NoCTerminalIO}
 import constellation.channel.{IOFlit, UserIngressParams, UserEgressParams, TerminalChannel}
 
 case class TLNoCParams(
@@ -19,16 +19,19 @@ case class TLNoCParams(
   // if set, generates a private noc using the config,
   // else use globalNoC params to connect to global interconncet
   privateNoC: Option[NoCConfig],
-  globalNoCIngressGen: Option[Int => ModuleValue[TerminalChannel]] = None,
-  globalNoCEgressGen: Option[Int => ModuleValue[TerminalChannel]] = None,
-  globalNoCVNetMapping: Int => Int = i => i)
-
+  globalTerminalChannels: Option[() => BundleBridgeSink[NoCTerminalIO]] = None
+)
 
 class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
   val nocName = params.nocName
   val inNodeMapping = params.inNodeMapping
   val outNodeMapping = params.outNodeMapping
   val privateNoC = params.privateNoC
+  val globalSink: Option[BundleBridgeSink[NoCTerminalIO]] = if (privateNoC.isEmpty) {
+    Some(params.globalTerminalChannels.get())
+  } else {
+    None
+  }
   override lazy val module = new LazyModuleImp(this) {
     val (io_in, edgesIn) = node.in.unzip
     val (io_out, edgesOut) = node.out.unzip
@@ -367,43 +370,43 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
     }
 
 
-
+    require(in.size == inNodeMapping.size && out.size == outNodeMapping.size)
     val nIngresses = in.size * 3 + out.size * 2
     val nEgresses = out.size * 3 + in.size * 2
 
-    if (privateNoC.isEmpty) {
-      // Generate connections to the global NoC, check that the global NoC params are acceptable
-      require(p(NoCKey).ingresses.map(_.payloadBits >= actualPayloadWidth).reduce(_&&_))
-      require(p(NoCKey).egresses.map(_.payloadBits >= actualPayloadWidth).reduce(_&&_))
-      require(p(NoCKey).nVirtualNetworks >= 5)
-    } else {
-      println(s"Constellation TLNoC: $nocName has width $actualPayloadWidth")
-    }
+    val ingressParams = (inNodeMapping.map(i => Seq(i, i, i)) ++ outNodeMapping.map(i => Seq(i, i)))
+      .flatten.zipWithIndex.map { case (i,iId) => UserIngressParams(
+        destId = i,
+        possibleEgresses = (0 until nEgresses).filter(e => connectivity(iId, e, ingressVNets(iId))).toSet,
+        vNetId = ingressVNets(iId),
+        payloadBits = actualPayloadWidth
+      )}
+    val egressParams = (inNodeMapping.map(i => Seq(i, i)) ++ outNodeMapping.map(i => Seq(i, i, i)))
+      .flatten.zipWithIndex.map { case (e,eId) => UserEgressParams(
+        srcId = e,
+        payloadBits = actualPayloadWidth
+      )}
 
-    val noc = privateNoC.map { n => Module(LazyModule(new NoC()(p.alterPartial({
-      case NoCKey =>
-        n.copy(
-          routerParams = (i: Int) => n.routerParams(i).copy(
-            payloadBits = actualPayloadWidth),
-          ingresses = ((Seq.tabulate (in.size) { i => Seq.fill(3) { inNodeMapping(i) } } ++
-            Seq.tabulate(out.size) { i => Seq.fill(2) { outNodeMapping(i) } }).flatten
-          ).zipWithIndex.map { case (i,iId) => UserIngressParams(
-            destId = i,
-            possibleEgresses = (0 until nEgresses).filter(e => connectivity(iId, e, ingressVNets(iId))).toSet,
-            vNetId = ingressVNets(iId),
-            payloadBits = actualPayloadWidth
-          )},
-          egresses = ((Seq.tabulate (in.size) { i => Seq.fill(2) { inNodeMapping(i) } } ++
-            Seq.tabulate(out.size) { i => Seq.fill(3) { outNodeMapping(i) } }).flatten
-          ).zipWithIndex.map { case (e,eId) => UserEgressParams(
-            srcId = e,
-            payloadBits = actualPayloadWidth
-          )},
+    val noc = privateNoC.map { nocParams =>
+      // If desired, create a private noc
+      require(nocParams.nVirtualNetworks == 5)
+      Module(LazyModule(new NoC()(p.alterPartial({
+        case NoCKey => nocParams.copy(
+          routerParams = (i: Int) => nocParams.routerParams(i).copy(payloadBits = actualPayloadWidth),
+          ingresses = ingressParams,
+          egresses = egressParams,
           nocName = nocName
         )
-    }))).module)}
+      }))).module)
+    }
     noc.map(_.io.router_clocks.foreach(_.clock := clock))
     noc.map(_.io.router_clocks.foreach(_.reset := reset))
+
+    val ingresses: Seq[TerminalChannel] = noc.map(_.io.ingress).getOrElse(globalSink.get.in(0)._1.ingress)
+    val egresses: Seq[TerminalChannel] = noc.map(_.io.egress).getOrElse(globalSink.get.in(0)._1.egress)
+
+    for (t <- ingresses) { require(t.payloadBits >= actualPayloadWidth) }
+    for (t <-  egresses) { require(t.payloadBits >= actualPayloadWidth) }
 
     val tsc = RegInit(0.U(32.W))
     tsc := tsc + 1.U
@@ -420,11 +423,11 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
 
 
     for (i <- 0 until in.size) {
-      val inA  = noc.map(_.io.ingress (i*3)  ).get
-      val outB = noc.map(_.io.egress  (i*2)  ).get
-      val inC  = noc.map(_.io.ingress (i*3+1)).get
-      val outD = noc.map(_.io.egress  (i*2+1)).get
-      val inE  = noc.map(_.io.ingress (i*3+2)).get
+      val inA  = ingresses (i*3)
+      val outB = egresses  (i*2)
+      val inC  = ingresses (i*3+1)
+      val outD = egresses  (i*2+1)
+      val inE  = ingresses (i*3+2)
       val masterNames = edgesIn(i).master.masters.map(_.name).mkString(",")
       println(s"Constellation TLNoC: in  $i @ ${inNodeMapping(i)}: $masterNames")
       println(s"Constellation TLNoC:   ingress (${i*3} ${i*3+1} ${i*3+2}) egress (${i*2} ${i*2+1})")
@@ -455,11 +458,11 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
     }
 
     for (i <- 0 until out.size) {
-      val outA  = noc.map(_.io.egress  (in.size*2+i*3)  ).get
-      val inB   = noc.map(_.io.ingress (in.size*3+i*2)  ).get
-      val outC  = noc.map(_.io.egress  (in.size*2+i*3+1)).get
-      val inD   = noc.map(_.io.ingress (in.size*3+i*2+1)).get
-      val outE  = noc.map(_.io.egress  (in.size*2+i*3+2)).get
+      val outA  = egresses  (in.size*2+i*3)
+      val inB   = ingresses (in.size*3+i*2)
+      val outC  = egresses  (in.size*2+i*3+1)
+      val inD   = ingresses (in.size*3+i*2+1)
+      val outE  = egresses  (in.size*2+i*3+2)
       val slaveNames = edgesOut(i).slave.slaves.map(_.name).mkString(",")
       println(s"Constellation TLNoC: out $i @ ${outNodeMapping(i)}: $slaveNames")
       println(s"Constellation TLNoC:   ingress (${in.size*3+i*2} ${in.size*3+i*2+1}) egress (${in.size*2+i*3} ${in.size*2+i*3+1} ${in.size*2+i*3+2})")

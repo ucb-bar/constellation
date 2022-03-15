@@ -36,7 +36,19 @@ class WithConstellationNoCSystemBus(inNodeMapping: Seq[Int], outNodeMapping: Seq
 
 // connect them to the global noc instead
 class WithSbusGlobalNoC extends Config((site, here, up) => {
-  case InstantiateGlobalNoCInterconnect => true
+  case InstantiateGlobalTLInterconnect => {
+    val instantiation = up(TLNetworkTopologyLocated(InSubsystem)).map(topo => topo match {
+      case j: TLBusWrapperTopology => j.instantiations
+      case _ => Nil
+    }).flatten.filter(_._1 == SBUS)(0)
+    val (inNodeMapping, outNodeMapping) = instantiation._2 match {
+      case s: ConstellationSystemBusParams => (s.inNodeMapping, s.outNodeMapping)
+      case _ => require(false); (Nil, Nil)
+    }
+    up(InstantiateGlobalTLInterconnect).copy(busMap =
+      up(InstantiateGlobalTLInterconnect).busMap + (SBUS -> (inNodeMapping, outNodeMapping))
+    )
+  }
   case TLNetworkTopologyLocated(InSubsystem) => {
     up(TLNetworkTopologyLocated(InSubsystem), site).map(topo => {
       topo match {

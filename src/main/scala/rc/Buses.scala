@@ -20,17 +20,13 @@ case class ConstellationSystemBusParams(
   def instantiate(context: HasTileLinkLocations, loc: Location[TLBusWrapper])(implicit p: Parameters): SystemBus = {
 
     val base_noc_params = TLNoCParams("sbus", inNodeMapping, outNodeMapping, privateNoC)
-    val noc_params = privateNoC.map { _ =>
-      val global_context = context.asInstanceOf[CanHaveGlobalNoCInterconnect]
-      base_noc_params.copy(
-        globalNoCIngressGen = Some(global_context.connectNoCIngress _),
-        globalNoCEgressGen = Some(global_context.connectNoCEgress _),
-        // TODO: global noc vnet mapping
-      )
-    }.getOrElse(base_noc_params)
-    val constellation = LazyModule(new ConstellationSystemBus(params,
-      TLNoCParams("sbus", inNodeMapping, outNodeMapping, privateNoC)
-    ))
+    val noc_params = context match {
+      case c: CanHaveGlobalTLInterconnect =>
+        base_noc_params.copy(globalTerminalChannels = Some(() => c.getSubnetTerminalChannels(SBUS)))
+      case _ => base_noc_params
+    }
+    val constellation = LazyModule(new ConstellationSystemBus(params, noc_params))
+
     constellation.suggestName(loc.name)
     context.tlBusWrapperLocationMap += (loc -> constellation)
     constellation
