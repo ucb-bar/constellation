@@ -34,6 +34,28 @@ class WithConstellationNoCSystemBus(inNodeMapping: Seq[Int], outNodeMapping: Seq
 })
 
 
+// Use a noc based memory bus. By default instantiates a private noc within the bus
+class WithConstellationNoCMemoryBus(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int]) extends Config((site, here, up) => {
+  case TLNetworkTopologyLocated(InSubsystem) => {
+    up(TLNetworkTopologyLocated(InSubsystem), site).map(topo => {
+      topo match {
+        case j: TLBusWrapperTopology => {
+          new TLBusWrapperTopology(j.instantiations.map(inst => inst match {
+            case (MBUS, mbus_params: MemoryBusParams) =>
+              (MBUS, ConstellationMemoryBusParams(
+                mbus_params, inNodeMapping, outNodeMapping, Some(up(NoCKey))))
+            case (MBUS, mbus_params: ConstellationMemoryBusParams) =>
+              (MBUS, mbus_params.copy(inNodeMapping=inNodeMapping, outNodeMapping=outNodeMapping))
+            case a => a
+          }), j.connections)
+        }
+        case x => x
+      }
+    })
+  }
+})
+
+
 // connect them to the global noc instead
 class WithSbusGlobalNoC extends Config((site, here, up) => {
   case InstantiateGlobalTLInterconnect => {
@@ -66,3 +88,33 @@ class WithSbusGlobalNoC extends Config((site, here, up) => {
   }
 })
 
+class WithMbusGlobalNoC extends Config((site, here, up) => {
+  case InstantiateGlobalTLInterconnect => {
+    val instantiation = up(TLNetworkTopologyLocated(InSubsystem)).map(topo => topo match {
+      case j: TLBusWrapperTopology => j.instantiations
+      case _ => Nil
+    }).flatten.filter(_._1 == MBUS)(0)
+    val (inNodeMapping, outNodeMapping) = instantiation._2 match {
+      case s: ConstellationMemoryBusParams => (s.inNodeMapping, s.outNodeMapping)
+      case _ => require(false); (Nil, Nil)
+    }
+    up(InstantiateGlobalTLInterconnect).copy(busMap =
+      up(InstantiateGlobalTLInterconnect).busMap + (MBUS -> (inNodeMapping, outNodeMapping))
+    )
+  }
+  case TLNetworkTopologyLocated(InSubsystem) => {
+    up(TLNetworkTopologyLocated(InSubsystem), site).map(topo => {
+      topo match {
+        case j: TLBusWrapperTopology => {
+          new TLBusWrapperTopology(j.instantiations.map(inst => inst match {
+            case (MBUS, mbus_params: ConstellationMemoryBusParams) => {
+              (MBUS, mbus_params.copy(privateNoC=None))
+            }
+            case a => a
+          }), j.connections)
+        }
+        case x => x
+      }
+    })
+  }
+})

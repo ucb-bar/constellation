@@ -429,8 +429,8 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
       val outD = egresses  (i*2+1)
       val inE  = ingresses (i*3+2)
       val masterNames = edgesIn(i).master.masters.map(_.name).mkString(",")
-      println(s"Constellation TLNoC: in  $i @ ${inNodeMapping(i)}: $masterNames")
-      println(s"Constellation TLNoC:   ingress (${i*3} ${i*3+1} ${i*3+2}) egress (${i*2} ${i*2+1})")
+      println(s"Constellation TLNoC $nocName: in  $i @ ${inNodeMapping(i)}: $masterNames")
+      println(s"Constellation TLNoC $nocName:   ingress (${i*3} ${i*3+1} ${i*3+2}) egress (${i*2} ${i*2+1})")
 
       splitToFlit(
         in(i).a, inA.flit, firstAI(i), lastAI(i), (in.size*2+0).U +& (requestAIIds(i) * 3.U),
@@ -464,8 +464,8 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
       val inD   = ingresses (in.size*3+i*2+1)
       val outE  = egresses  (in.size*2+i*3+2)
       val slaveNames = edgesOut(i).slave.slaves.map(_.name).mkString(",")
-      println(s"Constellation TLNoC: out $i @ ${outNodeMapping(i)}: $slaveNames")
-      println(s"Constellation TLNoC:   ingress (${in.size*3+i*2} ${in.size*3+i*2+1}) egress (${in.size*2+i*3} ${in.size*2+i*3+1} ${in.size*2+i*3+2})")
+      println(s"Constellation TLNoC $nocName: out $i @ ${outNodeMapping(i)}: $slaveNames")
+      println(s"Constellation TLNoC $nocName:   ingress (${in.size*3+i*2} ${in.size*3+i*2+1}) egress (${in.size*2+i*3} ${in.size*2+i*3+1} ${in.size*2+i*3+2})")
 
       combineFromFlit (outA.flit, out(i).a)
       combineFromFlit (outC.flit, out(i).c)

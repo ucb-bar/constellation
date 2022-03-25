@@ -21,10 +21,10 @@ case class GlobalTLNoCParams(
 case object InstantiateGlobalTLInterconnect extends Field[GlobalTLNoCParams](GlobalTLNoCParams())
 
 trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
-  val globalNoCWidth = p(InstantiateGlobalTLInterconnect).payloadWidth
-  val busMap = p(InstantiateGlobalTLInterconnect).busMap
-  val supportedBuses = busMap.keys.toList
-  val hasGlobalTLInterconnect = supportedBuses.size > 0
+  def globalNoCWidth = p(InstantiateGlobalTLInterconnect).payloadWidth
+  def busMap = p(InstantiateGlobalTLInterconnect).busMap
+  def supportedBuses = busMap.keys.toList
+  def hasGlobalTLInterconnect = supportedBuses.size > 0
   def inNodeMapping(bus: TLBusWrapperLocation) = busMap(bus)._1
   def outNodeMapping(bus: TLBusWrapperLocation) = busMap(bus)._2
   def nIngresses(bus: TLBusWrapperLocation) = {
@@ -97,7 +97,7 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
           .filter(e => connectivity(iId, e, ingressVNets(iId)))
           .map(_ + egressOffset(bus))
           .toSet,
-        vNetId = ingressVNets(iId),
+        vNetId = ingressVNets(iId) + vNetOffset(bus),
         payloadBits = globalNoCWidth
       )}
     val egressParams = (inNodeMapping(bus).map(i => Seq(i, i)) ++ outNodeMapping(bus).map(i => Seq(i, i, i)))
@@ -113,29 +113,30 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
       routerParams = (i: Int) => p(NoCKey).routerParams(i).copy(payloadBits = globalNoCWidth),
       ingresses = ingressParams.flatten,
       egresses = egressParams.flatten,
-      nVirtualNetworks = supportedBuses.size * 5,
       nocName = "global_tl"
     )
   }))))
-
+  if (hasGlobalTLInterconnect) {
+    require(p(NoCKey).nVirtualNetworks >= 5 * supportedBuses.size)
+  }
 
 
   def getSubnetTerminalChannels(bus: TLBusWrapperLocation): BundleBridgeSink[NoCTerminalIO] = {
     val source = this { BundleBridgeSource[NoCTerminalIO](() =>
       new NoCTerminalIO(
-        noc.get.globalIngressParams.slice(ingressOffset(bus), nIngresses(bus)),
-        noc.get.globalEgressParams.slice(egressOffset(bus), nEgresses(bus))
+        noc.get.globalIngressParams.drop(ingressOffset(bus)).take(nIngresses(bus)),
+        noc.get.globalEgressParams .drop( egressOffset(bus)).take( nEgresses(bus))
       )
     )}
     val sink = BundleBridgeSink[NoCTerminalIO]()
     sink := source
     this { InModuleBody { /* connect source to noc */
-      (noc.get.module.io.ingress.slice(ingressOffset(bus), nIngresses(bus)) zip source.out(0)._1.ingress)
+      (noc.get.module.io.ingress.drop(ingressOffset(bus)).take(nIngresses(bus)) zip source.out(0)._1.ingress)
         .map(t => {
           t._1 <> t._2
           t._1.flit.bits.egress_id := t._2.flit.bits.egress_id + egressOffset(bus).U
         })
-      (noc.get.module.io.egress.slice (egressOffset(bus) , nEgresses (bus)) zip source.out(0)._1.egress)
+      (noc.get.module.io.egress .drop( egressOffset(bus)).take(nEgresses (bus)) zip source.out(0)._1.egress)
         .map(t => {
           t._2 <> t._1
           t._2.flit.bits.egress_id := t._1.flit.bits.egress_id - egressOffset(bus).U
