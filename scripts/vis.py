@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import networkx as nx
 import os
 import sys
