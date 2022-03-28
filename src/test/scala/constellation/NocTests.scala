@@ -4,6 +4,7 @@ import chipsalliance.rocketchip.config.{Config, Parameters}
 import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
 import chisel3._
+import constellation.test._
 
 class NoCChiselTester(implicit val p: Parameters) extends Module {
   val th = Module(new TestHarness)

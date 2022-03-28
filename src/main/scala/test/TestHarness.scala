@@ -1,4 +1,4 @@
-package constellation
+package constellation.test
 
 import chisel3._
 import chisel3.util._
@@ -9,6 +9,7 @@ import freechips.rocketchip.config.{Field, Parameters, Config}
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.util._
 
+import constellation._
 import constellation.channel._
 import constellation.rc.{TLNoC, TLNoCParams}
 

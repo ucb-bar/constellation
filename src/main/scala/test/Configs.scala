@@ -1,4 +1,4 @@
-package constellation
+package constellation.test
 
 import freechips.rocketchip.config.{Field, Parameters, Config}
 import constellation.routing.{RoutingRelation}
@@ -394,9 +394,9 @@ class TestConfig56 extends Config(
   new constellation.channel.WithIngressVNets((i: Int) => i % 4) ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(3)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 9) ++
-  new constellation.channel.WithEgresses(0 until 9) ++
-  new constellation.topology.WithMesh2DTopology(3, 3, RoutingRelation.mesh2DEscapeRouter))
+  new constellation.channel.WithIngresses(0 until 16) ++
+  new constellation.channel.WithEgresses(0 until 16) ++
+  new constellation.topology.WithMesh2DTopology(4, 4, RoutingRelation.mesh2DEscapeRouter))
 
 
 
