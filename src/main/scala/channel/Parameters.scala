@@ -83,13 +83,13 @@ case class ChannelParams(
   srcMultiplier: Int,
   destMultiplier: Int
 )(implicit p: Parameters) extends BaseChannelParams {
-  def nVirtualChannels = virtualChannelParams.size
+  val nVirtualChannels = virtualChannelParams.size
   val maxBufferSize = virtualChannelParams.map(_.bufferSize).max
 
-  def possiblePackets = virtualChannelParams.map(_.possiblePackets).reduce(_++_)
+  val possiblePackets = virtualChannelParams.map(_.possiblePackets).reduce(_++_)
   val traversable = virtualChannelParams.map(_.traversable).reduce(_||_)
 
-  def channelRoutingInfos = (0 until nVirtualChannels).map(i => ChannelRoutingInfo(srcId, i, destId, nVirtualChannels))
+  val channelRoutingInfos = (0 until nVirtualChannels).map(i => ChannelRoutingInfo(srcId, i, destId, nVirtualChannels))
 }
 
 object ChannelParams {
@@ -121,9 +121,9 @@ case class IngressChannelParams(
   vNetId: Int,
   payloadBits: Int
 )(implicit p: Parameters) extends TerminalChannelParams {
-  def srcId = -1
-  def possiblePackets = possibleEgresses.map { e => PacketRoutingInfo(e, vNetId) }
-  def channelRoutingInfos = Seq(ChannelRoutingInfo(-1, 0, destId, 1))
+  val srcId = -1
+  val possiblePackets = possibleEgresses.map { e => PacketRoutingInfo(e, vNetId) }
+  val channelRoutingInfos = Seq(ChannelRoutingInfo(-1, 0, destId, 1))
 }
 
 object IngressChannelParams {
@@ -152,8 +152,8 @@ case class EgressChannelParams(
   srcId: Int,
   payloadBits: Int
 )(implicit p: Parameters) extends TerminalChannelParams {
-  def destId = -1
-  def channelRoutingInfos = Seq(ChannelRoutingInfo(srcId, 0, -1, 1))
+  val destId = -1
+  val channelRoutingInfos = Seq(ChannelRoutingInfo(srcId, 0, -1, 1))
 }
 
 object EgressChannelParams {

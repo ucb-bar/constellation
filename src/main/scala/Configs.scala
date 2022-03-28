@@ -345,6 +345,62 @@ class TestConfig49 extends Config(
   new constellation.channel.WithEgresses(0 until 9) ++
   new constellation.topology.WithBidirectionalTorus2DTopology(3, 3))
 
+// topologies which put the ingress/egress points on a separate "plane" of nodes
+class TestConfig50 extends Config(
+  new constellation.topology.WithTerminalPlane ++
+  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
+  new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngresses(Seq(0, 1, 1)) ++
+  new constellation.channel.WithEgresses(Seq(1, 1, 2)) ++
+  new constellation.topology.WithUnidirectionalLineTopology(3))
+class TestConfig51 extends Config(
+  new constellation.topology.WithTerminalPlane ++
+  new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
+  new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngresses(Seq(1, 1, 2, 2)) ++
+  new constellation.channel.WithEgresses(Seq(0, 0, 1, 1, 2, 2, 3, 3)) ++
+  new constellation.topology.WithBidirectionalLineTopology(4))
+class TestConfig52 extends Config(
+  new constellation.topology.WithTerminalPlane ++
+  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
+  new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngresses((0 until 6) ++ (0 until 6)) ++
+  new constellation.channel.WithEgresses((0 until 6) ++ (0 until 6)) ++
+  new constellation.topology.WithUnidirectionalTorus1DTopology(6))
+class TestConfig53 extends Config(
+  new constellation.topology.WithTerminalPlane ++
+  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
+  new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngresses((0 until 6) ++ (0 until 6)) ++
+  new constellation.channel.WithEgresses((0 until 6) ++ (0 until 6)) ++
+  new constellation.topology.WithBidirectionalTorus1DTopology(6))
+class TestConfig54 extends Config(
+  new constellation.topology.WithTerminalPlane ++
+  new constellation.channel.WithUniformNVirtualChannels(1, UserVirtualChannelParams(5)) ++
+  new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngresses((0 until 9) ++ (0 until 9)) ++
+  new constellation.channel.WithEgresses(((0 until 9) ++ (0 until 9)).map(_ + 9*2)) ++
+  new constellation.topology.WithButterflyTopology(3, 3))
+class TestConfig55 extends Config(
+  new constellation.topology.WithTerminalPlane ++
+  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
+  new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngresses((0 until 25)) ++
+  new constellation.channel.WithEgresses((0 until 25)) ++
+  new constellation.topology.WithMesh2DTopology(5, 5, RoutingRelation.mesh2DEscapeRouter))
+class TestConfig56 extends Config(
+  new constellation.routing.WithNBlockingVirtualNetworks(4) ++
+  new constellation.topology.WithTerminalPlane ++
+  new constellation.channel.WithIngressVNets((i: Int) => i % 4) ++
+  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(3)) ++
+  new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngresses(0 until 9) ++
+  new constellation.channel.WithEgresses(0 until 9) ++
+  new constellation.topology.WithMesh2DTopology(3, 3, RoutingRelation.mesh2DEscapeRouter))
+
+
+
+// test configs for TL network
 class TLTestConfig00 extends Config(
   new WithTLNoCTesterParams(TLNoCTesterParams(Seq(0), Seq(1))) ++
   new constellation.routing.WithNNonblockingVirtualNetworks(5) ++
@@ -368,3 +424,10 @@ class TLTestConfig03 extends Config(
   new constellation.routing.WithNNonblockingVirtualNetworks(5) ++
   new constellation.channel.WithUniformNVirtualChannels(10, UserVirtualChannelParams(3)) ++
   new constellation.topology.WithUnidirectionalTorus1DTopology(6))
+
+class TLTestConfig04 extends Config(
+  new WithTLNoCTesterParams(TLNoCTesterParams(Seq(4, 0, 2, 5, 6, 9, 11), Seq(7, 1, 3, 8, 10))) ++
+  new constellation.routing.WithNBlockingVirtualNetworks(5) ++
+  new constellation.topology.WithTerminalPlane ++
+  new constellation.channel.WithUniformNVirtualChannels(5, UserVirtualChannelParams(3)) ++
+  new constellation.topology.WithMesh2DTopology(4, 3, RoutingRelation.mesh2DEscapeRouter))

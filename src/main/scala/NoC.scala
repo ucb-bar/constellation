@@ -3,6 +3,7 @@ package constellation
 import chisel3._
 import chisel3.util._
 
+
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp, BundleBridgeSink, InModuleBody}
 import freechips.rocketchip.util.ElaborationArtefacts
@@ -108,38 +109,59 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
    * @param routingRel the routing relation for the network
    */
   def checkConnectivity(vNetId: Int, routingRel: RoutingRelation) = {
+    val nextChannelParamMap = (0 until nNodes).map { i => i -> fullChannelParams.filter(_.srcId == i) }.toMap
+    val tempPossiblePacketMap = scala.collection.mutable.Map[ChannelRoutingInfo, Set[PacketRoutingInfo]]()
+      .withDefaultValue(Set())
+
     // Loop through accessible ingress/egress pairs
     globalIngressParams.zipWithIndex.filter(_._1.vNetId == vNetId).map { case (iP,iIdx) =>
       val iId = iP.destId
-      iP.possibleEgresses.map { oIdx =>
+      println(s"Constellation: $nocName Checking connectivity from ingress $iIdx")
+      iP.possibleEgresses.toSeq.sorted.map { oIdx =>
         val oP = globalEgressParams(oIdx)
         val oId = oP.srcId
+        val pInfo = PacketRoutingInfo(oIdx, vNetId)
+        val flowPossiblePackets = scala.collection.mutable.Set[ChannelRoutingInfo]()
 
-        // Track the positions a packet performing ingress->egress might occupy
-        var positions: Set[ChannelRoutingInfo] = iP.channelRoutingInfos.toSet
-        while (positions.size != 0) {
-          positions.foreach { pos => possiblePacketMap(pos) += (PacketRoutingInfo(oIdx, vNetId)) }
-          // Determine next possible positions based on current possible positions
-          // and connectivity function
-          positions = positions.filter(_.dst != oId).map { cI =>
-            val nexts = fullChannelParams.filter(_.srcId == cI.dst).map { nxtC =>
-              (0 until nxtC.nVirtualChannels).map { nxtV =>
+        var stack: Seq[ChannelRoutingInfo] = iP.channelRoutingInfos
+        while (stack.size != 0) {
+          val head = stack.head
+          stack = stack.tail
+
+          // This channel is the destination
+          val atDest = head.dst == oId
+          // In this call to checkConnectivity, a previously searched ingress point
+          // generated a packet that could route to its destination through head
+          // We don't have to search further along this path.
+          val prevFoundRoutable = tempPossiblePacketMap(head).contains(pInfo)
+
+          if (!atDest && !prevFoundRoutable) {
+            // Find all possible VCs a packet in head can route to
+            val nexts = nextChannelParamMap(head.dst).map { nxtC =>
+              nxtC.channelRoutingInfos.map { cI =>
                 val can_transition = routingRel(
-                  cI.dst,
+                  head.dst,
+                  head,
                   cI,
-                  nxtC.channelRoutingInfos(nxtV),
-                  PacketRoutingInfo(oIdx, vNetId)
+                  pInfo
                 )
-                if (can_transition) Some(nxtC.channelRoutingInfos(nxtV)) else None
+                // if (head.src == 25 && src.dst == 0)
+                //   println((can_transition, head, cI, pInfo))
+                if (can_transition) Some(cI) else None
               }.flatten
             }.flatten
+            // If the packet can't route to any VCs, this is an error
             require(nexts.size > 0,
-              s"Failed to route from $iId to $oId at $cI for vnet $vNetId")
-            nexts
-          }.flatten.toSet
+              s"Failed to route from $iId to $oId at $head for vnet $vNetId")
+            val toAdd = nexts.filter(n => !flowPossiblePackets.contains(n))
+            nexts.foreach(n => flowPossiblePackets += n)
+            stack = toAdd ++ stack
+          }
         }
+        flowPossiblePackets.foreach { k => tempPossiblePacketMap(k) += pInfo }
       }
     }
+    tempPossiblePacketMap.foreach { case (k,v) => possiblePacketMap(k) ++= v }
   }
   def checkAcyclic(vNetId: Int, routingRel: RoutingRelation): Option[Seq[ChannelRoutingInfo]] = {
     var visited = Set[ChannelRoutingInfo]()
@@ -227,9 +249,11 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
       }
       vP.copy(possiblePackets=possiblePacketMap(cP.channelRoutingInfos(vId)))
     }
-  )}
-  channelParams.map(cP => if (!cP.traversable)
-    println(s"Constellation WARNING: $nocName physical channel from ${cP.srcId} to ${cP.destId} appears to be untraversable"))
+  )}.map(cP => {
+    if (!cP.traversable)
+      println(s"Constellation WARNING: $nocName physical channel from ${cP.srcId} to ${cP.destId} appears to be untraversable.")
+    cP
+  }).filter(_.traversable)
 
   val clockSourceNodes = Seq.tabulate(nNodes) { i => ClockSourceNode(Seq(ClockSourceParameters())) }
   val router_sink_domains = Seq.tabulate(nNodes) { i =>
@@ -240,31 +264,48 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
     router_sink_domain
   }
 
-  val routers = Seq.tabulate(nNodes) { i => router_sink_domains(i) { LazyModule(new Router(
-    routerParams = RouterParams(
-      nodeId = i,
-      user = p(NoCKey).routerParams(i)
-    ),
-    inParams = channelParams.filter(_.destId == i),
-    outParams = channelParams.filter(_.srcId == i),
-    ingressParams = globalIngressParams.filter(_.destId == i),
-    egressParams = globalEgressParams.filter(_.srcId == i)
-  ))}}
+  val routers = Seq.tabulate(nNodes) { i => router_sink_domains(i) {
+    val inParams = channelParams.filter(_.destId == i)
+    val outParams = channelParams.filter(_.srcId == i)
+    val ingressParams = globalIngressParams.filter(_.destId == i)
+    val egressParams = globalEgressParams.filter(_.srcId == i)
+    val noIn = inParams.size + ingressParams.size == 0
+    val noOut = outParams.size + egressParams.size == 0
+    if (noIn || noOut) {
+      println(s"Constellation WARNING: $nocName router $i seems to be unused, it will not be generated")
+      None
+    } else {
+      Some(LazyModule(new Router(
+        routerParams = RouterParams(
+          nodeId = i,
+          user = p(NoCKey).routerParams(i)
+        ),
+        inParams = inParams,
+        outParams = outParams,
+        ingressParams = ingressParams,
+        egressParams = egressParams
+      )))
+    }
+  }}.flatten
 
   val ingressNodes = globalIngressParams.map { u => TerminalChannelSourceNode(u) }
   val egressNodes = globalEgressParams.map { u => TerminalChannelDestNode(u) }
 
   Seq.tabulate(nNodes, nNodes) { case (i, j) => if (i != j) {
-    val sourceNodes = routers(i).sourceNodes.filter(_.sourceParams.destId == j)
-    val destNodes = routers(j).destNodes.filter(_.destParams.srcId == i)
-    require (sourceNodes.size == destNodes.size)
-    val channelParam = p(NoCKey).channelParamGen(i, j)
-    (sourceNodes zip destNodes).foreach { case (src, dst) =>
-      router_sink_domains(j) { dst := channelParam.channelGen(p)(src) }
+    val routerI = routers.find(_.nodeId == i)
+    val routerJ = routers.find(_.nodeId == j)
+    if (routerI.isDefined && routerJ.isDefined) {
+      val sourceNodes = routerI.get.sourceNodes.filter(_.sourceParams.destId == j)
+      val destNodes = routerJ.get.destNodes.filter(_.destParams.srcId == i)
+      require (sourceNodes.size == destNodes.size)
+      val channelParam = p(NoCKey).channelParamGen(i, j)
+      (sourceNodes zip destNodes).foreach { case (src, dst) =>
+        router_sink_domains(j) { dst := channelParam.channelGen(p)(src) }
+      }
     }
   }}
 
-  routers.zipWithIndex.map { case (dst,dstId) =>
+  routers.foreach { dst =>
     dst.ingressNodes.foreach(n =>
       n := ingressNodes(n.destParams.asInstanceOf[IngressChannelParams].ingressId)
     )
@@ -289,8 +330,6 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
     (io.ingress zip ingressNodes.map(_.out(0)._1)).foreach { case (l,r) => r <> l }
     (io.egress  zip egressNodes .map(_.in (0)._1)).foreach { case (l,r) => l <> r }
     (io.router_clocks zip clockSourceNodes.map(_.out(0)._1)).foreach { case (l,r) => l <> r }
-
-    val routerModules = routers.map(r => r.module)
 
     // TODO: These assume a single clock-domain across the entire noc
     val debug_va_stall_ctr = RegInit(0.U(64.W))

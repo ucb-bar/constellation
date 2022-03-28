@@ -101,3 +101,17 @@ class BidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology(nX * nY) {
   }
   val plotter = new Mesh2DPlotter(nX, nY)
 }
+
+class TerminalPlaneTopology(val base: PhysicalTopology) extends PhysicalTopology(3 * base.nNodes) {
+  def topo(src: Int, dst: Int) = {
+    def isBase(n: Int) = n < base.nNodes
+    def isIngress(n: Int) = !isEgress(n) && !isBase(n)
+    def isEgress(n: Int) = n >= 2 * base.nNodes
+
+    val ingressToBase = isIngress(src) && isBase(dst) && src - base.nNodes == dst
+    val baseToBase = isBase(src) && isBase(dst) && base.topo(src, dst)
+    val baseToEgress = isBase(src) && isEgress(dst) && src == dst - 2 * base.nNodes
+    (ingressToBase || baseToBase || baseToEgress)
+  }
+  val plotter = new TerminalPlanePlotter(base.plotter, base.nNodes)
+}

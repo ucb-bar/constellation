@@ -1,6 +1,7 @@
 package constellation.routing
 
 import scala.math.pow
+import scala.collection.mutable.HashMap
 
 /** Routing and channel allocation policy
  *
@@ -19,9 +20,12 @@ class RoutingRelation(
   def apply(nodeId: Int, srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, pInfo: PacketRoutingInfo): Boolean = {
     apply(nodeId, srcC, nxtC, PacketRoutingInfoInternal(pInfo.dst, pInfo.vNet))
   }
+
+  val memoize = new HashMap[(Int, ChannelRoutingInfo, ChannelRoutingInfo, PacketRoutingInfoInternal), Boolean]()
   def apply(nodeId: Int, srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, pInfo: PacketRoutingInfoInternal): Boolean = {
     require(nodeId == srcC.dst && nodeId == nxtC.src)
-    f(nodeId, srcC, nxtC, pInfo)
+    val key = (nodeId, srcC, nxtC, pInfo)
+    memoize.getOrElseUpdate(key, f(nodeId, srcC, nxtC, pInfo))
   }
 
   def unary_!()               = new RoutingRelation(
@@ -439,5 +443,29 @@ object RoutingRelation {
     }
   }, (c, v) => {
     c.vc >= v && f.isEscape(c.copy(vc=c.vc - v * nDedicated, n_vc=c.n_vc - v * nDedicated), 0)
+  })
+
+  def terminalPlane(f: RoutingRelation, nNodes: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
+    if (srcC.isIngress && nxtC.dst < nNodes) {
+      true
+    } else if (nxtC.dst == pInfo.dst) {
+      true
+    } else if (nodeId < nNodes && nxtC.dst < nNodes && nodeId != pInfo.dst - 2 * nNodes) {
+      if (srcC.src >= nNodes) {
+        f(nodeId,
+          srcC.copy(src=(-1), vc=0, n_vc=1),
+          nxtC,
+          pInfo.copy(dst=pInfo.dst-2*nNodes))
+      } else {
+        f(nodeId,
+          srcC,
+          nxtC,
+          pInfo.copy(dst=pInfo.dst-2*nNodes))
+      }
+    } else {
+      false
+    }
+  }, (c, v) => {
+    c.src >= nNodes || c.dst >= nNodes || f.isEscape(c, v)
   })
 }

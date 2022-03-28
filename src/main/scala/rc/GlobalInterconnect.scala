@@ -11,6 +11,7 @@ import freechips.rocketchip.util._
 
 import constellation.{NoC, NoCKey, NoCTerminalIO}
 import constellation.channel.{TerminalChannel, UserIngressParams, UserEgressParams}
+import constellation.topology.{TerminalPlaneTopology}
 
 import scala.collection.immutable.ListMap
 
@@ -35,10 +36,14 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
     val (in, out) = (inNodeMapping(bus), outNodeMapping(bus))
     out.size * 3 + in.size * 2
   }
+  val (ingressTerminalOffset, egressTerminalOffset) = p(NoCKey).topology match {
+    case t: TerminalPlaneTopology => (t.base.nNodes, t.base.nNodes * 2)
+    case _ => (0, 0)
+  }
   def ingressOffset(bus: TLBusWrapperLocation) = supportedBuses.map(b => nIngresses(b))
-    .scanLeft(0)(_ + _).toSeq(supportedBuses.indexOf(bus))
+    .scanLeft(0)(_ + _).toSeq(supportedBuses.indexOf(bus)) + ingressTerminalOffset
   def egressOffset(bus: TLBusWrapperLocation) = supportedBuses.map(b => nEgresses(b))
-    .scanLeft(0)(_ + _).toSeq(supportedBuses.indexOf(bus))
+    .scanLeft(0)(_ + _).toSeq(supportedBuses.indexOf(bus)) + egressTerminalOffset
   def vNetOffset(bus: TLBusWrapperLocation) = supportedBuses.indexOf(bus) * 5
 
 

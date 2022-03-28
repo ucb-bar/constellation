@@ -11,6 +11,7 @@ import freechips.rocketchip.util._
 
 import constellation.{NoC, NoCKey, NoCConfig, NoCTerminalIO}
 import constellation.channel.{IOFlit, UserIngressParams, UserEgressParams, TerminalChannel}
+import constellation.topology.{TerminalPlaneTopology}
 
 case class TLNoCParams(
   nocName: String,
@@ -19,6 +20,7 @@ case class TLNoCParams(
   // if set, generates a private noc using the config,
   // else use globalNoC params to connect to global interconncet
   privateNoC: Option[NoCConfig],
+
   globalTerminalChannels: Option[() => BundleBridgeSink[NoCTerminalIO]] = None
 )
 
@@ -390,11 +392,15 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
     val noc = privateNoC.map { nocParams =>
       // If desired, create a private noc
       require(nocParams.nVirtualNetworks == 5)
+      val (ingressOffset, egressOffset) = nocParams.topology match {
+        case t: TerminalPlaneTopology => (t.base.nNodes, t.base.nNodes * 2)
+        case _ => (0, 0)
+      }
       Module(LazyModule(new NoC()(p.alterPartial({
         case NoCKey => nocParams.copy(
           routerParams = (i: Int) => nocParams.routerParams(i).copy(payloadBits = actualPayloadWidth),
-          ingresses = ingressParams,
-          egresses = egressParams,
+          ingresses = ingressParams.map(i => i.copy(destId = i.destId + ingressOffset)),
+          egresses = egressParams.map(e => e.copy(srcId = e.srcId + egressOffset)),
           nocName = nocName
         )
       }))).module)

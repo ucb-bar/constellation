@@ -49,14 +49,15 @@ abstract class AbstractInputUnit(
     if (virtualChannelParams(srcV).traversable) {
       outParams.zipWithIndex.map { case (oP, oI) =>
         (0 until oP.nVirtualChannels).map { oV =>
-          val allow = virtualChannelParams(srcV).possiblePackets.map { pI =>
-            p(NoCKey).routingRelation(
+          var allow = false
+          virtualChannelParams(srcV).possiblePackets.foreach { pI =>
+            allow = allow || p(NoCKey).routingRelation(
               nodeId,
               cParam.channelRoutingInfos(srcV),
               oP.channelRoutingInfos(oV),
               pI
             )
-          }.reduce(_||_)
+          }
           if (!allow)
             sel(oI)(oV) := false.B
         }
