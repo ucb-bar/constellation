@@ -41,9 +41,9 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
     case _ => (0, 0)
   }
   def ingressOffset(bus: TLBusWrapperLocation) = supportedBuses.map(b => nIngresses(b))
-    .scanLeft(0)(_ + _).toSeq(supportedBuses.indexOf(bus)) + ingressTerminalOffset
+    .scanLeft(0)(_ + _).toSeq(supportedBuses.indexOf(bus))
   def egressOffset(bus: TLBusWrapperLocation) = supportedBuses.map(b => nEgresses(b))
-    .scanLeft(0)(_ + _).toSeq(supportedBuses.indexOf(bus)) + egressTerminalOffset
+    .scanLeft(0)(_ + _).toSeq(supportedBuses.indexOf(bus))
   def vNetOffset(bus: TLBusWrapperLocation) = supportedBuses.indexOf(bus) * 5
 
 
@@ -97,7 +97,7 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
 
     val ingressParams = (inNodeMapping(bus).map(i => Seq(i, i, i)) ++ outNodeMapping(bus).map(i => Seq(i, i)))
       .flatten.zipWithIndex.map { case (i, iId) => UserIngressParams(
-        destId = i,
+        destId = i + ingressTerminalOffset,
         possibleEgresses = (0 until nEgresses(bus))
           .filter(e => connectivity(iId, e, ingressVNets(iId)))
           .map(_ + egressOffset(bus))
@@ -107,7 +107,7 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
       )}
     val egressParams = (inNodeMapping(bus).map(i => Seq(i, i)) ++ outNodeMapping(bus).map(i => Seq(i, i, i)))
       .flatten.zipWithIndex.map { case (e, eId) => UserEgressParams(
-        srcId = e,
+        srcId = e + egressTerminalOffset,
         payloadBits = globalNoCWidth
       )}
     (ingressParams, egressParams)
