@@ -43,7 +43,7 @@ class ConstellationSystemBus(sbus_params: SystemBusParams, noc_params: TLNoCPara
   }
 
   private val system_bus_noc = LazyModule(new TLNoC(noc_params))
-  val inwardNode: TLInwardNode = system_bus_noc.node :=* TLRateAdjuster() :=* TLFIFOFixer(TLFIFOFixer.allVolatile) :=* replicator.map(_.node).getOrElse(TLTempNode())
+  val inwardNode: TLInwardNode = system_bus_noc.node :=* TLFIFOFixer(TLFIFOFixer.allVolatile) :=* replicator.map(_.node).getOrElse(TLTempNode())
   val outwardNode: TLOutwardNode = system_bus_noc.node
   def busView: TLEdge = system_bus_noc.node.edges.in.head
 
