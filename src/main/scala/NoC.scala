@@ -26,7 +26,8 @@ case class NoCConfig(
   // (blocker, blockee) => bool
   // If true, then blocker must be able to proceed when blockee is blocked
   vNetBlocking: (Int, Int) => Boolean = (_: Int, _: Int) => true,
-  nocName: String = "test"
+  nocName: String = "test",
+  skipValidationChecks: Boolean = false
 )
 case object NoCKey extends Field[NoCConfig](NoCConfig())
 
@@ -37,6 +38,7 @@ trait HasNoCParams {
   val nNodes = params.topology.nNodes
   val nVirtualNetworks = params.nVirtualNetworks
   val nocName = params.nocName
+  val skipValidationChecks = params.skipValidationChecks
 
   val nodeIdBits = log2Ceil(nNodes)
   val vNetBits = log2Up(params.nVirtualNetworks)
@@ -203,18 +205,22 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
   }
 
   // Connectivity for each virtual subnet
-  println(s"Constellation: $nocName Checking virtual subnet connectivity")
-  for (vNetId <- 0 until nVirtualNetworks) {
-    // blockees are vNets which the current vNet can block without affecting its own forwards progress
-    val blockees = (0 until nVirtualNetworks).filter(v => v != vNetId && p(NoCKey).vNetBlocking(vNetId, v))
-    val blockeeSets = blockees.toSet.subsets.filter(_.size > 0)
-    // For each subset of blockers for this virtual network, recheck connectivity assuming
-    // every virtual channel accessible to each blocker is locked
-    for (b <- blockeeSets) {
-      val routingRel = p(NoCKey).routingRelation
-      checkConnectivity(vNetId, routingRel && !(new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
-        b.map { v => possiblePacketMap(nxtC).map(_.vNet == v) }.flatten.fold(false)(_||_)
-      })))
+  if (skipValidationChecks) {
+    println(s"Constellation WARNING: $nocName skip checking virtual subnet connectivity")
+  } else {
+    println(s"Constellation: $nocName Checking virtual subnet connectivity")
+    for (vNetId <- 0 until nVirtualNetworks) {
+      // blockees are vNets which the current vNet can block without affecting its own forwards progress
+      val blockees = (0 until nVirtualNetworks).filter(v => v != vNetId && p(NoCKey).vNetBlocking(vNetId, v))
+      val blockeeSets = blockees.toSet.subsets.filter(_.size > 0)
+      // For each subset of blockers for this virtual network, recheck connectivity assuming
+      // every virtual channel accessible to each blocker is locked
+      for (b <- blockeeSets) {
+        val routingRel = p(NoCKey).routingRelation
+        checkConnectivity(vNetId, routingRel && !(new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
+          b.map { v => possiblePacketMap(nxtC).map(_.vNet == v) }.flatten.fold(false)(_||_)
+        })))
+      }
     }
   }
 
@@ -237,7 +243,6 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
       }
     }
   }
-
 
   // Tie off inpossible virtual channels
   // Also set possible nodes for each channel
