@@ -4,7 +4,7 @@ import freechips.rocketchip.config.{Field, Parameters, Config}
 import constellation.{NoCKey}
 
 class WithUniformChannels(f: UserChannelParams => UserChannelParams) extends Config((site, here, up) => {
-  case NoCKey => up(NoCKey, site).copy(channelParamGen = (src: Int, dst: Int) => {
+  case NoCKey => up(NoCKey, site).copy(channelParamGen = (src: Int, dst: Int) => { // TODO (ANIMESH) -> channelParamGen takes in a src/dst pair and emits the channel parameters for that pair. Use this + WithUniformChannelSrcMultiplier to figure out how to make it fat
     f(up(NoCKey, site).channelParamGen(src, dst))
   })
 })

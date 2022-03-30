@@ -1,6 +1,6 @@
 package constellation.routing
 
-import scala.math.pow
+import scala.math.{pow, min, max}
 
 /** Routing and channel allocation policy
  *
@@ -185,23 +185,29 @@ object RoutingRelation {
         }
         dsts(nxtY).contains(pInfo.dst % height)
       }
-    })
+    }) && noRoutingAtEgress
   }
 
-  def bidirectionalTree(nNodes: Int) = {
-    def canReach(src: Int, dst: Int): Boolean = {
+  def bidirectionalTree(nNodes: Int, dAry: Int) = {
+
+    /** Returns a boolean indicating whether src is an ancestor node of dst */
+    def isAncestor(src: Int, dst: Int): Boolean = {
       if (src == dst) {
         true
       } else if (src > dst) {
         false
       } else {
-        canReach(src * 2 + 1, dst) || canReach(src * 2 + 2, dst)
+        ((dAry * src + 1) to (dAry * src + dAry)).foldLeft(false)((sofar, nextChild) => sofar || isAncestor(nextChild, dst))
       }
     }
 
     new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
-        canReach(nxtC.dst, nodeId)
-    })
+        if (isAncestor(nodeId, pInfo.dst)) {
+          isAncestor(nxtC.dst, pInfo.dst) && (nxtC.dst >= nodeId)
+        } else {
+          isAncestor(nxtC.dst, nodeId)
+        }
+    }) && noRoutingAtEgress
   }
 
 

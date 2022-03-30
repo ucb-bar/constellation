@@ -56,17 +56,22 @@ class Butterfly(kAry: Int, nFly: Int) extends PhysicalTopology(pow(kAry, nFly-1)
   val plotter = new ButterflyPlotter(kAry, nFly)
 }
 
-/** An n-node binary tree topology. Nodes populate the tree bottom-up; the leaf layer will not be fully
-  * populated if n is not a power of two
+/** An n-node tree topology. Nodes populate the tree top-down; the leaf layer will not be fully
+  * populated if n is not a power of dAry.
   */
-class BidirectionalTree(n: Int) extends PhysicalTopology(n) {
-  val height = floor(log10(n) / log10(2)).toInt
+class BidirectionalTree(nNodes: Int, dAry: Int = 2) extends PhysicalTopology(nNodes) { // TODO (ANIMESH): input params should be (height of tree, arity) not (nNodes, arity)
+  require(dAry > 1)
+  val height = floor(log10(nNodes) / log10(dAry)).toInt
 
   /** Given the node id, returns the level of the tree the node is placed in. Levels are 0-indexed. */
-  def level(id: Int) = height - floor(log10(id + 1) / log10(2))
+  def level(id: Int) = height - floor(log10(id + 1) / log10(dAry))
 
-  def topo(src: Int, dest: Int) = ((floor(dest / 2) == src) || (floor(src / 2) == dest))
-  val plotter = new Mesh2DPlotter(n, n) // TODO (ANIMESH): create tree plotter
+  def topo(src: Int, dest: Int) = {
+    // println(s"TOPO: ${src} ${dest} ${(level(src) != level(dest)) && (src == floor((dest - 1) / dAry) || (src >= (dAry * dest + 1) && src <= (dAry * dest + dAry)))}")
+    (level(src) != level(dest)) && (src == floor((dest - 1) / dAry) || (src >= (dAry * dest + 1) && src <= (dAry * dest + dAry)))
+  }
+
+  val plotter = new Mesh2DPlotter(nNodes, nNodes) // TODO (ANIMESH): create tree plotter
 }
 
 /** A 2D mesh network with nX * nY nodes. Bidirectional channels exist between nodes that are a
