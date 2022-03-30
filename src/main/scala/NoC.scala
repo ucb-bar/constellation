@@ -33,18 +33,18 @@ case object NoCKey extends Field[NoCConfig](NoCConfig())
 
 trait HasNoCParams {
   implicit val p: Parameters
-  private val params = p(NoCKey)
+  val nocParams = p(NoCKey)
 
-  val nNodes = params.topology.nNodes
-  val nVirtualNetworks = params.nVirtualNetworks
-  val nocName = params.nocName
-  val skipValidationChecks = params.skipValidationChecks
+  val nNodes = nocParams.topology.nNodes
+  val nVirtualNetworks = nocParams.nVirtualNetworks
+  val nocName = nocParams.nocName
+  val skipValidationChecks = nocParams.skipValidationChecks
 
   val nodeIdBits = log2Ceil(nNodes)
-  val vNetBits = log2Up(params.nVirtualNetworks)
-  val nEgresses = params.egresses.size
-  val egressIdBits = log2Up(params.egresses.size)
-  val egressSrcIds = params.egresses.map(_.srcId)
+  val vNetBits = log2Up(nocParams.nVirtualNetworks)
+  val nEgresses = nocParams.egresses.size
+  val egressIdBits = log2Up(nocParams.egresses.size)
+  val egressSrcIds = nocParams.egresses.map(_.srcId)
 }
 
 class NoCTerminalIO(
@@ -55,6 +55,7 @@ class NoCTerminalIO(
 }
 
 class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
+
   var uniqueChannelId = 0
   def getUniqueChannelId(): Int = {
     val r = uniqueChannelId
@@ -63,10 +64,10 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
   }
 
   val fullChannelParams: Seq[ChannelParams] = Seq.tabulate(nNodes, nNodes) { case (i,j) =>
-    if (p(NoCKey).topology.topo(i, j)) {
-      val cP = p(NoCKey).channelParamGen(i, j)
-      val payloadBits = p(NoCKey).routerParams(i).payloadBits
-      require(p(NoCKey).routerParams(i).payloadBits == p(NoCKey).routerParams(j).payloadBits)
+    if (nocParams.topology.topo(i, j)) {
+      val cP = nocParams.channelParamGen(i, j)
+      val payloadBits = nocParams.routerParams(i).payloadBits
+      require(nocParams.routerParams(i).payloadBits == nocParams.routerParams(j).payloadBits)
       Some(ChannelParams(
         srcId = i,
         destId = j,
@@ -79,13 +80,13 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
     }
   }.flatten.flatten
 
-  val globalIngressParams = p(NoCKey).ingresses.zipWithIndex.map { case (u,i) =>
+  val globalIngressParams = nocParams.ingresses.zipWithIndex.map { case (u,i) =>
     IngressChannelParams(
       user = u,
       ingressId = i,
       uniqueId = getUniqueChannelId())
   }
-  val globalEgressParams = p(NoCKey).egresses.zipWithIndex.map { case (u,e) =>
+  val globalEgressParams = nocParams.egresses.zipWithIndex.map { case (u,e) =>
     EgressChannelParams(
       user = u,
       egressId = e,
@@ -201,7 +202,7 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
   // Check connectivity, ignoring blocking properties of virtual subnets
   println(s"Constellation: $nocName Checking full connectivity")
   for (vNetId <- 0 until nVirtualNetworks) {
-    checkConnectivity(vNetId, p(NoCKey).routingRelation)
+    checkConnectivity(vNetId, nocParams.routingRelation)
   }
 
   // Connectivity for each virtual subnet
@@ -211,12 +212,12 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
     println(s"Constellation: $nocName Checking virtual subnet connectivity")
     for (vNetId <- 0 until nVirtualNetworks) {
       // blockees are vNets which the current vNet can block without affecting its own forwards progress
-      val blockees = (0 until nVirtualNetworks).filter(v => v != vNetId && p(NoCKey).vNetBlocking(vNetId, v))
+      val blockees = (0 until nVirtualNetworks).filter(v => v != vNetId && nocParams.vNetBlocking(vNetId, v))
       val blockeeSets = blockees.toSet.subsets.filter(_.size > 0)
       // For each subset of blockers for this virtual network, recheck connectivity assuming
       // every virtual channel accessible to each blocker is locked
       for (b <- blockeeSets) {
-        val routingRel = p(NoCKey).routingRelation
+        val routingRel = nocParams.routingRelation
         checkConnectivity(vNetId, routingRel && !(new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
           b.map { v => possiblePacketMap(nxtC).map(_.vNet == v) }.flatten.fold(false)(_||_)
         })))
@@ -228,12 +229,12 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
   println(s"Constellation: $nocName Checking for possibility of deadlock")
   for (vNetId <- 0 until nVirtualNetworks) {
     // blockees are vNets which the current vNet can block without affecting its own forwards progress
-    val blockees = (0 until nVirtualNetworks).filter(v => v != vNetId && p(NoCKey).vNetBlocking(vNetId, v))
+    val blockees = (0 until nVirtualNetworks).filter(v => v != vNetId && nocParams.vNetBlocking(vNetId, v))
     val blockeeSets = blockees.toSet.subsets
     // For each subset of blockers for this virtual network, recheck connectivity assuming
     // every virtual channel accessible to each blocker is locked
     for (b <- blockeeSets) {
-      val routingRel = p(NoCKey).routingRelation
+      val routingRel = nocParams.routingRelation
       val acyclicPath = checkAcyclic(vNetId, routingRel
         && !(new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {b.map { v => possiblePacketMap(nxtC).map(_.vNet == v) }.flatten.fold(false)(_||_)}))
         && new RoutingRelation((nodeId, srcC, nxtC, pInfo) => routingRel.isEscape(nxtC, vNetId))
@@ -283,12 +284,13 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
       Some(LazyModule(new Router(
         routerParams = RouterParams(
           nodeId = i,
-          user = p(NoCKey).routerParams(i)
+          user = nocParams.routerParams(i)
         ),
         inParams = inParams,
         outParams = outParams,
         ingressParams = ingressParams,
-        egressParams = egressParams
+        egressParams = egressParams,
+
       )))
     }
   }}.flatten
@@ -303,7 +305,7 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
       val sourceNodes = routerI.get.sourceNodes.filter(_.sourceParams.destId == j)
       val destNodes = routerJ.get.destNodes.filter(_.destParams.srcId == i)
       require (sourceNodes.size == destNodes.size)
-      val channelParam = p(NoCKey).channelParamGen(i, j)
+      val channelParam = nocParams.channelParamGen(i, j)
       (sourceNodes zip destNodes).foreach { case (src, dst) =>
         router_sink_domains(j) { dst := channelParam.channelGen(p)(src) }
       }
@@ -364,7 +366,7 @@ class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
         ++ r.egressParams.map(e => s"e${e.egressId}")
         ++ r.ingressParams.map(i => s"i${i.ingressId}")
       )
-      val plotter = p(NoCKey).topology.plotter
+      val plotter = nocParams.topology.plotter
       val coords = (Seq(plotter.node(r.nodeId))
         ++ Seq.tabulate(r.egressParams.size ) { i => plotter. egress(i, r. egressParams.size, r.nodeId) }
         ++ Seq.tabulate(r.ingressParams.size) { i => plotter.ingress(i, r.ingressParams.size, r.nodeId) }

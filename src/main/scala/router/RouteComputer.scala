@@ -58,15 +58,20 @@ class RouteComputer(
                   outParams(o).channelRoutingInfos(outVId),
                   pI
                 )
-                ((((cI.vc << vNetBits) + pI.vNet) << nodeIdBits) + pI.dst, v)
+                ((cI.vc, pI.vNet, pI.dst), v)
               }
             }.flatten
-            val trues = table.filter(_._2).map(_._1.U)
-            val falses = table.filter(!_._2).map(_._1.U)
-            val addr = Cat(
+            val trues = table.filter(_._2).map(_._1)
+            val falses = table.filter(!_._2).map(_._1)
+            val addr = (
               req.bits.src_virt_id,
               req.bits.route_info.vnet,
-              req.bits.route_info.dst(allInParams(i).possiblePackets))
+              req.bits.route_info.dst(allInParams(i).possiblePackets)
+            )
+
+            def eq(a: (Int, Int, Int), b: (UInt, UInt, UInt)): Bool = {
+              a._1.U === b._1 && a._2.U === b._2 && a._3.U === b._3
+            }
 
             resp.bits.vc_sel(o)(outVId) := (if (falses.size == 0) {
               true.B
@@ -76,9 +81,9 @@ class RouteComputer(
               // The Quine-McCluskey impl in rocketchip memory leaks sometimes here...
               //if (trues.size + falses.size >= 100) {
               if (trues.size > falses.size) {
-                falses.map(_ =/= addr).andR
+                falses.map(t => !eq(t, addr)).andR
               } else {
-                trues.map(_ === addr).orR
+                trues.map(t => eq(t, addr)).orR
               }
               // } else {
               //   println(s"DecodeLogic ${trues.size} ${falses.size}")
