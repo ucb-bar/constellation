@@ -1,4 +1,4 @@
-package constellation
+package constellation.noc
 
 import freechips.rocketchip.config.{Field, Parameters, Config}
 

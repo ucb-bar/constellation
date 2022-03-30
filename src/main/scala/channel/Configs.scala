@@ -1,7 +1,7 @@
 package constellation.channel
 
 import freechips.rocketchip.config.{Field, Parameters, Config}
-import constellation.{NoCKey}
+import constellation.noc.{NoCKey}
 
 class WithUniformChannels(f: UserChannelParams => UserChannelParams) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(channelParamGen = (src: Int, dst: Int) => {

@@ -9,7 +9,7 @@ import freechips.rocketchip.config.{Field, Parameters, Config}
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.util._
 
-import constellation._
+import constellation.noc.{NoCKey, HasNoCParams, NoC}
 import constellation.channel._
 import constellation.rc.{TLNoC, TLNoCParams}
 

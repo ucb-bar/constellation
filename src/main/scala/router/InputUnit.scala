@@ -8,7 +8,6 @@ import freechips.rocketchip.util._
 
 import constellation.channel._
 import constellation.routing.{PacketRoutingBundle}
-import constellation.{NoCKey}
 import constellation.util.{GrantHoldArbiter, WrapInc, ArbiterPolicy}
 
 class AbstractInputUnitIO(
@@ -51,7 +50,7 @@ abstract class AbstractInputUnit(
         (0 until oP.nVirtualChannels).map { oV =>
           var allow = false
           virtualChannelParams(srcV).possiblePackets.foreach { pI =>
-            allow = allow || p(NoCKey).routingRelation(
+            allow = allow || nocParams.routingRelation(
               nodeId,
               cParam.channelRoutingInfos(srcV),
               oP.channelRoutingInfos(oV),

@@ -9,7 +9,7 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.subsystem._
 import freechips.rocketchip.util._
 
-import constellation.{NoC, NoCKey, NoCTerminalIO}
+import constellation.noc.{NoC, NoCKey, NoCTerminalIO}
 import constellation.channel.{TerminalChannel, UserIngressParams, UserEgressParams}
 import constellation.topology.{TerminalPlaneTopology}
 

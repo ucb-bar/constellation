@@ -1,7 +1,7 @@
 package constellation.router
 
 import freechips.rocketchip.config.{Field, Parameters, Config}
-import constellation.{NoCKey}
+import constellation.noc.{NoCKey}
 
 class WithCombineRCVA extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(routerParams = (i: Int) =>

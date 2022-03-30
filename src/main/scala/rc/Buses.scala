@@ -10,7 +10,7 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.subsystem._
 import freechips.rocketchip.util._
 
-import constellation.{NoCConfig}
+import constellation.noc.{NoCConfig}
 
 case class ConstellationSystemBusParams(
   params: SystemBusParams,

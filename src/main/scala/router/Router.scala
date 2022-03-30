@@ -9,7 +9,7 @@ import freechips.rocketchip.util.{PlusArg}
 
 import constellation.channel._
 import constellation.routing.{RoutingRelation}
-import constellation.{NoCKey, HasNoCParams}
+import constellation.noc.{HasNoCParams}
 
 case class UserRouterParams(
   payloadBits: Int = 64,
@@ -75,6 +75,7 @@ class Router(
   val debugNode = BundleBridgeSource(() => new DebugBundle(nAllInputs))
 
   lazy val module = new LazyModuleImp(this) {
+    println(s"Router $nodeId")
     val io_in = destNodes.map(_.in(0)._1)
     val io_out = sourceNodes.map(_.out(0)._1)
     val io_ingress = ingressNodes.map(_.in(0)._1)
