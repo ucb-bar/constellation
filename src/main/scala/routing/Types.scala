@@ -36,8 +36,8 @@ class ChannelRoutingBundle extends Bundle {
  */
 case class PacketRoutingInfo(
   egressId: Int, vNet: Int
-)(implicit val p: Parameters) {
-  def dst = p(NoCKey).egresses(egressId).srcId
+) {
+  def dst(implicit p: Parameters) = p(NoCKey).egresses(egressId).srcId
 }
 
 case class PacketRoutingInfoInternal(

@@ -82,7 +82,7 @@ case class ChannelParams(
   virtualChannelParams: Seq[VirtualChannelParams],
   srcMultiplier: Int,
   destMultiplier: Int
-)(implicit p: Parameters) extends BaseChannelParams {
+) extends BaseChannelParams {
   val nVirtualChannels = virtualChannelParams.size
   val maxBufferSize = virtualChannelParams.map(_.bufferSize).max
 
@@ -99,7 +99,7 @@ object ChannelParams {
     payloadBits: Int,
     user: UserChannelParams,
     uniqueId: Int
-  )(implicit p: Parameters): ChannelParams = {
+  ): ChannelParams = {
     ChannelParams(
       srcId = srcId,
       destId = destId,
@@ -120,7 +120,7 @@ case class IngressChannelParams(
   possibleEgresses: Set[Int],
   vNetId: Int,
   payloadBits: Int
-)(implicit p: Parameters) extends TerminalChannelParams {
+) extends TerminalChannelParams {
   val srcId = -1
   val possiblePackets = possibleEgresses.map { e => PacketRoutingInfo(e, vNetId) }
   val channelRoutingInfos = Seq(ChannelRoutingInfo(-1, 0, destId, 1))
@@ -130,8 +130,7 @@ object IngressChannelParams {
   def apply(
     ingressId: Int,
     uniqueId: Int,
-    user: UserIngressParams)(implicit p: Parameters): IngressChannelParams = {
-    require(user.destId < p(NoCKey).topology.nNodes)
+    user: UserIngressParams): IngressChannelParams = {
     IngressChannelParams(
       ingressId = ingressId,
       uniqueId = uniqueId,
@@ -151,7 +150,7 @@ case class EgressChannelParams(
   possiblePackets: Set[PacketRoutingInfo],
   srcId: Int,
   payloadBits: Int
-)(implicit p: Parameters) extends TerminalChannelParams {
+) extends TerminalChannelParams {
   val destId = -1
   val channelRoutingInfos = Seq(ChannelRoutingInfo(srcId, 0, -1, 1))
 }
@@ -161,8 +160,7 @@ object EgressChannelParams {
     egressId: Int,
     uniqueId: Int,
     possiblePackets: Set[PacketRoutingInfo],
-    user: UserEgressParams)(implicit p: Parameters): EgressChannelParams = {
-    require(user.srcId < p(NoCKey).topology.nNodes)
+    user: UserEgressParams): EgressChannelParams = {
     EgressChannelParams(
       egressId = egressId,
       uniqueId = uniqueId,

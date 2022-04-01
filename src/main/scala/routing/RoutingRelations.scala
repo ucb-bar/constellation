@@ -2,6 +2,7 @@ package constellation.routing
 
 import scala.math.pow
 import scala.collection.mutable.HashMap
+import freechips.rocketchip.config.{Parameters}
 
 /** Routing and channel allocation policy
  *
@@ -17,7 +18,7 @@ class RoutingRelation(
   f: (Int, ChannelRoutingInfo, ChannelRoutingInfo, PacketRoutingInfoInternal) => Boolean,
   val isEscape: (ChannelRoutingInfo, Int) => Boolean = (_,_) => true) {
 
-  def apply(nodeId: Int, srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, pInfo: PacketRoutingInfo): Boolean = {
+  def apply(nodeId: Int, srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, pInfo: PacketRoutingInfo)(implicit p: Parameters): Boolean = {
     apply(nodeId, srcC, nxtC, PacketRoutingInfoInternal(pInfo.dst, pInfo.vNet))
   }
 

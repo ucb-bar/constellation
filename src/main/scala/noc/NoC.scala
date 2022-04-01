@@ -54,7 +54,20 @@ class NoCTerminalIO(
   val egress = MixedVec(egressParams.map { u => new TerminalChannel(u) })
 }
 
-class NoC(implicit p: Parameters) extends LazyModule with HasNoCParams{
+class NoC(implicit p: Parameters) extends LazyModule {
+
+  val nocParams = p(NoCKey)
+
+  val nNodes = nocParams.topology.nNodes
+  val nVirtualNetworks = nocParams.nVirtualNetworks
+  val nocName = nocParams.nocName
+  val skipValidationChecks = nocParams.skipValidationChecks
+
+  val nodeIdBits = log2Ceil(nNodes)
+  val vNetBits = log2Up(nocParams.nVirtualNetworks)
+  val nEgresses = nocParams.egresses.size
+  val egressIdBits = log2Up(nocParams.egresses.size)
+  val egressSrcIds = nocParams.egresses.map(_.srcId)
 
   var uniqueChannelId = 0
   def getUniqueChannelId(): Int = {
