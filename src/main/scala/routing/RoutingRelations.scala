@@ -28,27 +28,6 @@ class RoutingRelation(
     val key = (nodeId, srcC, nxtC, pInfo)
     memoize.getOrElseUpdate(key, f(nodeId, srcC, nxtC, pInfo))
   }
-
-  def unary_!()               = new RoutingRelation(
-    (n, srcC, nxtC, pInfo) => !f(n, srcC, nxtC, pInfo),
-    isEscape
-  )
-  def ||(a2: RoutingRelation) = new RoutingRelation(
-    (n, srcC, nxtC, pInfo) => f(n, srcC, nxtC, pInfo) || a2(n, srcC, nxtC, pInfo),
-    (c, v) => isEscape(c, v) || a2.isEscape(c, v)
-  )
-  def ||(a2: Boolean)         = new RoutingRelation(
-    (n, srcC, nxtC, pInfo) => f(n, srcC, nxtC, pInfo) || a2,
-    isEscape
-  )
-  def &&(a2: RoutingRelation) = new RoutingRelation(
-    (n, srcC, nxtC, pInfo) => f(n, srcC, nxtC, pInfo) && a2(n, srcC, nxtC, pInfo),
-    (c, v) => isEscape(c, v) || a2.isEscape(c, v)
-  )
-  def &&(a2: Boolean)         = new RoutingRelation(
-    (n, srcC, nxtC, pInfo) => f(n, srcC, nxtC, pInfo) && a2,
-    isEscape
-  )
 }
 
 
@@ -84,8 +63,6 @@ object RoutingRelation {
     })
   }
 
-  def noRoutingAtEgress = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => pInfo.dst != nodeId)
-
 
   // Usable policies
   val allLegal = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => true)
@@ -101,7 +78,7 @@ object RoutingRelation {
    */
   val bidirectionalLine = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
     if (nodeId < nxtC.dst) pInfo.dst >= nxtC.dst else pInfo.dst <= nxtC.dst
-  }) && noRoutingAtEgress
+  })
 
   def unidirectionalTorus1DDateline(nNodes: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
     if (srcC.src == -1)  {
@@ -113,7 +90,7 @@ object RoutingRelation {
     } else {
       nxtC.vc <= srcC.vc && nxtC.vc != 0
     }
-  }) && noRoutingAtEgress
+  })
 
 
 
@@ -150,7 +127,7 @@ object RoutingRelation {
       true
     }
     distSel && bidirectionalTorus1DDateline(nNodes)(nodeId, srcC, nxtC, pInfo)
-  }) && noRoutingAtEgress
+  })
 
   def bidirectionalTorus1DRandom(nNodes: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
     val sel = if (srcC.src == -1) {
@@ -161,7 +138,7 @@ object RoutingRelation {
       (nodeId + nNodes - nxtC.dst) % nNodes == 1
     }
     sel && bidirectionalTorus1DDateline(nNodes)(nodeId, srcC, nxtC, pInfo)
-  }) && noRoutingAtEgress
+  })
 
   def butterfly(kAry: Int, nFly: Int) = {
     require(kAry >= 2 && nFly >= 2)
@@ -243,13 +220,14 @@ object RoutingRelation {
     val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
     val (dstX, dstY)   = (pInfo.dst % nX , pInfo.dst / nX)
 
-    (if (dstY > nodeY && dstX != nodeX) {
-      mesh2DMinimal(nX, nY) && nxtY != nodeY + 1
+    val minimal = mesh2DMinimal(nX, nY)(nodeId, srcC, nxtC, pInfo)
+    if (dstY > nodeY && dstX != nodeX) {
+      minimal && nxtY != nodeY + 1
     } else if (dstY > nodeY) {
-      new RoutingRelation((nodeId, srcC, nxtC, pInfo) => nxtY == nodeY + 1)
+      nxtY == nodeY + 1
     } else {
-      mesh2DMinimal(nX, nY)
-    })(nodeId, srcC, nxtC, pInfo)
+      minimal
+    }
   })
 
 
@@ -261,16 +239,16 @@ object RoutingRelation {
     val (srcX, srcY)   = (srcC.src % nX , srcC.src / nX)
 
     val turn = nxtX != srcX && nxtY != srcY
-    val canRouteThis = mesh2DDimensionOrdered(srcC.vc % 2)(nX, nY)
-    val canRouteNext = mesh2DDimensionOrdered(nxtC.vc % 2)(nX, nY)
+    val canRouteThis = mesh2DDimensionOrdered(srcC.vc % 2)(nX, nY)(nodeId, srcC, nxtC, pInfo)
+    val canRouteNext = mesh2DDimensionOrdered(nxtC.vc % 2)(nX, nY)(nodeId, srcC, nxtC, pInfo)
 
     val sel = if (srcC.src == -1) {
       canRouteNext
     } else {
       (canRouteThis && nxtC.vc % 2 == srcC.vc % 2 && nxtC.vc <= srcC.vc) || (canRouteNext && nxtC.vc % 2 != srcC.vc % 2 && nxtC.vc <= srcC.vc)
     }
-    (mesh2DMinimal(nX, nY) && sel)(nodeId, srcC, nxtC, pInfo)
-  }) && noRoutingAtEgress
+    mesh2DMinimal(nX, nY)(nodeId, srcC, nxtC, pInfo) && sel
+  })
 
 
   def mesh2DEscapeRouter(nX: Int, nY: Int) = escapeChannels(mesh2DDimensionOrdered()(nX, nY), mesh2DMinimal(nX, nY))
@@ -343,7 +321,7 @@ object RoutingRelation {
     } else {
       nxtX == nodeX
     }
-    (unidirectionalTorus2DDateline(nX, nY) && sel)(nodeId, srcC, nxtC, pInfo)
+    unidirectionalTorus2DDateline(nX, nY)(nodeId, srcC, nxtC, pInfo) && sel
   })
 
   def dimensionOrderedBidirectionalTorus2DDateline(nX: Int, nY: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {

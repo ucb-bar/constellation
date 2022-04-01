@@ -231,9 +231,11 @@ class NoC(implicit p: Parameters) extends LazyModule {
       // every virtual channel accessible to each blocker is locked
       for (b <- blockeeSets) {
         val routingRel = nocParams.routingRelation
-        checkConnectivity(vNetId, routingRel && !(new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
-          b.map { v => possiblePacketMap(nxtC).map(_.vNet == v) }.flatten.fold(false)(_||_)
-        })))
+        checkConnectivity(vNetId, new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
+          val base = routingRel(nodeId, srcC, nxtC, pInfo)
+          val blocked = b.map { v => possiblePacketMap(nxtC).map(_.vNet == v) }.flatten.fold(false)(_||_)
+          base && !blocked
+        }))
       }
     }
   }
@@ -248,10 +250,12 @@ class NoC(implicit p: Parameters) extends LazyModule {
     // every virtual channel accessible to each blocker is locked
     for (b <- blockeeSets) {
       val routingRel = nocParams.routingRelation
-      val acyclicPath = checkAcyclic(vNetId, routingRel
-        && !(new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {b.map { v => possiblePacketMap(nxtC).map(_.vNet == v) }.flatten.fold(false)(_||_)}))
-        && new RoutingRelation((nodeId, srcC, nxtC, pInfo) => routingRel.isEscape(nxtC, vNetId))
-      )
+      val acyclicPath = checkAcyclic(vNetId, new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
+        val base = routingRel(nodeId, srcC, nxtC, pInfo)
+        val blocked = b.map { v => possiblePacketMap(nxtC).map(_.vNet == v) }.flatten.fold(false)(_||_)
+        val escape = routingRel.isEscape(nxtC, vNetId)
+        base && !blocked && escape
+      }))
       acyclicPath.foreach { path =>
         println(s"Constellation WARNING: $nocName cyclic path on virtual network $vNetId may cause deadlock: ${acyclicPath.get}")
       }
