@@ -10,13 +10,13 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.subsystem._
 import freechips.rocketchip.util._
 
-import constellation.noc.{NoCConfig}
+import constellation.noc.{NoCParams}
 
 case class ConstellationSystemBusParams(
   params: SystemBusParams,
   inNodeMapping: Seq[Int],
   outNodeMapping: Seq[Int],
-  privateNoC: Option[NoCConfig]
+  privateNoC: Option[NoCParams]
 ) extends TLBusWrapperInstantiationLike {
   def instantiate(context: HasTileLinkLocations, loc: Location[TLBusWrapper])(implicit p: Parameters): ConstellationSystemBus = {
     val base_noc_params = TLNoCParams("sbus", inNodeMapping, outNodeMapping, privateNoC)
@@ -54,7 +54,7 @@ case class ConstellationMemoryBusParams(
   params: MemoryBusParams,
   inNodeMapping: Seq[Int],
   outNodeMapping: Seq[Int],
-  privateNoC: Option[NoCConfig]
+  privateNoC: Option[NoCParams]
 ) extends TLBusWrapperInstantiationLike {
   def instantiate(context: HasTileLinkLocations, loc: Location[TLBusWrapper])(implicit p: Parameters): ConstellationMemoryBus = {
     val base_noc_params = TLNoCParams("mbus", inNodeMapping, outNodeMapping, privateNoC)

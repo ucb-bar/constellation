@@ -9,7 +9,7 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.subsystem._
 import freechips.rocketchip.util._
 
-import constellation.noc.{NoC, NoCKey, NoCConfig, NoCTerminalIO}
+import constellation.noc.{NoC, NoCKey, NoCParams, NoCTerminalIO}
 import constellation.channel.{IOFlit, UserIngressParams, UserEgressParams, TerminalChannel}
 import constellation.topology.{TerminalPlaneTopology}
 
@@ -19,7 +19,7 @@ case class TLNoCParams(
   outNodeMapping: Seq[Int],
   // if set, generates a private noc using the config,
   // else use globalNoC params to connect to global interconncet
-  privateNoC: Option[NoCConfig],
+  privateNoC: Option[NoCParams],
 
   globalTerminalChannels: Option[() => BundleBridgeSink[NoCTerminalIO]] = None
 )
