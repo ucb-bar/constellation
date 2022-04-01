@@ -13,7 +13,7 @@ object ChannelImp extends SimpleNodeImp[ChannelParams, ChannelParams, ChannelEdg
     ChannelEdgeParams(pd, p)
   }
   def bundle(e: ChannelEdgeParams) = new Channel(e.cp)(e.p)
-  def render(e: ChannelEdgeParams) = if (e.cp.possiblePackets.size == 0) {
+  def render(e: ChannelEdgeParams) = if (e.cp.possiblePackets(e.p).size == 0) {
     RenderedEdge(colour = "ffffff", label = "X")
   } else {
     RenderedEdge(colour = "#0000ff", label = e.cp.payloadBits.toString)
@@ -42,7 +42,7 @@ object TerminalChannelImp extends SimpleNodeImp[TerminalChannelParams, TerminalC
     TerminalChannelEdgeParams(pd, p)
   }
   def bundle(e: TerminalChannelEdgeParams) = new TerminalChannel(e.cp)(e.p)
-  def render(e: TerminalChannelEdgeParams) = if (e.cp.possiblePackets.size == 0) {
+  def render(e: TerminalChannelEdgeParams) = if (e.cp.possiblePackets(e.p).size == 0) {
     RenderedEdge(colour = "ffffff", label = "X")
   } else {
     RenderedEdge(colour = e.cp match {

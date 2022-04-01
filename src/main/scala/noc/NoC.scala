@@ -72,7 +72,7 @@ class NoC(implicit p: Parameters) extends LazyModule {
       egressId = e,
       uniqueId = getUniqueChannelId(),
       possiblePackets = globalIngressParams.filter(_.possibleEgresses.contains(e)).map { i =>
-        PacketRoutingInfo(e, i.vNetId)
+        PacketRoutingInfo(e, i.vNetId, u.srcId)
       }.toSet
     )
   }
@@ -103,7 +103,7 @@ class NoC(implicit p: Parameters) extends LazyModule {
       iP.possibleEgresses.toSeq.sorted.map { oIdx =>
         val oP = globalEgressParams(oIdx)
         val oId = oP.srcId
-        val pInfo = PacketRoutingInfo(oIdx, vNetId)
+        val pInfo = PacketRoutingInfo(oIdx, vNetId, oId)
         val flowPossiblePackets = scala.collection.mutable.Set[ChannelRoutingInfo]()
 
         var stack: Seq[ChannelRoutingInfo] = iP.channelRoutingInfos

@@ -35,14 +35,7 @@ class ChannelRoutingBundle extends Bundle {
  * @param vNet virtual subnetwork identifier
  */
 case class PacketRoutingInfo(
-  egressId: Int, vNet: Int
-) {
-  def dst(implicit p: Parameters) = p(NoCKey).egresses(egressId).srcId
-}
-
-case class PacketRoutingInfoInternal(
-  dst: Int,
-  vNet: Int
+  egressId: Int, vNet: Int, dst: Int
 )
 
 class PacketRoutingBundle(implicit val p: Parameters) extends Bundle with HasNoCParams{

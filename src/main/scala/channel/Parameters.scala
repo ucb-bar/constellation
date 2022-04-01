@@ -60,7 +60,7 @@ case class VirtualChannelParams(
 trait BaseChannelParams {
   def srcId: Int
   def destId: Int
-  def possiblePackets: Set[PacketRoutingInfo]
+  def possiblePackets(implicit p: Parameters): Set[PacketRoutingInfo]
   def nVirtualChannels: Int
   def channelRoutingInfos: Seq[ChannelRoutingInfo]
   def payloadBits: Int
@@ -86,7 +86,8 @@ case class ChannelParams(
   val nVirtualChannels = virtualChannelParams.size
   val maxBufferSize = virtualChannelParams.map(_.bufferSize).max
 
-  val possiblePackets = virtualChannelParams.map(_.possiblePackets).reduce(_++_)
+  val _possiblePackets = virtualChannelParams.map(_.possiblePackets).reduce(_++_)
+  def possiblePackets(implicit p: Parameters) = _possiblePackets
   val traversable = virtualChannelParams.map(_.traversable).reduce(_||_)
 
   val channelRoutingInfos = (0 until nVirtualChannels).map(i => ChannelRoutingInfo(srcId, i, destId, nVirtualChannels))
@@ -122,7 +123,7 @@ case class IngressChannelParams(
   payloadBits: Int
 ) extends TerminalChannelParams {
   val srcId = -1
-  val possiblePackets = possibleEgresses.map { e => PacketRoutingInfo(e, vNetId) }
+  def possiblePackets(implicit p: Parameters) = possibleEgresses.map { e => PacketRoutingInfo(e, vNetId, p(NoCKey).egresses(e).srcId) }
   val channelRoutingInfos = Seq(ChannelRoutingInfo(-1, 0, destId, 1))
 }
 
@@ -147,12 +148,13 @@ object IngressChannelParams {
 case class EgressChannelParams(
   egressId: Int,
   uniqueId: Int,
-  possiblePackets: Set[PacketRoutingInfo],
+  _possiblePackets: Set[PacketRoutingInfo],
   srcId: Int,
   payloadBits: Int
 ) extends TerminalChannelParams {
   val destId = -1
   val channelRoutingInfos = Seq(ChannelRoutingInfo(srcId, 0, -1, 1))
+  def possiblePackets(implicit p: Parameters) = _possiblePackets
 }
 
 object EgressChannelParams {
@@ -164,7 +166,7 @@ object EgressChannelParams {
     EgressChannelParams(
       egressId = egressId,
       uniqueId = uniqueId,
-      possiblePackets = possiblePackets,
+      _possiblePackets = possiblePackets,
       srcId = user.srcId,
       payloadBits = user.payloadBits
     )

@@ -15,15 +15,11 @@ import freechips.rocketchip.config.{Parameters}
  *                 for deadlock-freedom by verifying lack of a cyclic dependency.
  */
 class RoutingRelation(
-  f: (Int, ChannelRoutingInfo, ChannelRoutingInfo, PacketRoutingInfoInternal) => Boolean,
+  f: (Int, ChannelRoutingInfo, ChannelRoutingInfo, PacketRoutingInfo) => Boolean,
   val isEscape: (ChannelRoutingInfo, Int) => Boolean = (_,_) => true) {
 
-  def apply(nodeId: Int, srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, pInfo: PacketRoutingInfo)(implicit p: Parameters): Boolean = {
-    apply(nodeId, srcC, nxtC, PacketRoutingInfoInternal(pInfo.dst, pInfo.vNet))
-  }
-
-  val memoize = new HashMap[(Int, ChannelRoutingInfo, ChannelRoutingInfo, PacketRoutingInfoInternal), Boolean]()
-  def apply(nodeId: Int, srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, pInfo: PacketRoutingInfoInternal): Boolean = {
+  val memoize = new HashMap[(Int, ChannelRoutingInfo, ChannelRoutingInfo, PacketRoutingInfo), Boolean]()
+  def apply(nodeId: Int, srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, pInfo: PacketRoutingInfo): Boolean = {
     require(nodeId == srcC.dst && nodeId == nxtC.src)
     val key = (nodeId, srcC, nxtC, pInfo)
     memoize.getOrElseUpdate(key, f(nodeId, srcC, nxtC, pInfo))
