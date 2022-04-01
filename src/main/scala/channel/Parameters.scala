@@ -81,7 +81,8 @@ case class ChannelParams(
   payloadBits: Int,
   virtualChannelParams: Seq[VirtualChannelParams],
   srcMultiplier: Int,
-  destMultiplier: Int
+  destMultiplier: Int,
+  channelGen: Parameters => ChannelOutwardNode => ChannelOutwardNode = { p => u => u }
 ) extends BaseChannelParams {
   val nVirtualChannels = virtualChannelParams.size
   val maxBufferSize = virtualChannelParams.map(_.bufferSize).max
@@ -107,6 +108,7 @@ object ChannelParams {
       payloadBits = payloadBits,
       srcMultiplier = user.srcMultiplier,
       destMultiplier = user.destMultiplier,
+      channelGen = user.channelGen,
       virtualChannelParams = user.virtualChannelParams.zipWithIndex.map { case (vP, vc) =>
         VirtualChannelParams(srcId, destId, vc, vP.bufferSize, Set[PacketRoutingInfo](), uniqueId)
       }

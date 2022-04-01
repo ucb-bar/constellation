@@ -208,7 +208,7 @@ class TestHarness(implicit val p: Parameters) extends Module {
   val noc = Module(lazyNoC.module)
   noc.io.router_clocks.foreach(_.clock := clock)
   noc.io.router_clocks.foreach(_.reset := reset)
-  val noc_tester = Module(new NoCTester(lazyNoC.globalIngressParams, lazyNoC.globalEgressParams))
+  val noc_tester = Module(new NoCTester(lazyNoC.allIngressParams, lazyNoC.allEgressParams))
   noc.io.ingress <> noc_tester.io.to_noc
   noc_tester.io.from_noc <> noc.io.egress
   io.success := noc_tester.io.success
