@@ -25,7 +25,7 @@ class SwitchAllocator(
   val io = IO(new Bundle {
     val req = MixedVec(allInParams.map(u =>
       Vec(u.destMultiplier, Flipped(Decoupled(new SwitchAllocReq(outParams, egressParams))))))
-    val credit_alloc = MixedVec(outParams.map { u => Vec(u.nVirtualChannels, Output(Bool())) })
+    val credit_alloc = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Output(new OutputCreditAlloc))})
     val switch_sel = MixedVec(allOutParams.map { o => Vec(o.srcMultiplier,
       MixedVec(allInParams.map { i => Vec(i.destMultiplier, Output(Bool())) })) })
   })
@@ -64,12 +64,14 @@ class SwitchAllocator(
     }
   }
 
-  io.credit_alloc.foreach(_.foreach(_ := false.B))
-  (arbs.take(nOutputs) zip io.credit_alloc).zipWithIndex.map { case ((a,i),t) =>
+  io.credit_alloc.foreach(_.foreach(_.alloc := false.B))
+  io.credit_alloc.foreach(_.foreach(_.tail := false.B))
+  (arbs zip io.credit_alloc).zipWithIndex.map { case ((a,i),t) =>
     for (j <- 0 until i.size) {
       for (k <- 0 until a.io.out.size) {
         when (a.io.out(k).valid && a.io.out(k).bits.vc_sel(t)(j)) {
-          i(j) := true.B
+          i(j).alloc := true.B
+          i(j).tail := a.io.out(k).bits.tail
         }
       }
     }

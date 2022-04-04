@@ -8,7 +8,7 @@ import freechips.rocketchip.util._
 
 import constellation.channel._
 
-class EgressUnit(inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannelParams], cParam: EgressChannelParams)
+class EgressUnit(coupleSAVA: Boolean, inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannelParams], cParam: EgressChannelParams)
   (implicit p: Parameters) extends AbstractOutputUnit(inParams, ingressParams, cParam)(p) {
 
   require(nVirtualChannels == 1)
@@ -29,9 +29,10 @@ class EgressUnit(inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannel
 
   io.credit_available(0) := q.io.count === 0.U
   io.channel_available(0) := channel_empty
-  when (io.in(0).fire() && io.in(0).bits.tail) {
+
+  when (io.credit_alloc(0).alloc && io.credit_alloc(0).tail) {
     channel_empty := true.B
-    io.channel_available(0) := true.B
+    if (coupleSAVA) io.channel_available(0) := true.B
   }
 
   when (io.allocs(0)) {

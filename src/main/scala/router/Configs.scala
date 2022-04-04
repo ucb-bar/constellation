@@ -15,6 +15,12 @@ class WithCombineSAST extends Config((site, here, up) => {
   )
 })
 
+class WithCoupleSAVA extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(routerParams = (i: Int) =>
+    up(NoCKey, site).routerParams(i).copy(coupleSAVA = true)
+  )
+})
+
 class WithEarlyRC extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(routerParams = (i: Int) =>
     up(NoCKey, site).routerParams(i).copy(earlyRC = true)

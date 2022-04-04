@@ -33,6 +33,7 @@ class AbstractInputUnitIO(
     val va_stall = UInt(log2Ceil(nVirtualChannels).W)
     val sa_stall = UInt(log2Ceil(nVirtualChannels).W)
   })
+  val block = Input(Bool())
 }
 
 abstract class AbstractInputUnit(
@@ -216,6 +217,10 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   }
   io.debug.sa_stall := PopCount(salloc_arb.io.in.map(r => r.valid && !r.ready))
   io.salloc_req <> salloc_arb.io.out
+  when (io.block) {
+    salloc_arb.io.out.foreach(_.ready := false.B)
+    io.salloc_req.foreach(_.valid := false.B)
+  }
 
   class OutBundle extends Bundle {
     val valid = Bool()

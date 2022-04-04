@@ -20,3 +20,7 @@ class WithTerminalPlane extends Config((site, here, up) => {
     )
   }
 })
+
+class WithCtrl extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey).copy(hasCtrl = true)
+})

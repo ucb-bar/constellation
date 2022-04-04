@@ -83,8 +83,8 @@ class IngressUnit(
 
   val c = (vcalloc_q.io.deq.bits.vc_sel.asUInt & io.out_credit_available.asUInt) =/= 0.U
   val vcalloc_tail = vcalloc_buffer.io.deq.bits.tail
-  io.salloc_req(0).valid := vcalloc_buffer.io.deq.valid && vcalloc_q.io.deq.valid && c
-  vcalloc_buffer.io.deq.ready := io.salloc_req(0).ready && vcalloc_q.io.deq.valid && c
+  io.salloc_req(0).valid := vcalloc_buffer.io.deq.valid && vcalloc_q.io.deq.valid && c && !io.block
+  vcalloc_buffer.io.deq.ready := io.salloc_req(0).ready && vcalloc_q.io.deq.valid && c && !io.block
   vcalloc_q.io.deq.ready := vcalloc_tail && vcalloc_buffer.io.deq.fire()
 
   val out_bundle = if (combineSAST) {

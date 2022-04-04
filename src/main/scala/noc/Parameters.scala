@@ -25,7 +25,8 @@ case class NoCParams(
   // If true, then blocker must be able to proceed when blockee is blocked
   vNetBlocking: (Int, Int) => Boolean = (_: Int, _: Int) => true,
   nocName: String = "test",
-  skipValidationChecks: Boolean = false
+  skipValidationChecks: Boolean = false,
+  hasCtrl: Boolean = false
 )
 case object NoCKey extends Field[NoCParams](NoCParams())
 
@@ -37,6 +38,7 @@ trait HasNoCParams {
   val nVirtualNetworks = nocParams.nVirtualNetworks
   val nocName = nocParams.nocName
   val skipValidationChecks = nocParams.skipValidationChecks
+  val hasCtrl = nocParams.hasCtrl
 
   val nodeIdBits = log2Ceil(nNodes)
   val vNetBits = log2Up(nocParams.nVirtualNetworks)
@@ -124,7 +126,7 @@ object InternalNoCParams {
       // Loop through accessible ingress/egress pairs
       ingressParams.zipWithIndex.filter(_._1.vNetId == vNetId).map { case (iP,iIdx) =>
         val iId = iP.destId
-        println(s"Constellation: $nocName Checking connectivity from ingress $iIdx")
+        //println(s"Constellation: $nocName Checking connectivity from ingress $iIdx")
         iP.possibleEgresses.toSeq.sorted.map { oIdx =>
           val oP = egressParams(oIdx)
           val oId = oP.srcId
