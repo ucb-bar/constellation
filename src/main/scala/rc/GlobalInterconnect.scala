@@ -125,6 +125,12 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
     require(p(NoCKey).nVirtualNetworks >= 5 * supportedBuses.size)
   }
 
+  // TODO: for now use the implicit clock/reset
+  InModuleBody {
+    noc.map(_.module.io.router_clocks.foreach(_.clock := module.clock))
+    noc.map(_.module.io.router_clocks.foreach(_.reset := module.reset))
+  }
+
 
   def getSubnetTerminalChannels(bus: TLBusWrapperLocation): BundleBridgeSink[NoCTerminalIO] = {
     val source = this { BundleBridgeSource[NoCTerminalIO](() =>
