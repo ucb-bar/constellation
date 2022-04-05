@@ -197,12 +197,11 @@ class TestConfig28 extends Config(
   new constellation.channel.WithEgresses(0 until 25) ++
   new constellation.topology.WithMesh2DTopology(5, 5))
 class TestConfig29 extends Config(
-  new constellation.noc.WithCtrl ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithIngresses(0 until 25) ++
   new constellation.channel.WithEgresses(0 until 25) ++
-  new constellation.topology.WithMesh2DTopology(5, 5))
+  new constellation.topology.WithMesh2DTopology(5, 5, RoutingRelation.mesh2DAlternatingDimensionOrdered))
 class TestConfig30 extends Config(
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
@@ -239,7 +238,7 @@ class TestConfig34 extends Config(
   new constellation.channel.WithEgresses(0 until 9) ++
   new constellation.topology.WithMesh2DTopology(3, 3, RoutingRelation.mesh2DEscapeRouter))
 class TestConfig35 extends Config(
-  new constellation.router.WithIterativeVCAllocator ++
+  new constellation.router.WithSimpleVCAllocator ++
   new constellation.channel.WithUniformNVirtualChannels(2, UserVirtualChannelParams(2)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithIngresses(0 until 9) ++
@@ -410,6 +409,14 @@ class TestConfig57 extends Config(
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithIngresses(0 until 16) ++
   new constellation.channel.WithEgresses(0 until 16) ++
+  new constellation.topology.WithMesh2DTopology(4, 4, RoutingRelation.mesh2DEscapeRouter))
+class TestConfig58 extends Config(
+  new constellation.router.WithSafeCoupleSAVA ++
+  new constellation.noc.WithTerminalPlane ++
+  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
+  new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngresses(4 until 16) ++
+  new constellation.channel.WithEgresses(0 until 4) ++
   new constellation.topology.WithMesh2DTopology(4, 4, RoutingRelation.mesh2DEscapeRouter))
 
 
