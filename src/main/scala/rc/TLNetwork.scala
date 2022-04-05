@@ -18,10 +18,9 @@ case class TLNoCParams(
   inNodeMapping: Seq[Int],
   outNodeMapping: Seq[Int],
   // if set, generates a private noc using the config,
-  // else use globalNoC params to connect to global interconncet
+  // else use globalNoC params to connect to global interconnect
   privateNoC: Option[NoCParams],
-
-  globalTerminalChannels: Option[() => BundleBridgeSink[NoCTerminalIO]] = None
+  globalTerminalChannels: Option[() => BundleBridgeSink[NoCTerminalIO]] = None,
 )
 
 class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
@@ -34,6 +33,7 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
   } else {
     None
   }
+
   override lazy val module = new LazyModuleImp(this) {
     val (io_in, edgesIn) = node.in.unzip
     val (io_out, edgesOut) = node.out.unzip
@@ -405,8 +405,13 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
         )
       }))).module)
     }
-    noc.map(_.io.router_clocks.foreach(_.clock := clock))
-    noc.map(_.io.router_clocks.foreach(_.reset := reset))
+    // If we have privateNoC
+    noc.map { n =>
+      n.io.router_clocks.foreach(_.clock := clock)
+      n.io.router_clocks.foreach(_.reset := reset)
+      n.io.router_ctrl.foreach(_ := DontCare)
+      n.io.router_ctrl.foreach(_.enable := false.B)
+    }
 
     val ingresses: Seq[TerminalChannel] = noc.map(_.io.ingress).getOrElse(globalSink.get.in(0)._1.ingress)
     val egresses: Seq[TerminalChannel] = noc.map(_.io.egress).getOrElse(globalSink.get.in(0)._1.egress)

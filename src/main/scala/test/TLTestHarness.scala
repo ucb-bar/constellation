@@ -18,6 +18,7 @@ import constellation.router.{HasRouterCtrlConsts}
 case class TLNoCTesterParams(
   inNodeMapping: Seq[Int],
   outNodeMapping: Seq[Int],
+  ctrlSourceNode: Int = 0,
   txns: Int = 1000
 )
 
@@ -34,24 +35,24 @@ class TLNoCTester(implicit p: Parameters) extends LazyModule {
   val outNodeMapping = tParams.outNodeMapping
   val nManagers = outNodeMapping.size
   val nClients = inNodeMapping.size
-  val xbar = LazyModule(new TLNoC(TLNoCParams("test", inNodeMapping, outNodeMapping, Some(p(NoCKey)))))
+  val noc = LazyModule(new TLNoC(TLNoCParams("test", inNodeMapping, outNodeMapping, Some(p(NoCKey)))))
 
   val fuzzers = (0 until nClients) map { n =>
     val fuzz = LazyModule(new TLFuzzer(txns))
-    xbar.node := TLDelayer(0.1) := fuzz.node
+    noc.node := TLDelayer(0.1) := fuzz.node
     fuzz
   }
 
   (0 until nManagers) foreach { n =>
     val ram = LazyModule(new TLRAM(AddressSet(0x0+0x400*n, 0x3ff)))
-    DisableMonitors { implicit p => ram.node := TLFragmenter(4, 256) } := TLDelayer(0.1) := xbar.node
+    DisableMonitors { implicit p => ram.node := TLFragmenter(4, 256) } := TLDelayer(0.1) := noc.node
   }
 
   lazy val module = new LazyModuleImp(this) {
     val io = IO(new Bundle {
       val finished = Output(Bool())
     })
-    io.finished := fuzzers.last.module.io.finished
+    io.finished := fuzzers.map(_.module.io.finished).reduce(_&&_)
   }
 }
 

@@ -8,6 +8,10 @@ class WithConstPacketSize(sZ: Int = 9) extends Config((site, here, up) => {
   case NoCTesterKey => up(NoCTesterKey).copy(constPacketSize = true, maxFlits = sZ)
 })
 
+class WithInputStallProbability(prob: Double) extends Config((site, here, up) => {
+  case NoCTesterKey => up(NoCTesterKey).copy(inputStallProbability = prob)
+})
+
 // 1D mesh. Shared bus
 class TestConfig00 extends Config(
   new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
@@ -411,7 +415,18 @@ class TestConfig57 extends Config(
   new constellation.channel.WithEgresses(0 until 16) ++
   new constellation.topology.WithMesh2DTopology(4, 4, RoutingRelation.mesh2DEscapeRouter))
 class TestConfig58 extends Config(
+  new constellation.test.WithInputStallProbability(0.7) ++
   new constellation.router.WithSafeCoupleSAVA ++
+  new constellation.noc.WithTerminalPlane ++
+  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
+  new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngresses(4 until 16) ++
+  new constellation.channel.WithEgresses(0 until 4) ++
+  new constellation.topology.WithMesh2DTopology(4, 4, RoutingRelation.mesh2DEscapeRouter))
+class TestConfig59 extends Config(
+  new constellation.test.WithInputStallProbability(0.7) ++
+  new constellation.router.WithSafeCoupleSAVA ++
+  new constellation.noc.WithCtrl ++
   new constellation.noc.WithTerminalPlane ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++

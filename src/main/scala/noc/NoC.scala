@@ -97,10 +97,12 @@ class NoC(implicit p: Parameters) extends LazyModule {
     sink
   }
   val ctrlNodes = if (nocParams.hasCtrl) {
-    routers.map { r =>
-      val sink = BundleBridgeSink[RouterCtrlBundle]()
-      sink := r.ctrlNode.get
-      sink
+    (0 until nNodes).map { i =>
+      routers.find(_.nodeId == i).map { r =>
+        val sink = BundleBridgeSink[RouterCtrlBundle]()
+        sink := r.ctrlNode.get
+        sink
+      }
     }
   } else {
     Nil
@@ -118,8 +120,15 @@ class NoC(implicit p: Parameters) extends LazyModule {
     (io.egress  zip egressNodes .map(_.in (0)._1)).foreach { case (l,r) => l <> r }
     (io.router_clocks zip clockSourceNodes.map(_.out(0)._1)).foreach { case (l,r) => l <> r }
 
-    if (nocParams.hasCtrl)
-      (io.router_ctrl zip ctrlNodes.map(_.in(0)._1)).foreach { case (l,r) => l <> r }
+    if (nocParams.hasCtrl) {
+      ctrlNodes.zipWithIndex.map { case (c,i) =>
+        if (c.isDefined) {
+          io.router_ctrl(i) <> c.get.in(0)._1
+        } else {
+          io.router_ctrl(i) <> DontCare
+        }
+      }
+    }
 
     // TODO: These assume a single clock-domain across the entire noc
     val debug_va_stall_ctr = RegInit(0.U(64.W))

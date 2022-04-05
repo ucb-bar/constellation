@@ -60,7 +60,7 @@ class InputGen(idx: Int, cParams: IngressChannelParams)(implicit val p: Paramete
   val can_fire = (flits_left === 0.U) && io.rob_ready
 
   val packet_remaining = if (p(NoCTesterKey).constPacketSize) maxFlits.U else (LFSR(20) % maxFlits.U)
-  val random_delay = LFSR(20) < (inputStallProbability * (1 << 10)).toInt.U
+  val random_delay = LFSR(20) < (inputStallProbability * (1 << 20)).toInt.U
   io.out.valid := !random_delay && flits_left === 0.U && io.rob_ready
   io.out.bits.head := true.B
   io.out.bits.tail := packet_remaining === 0.U
@@ -238,13 +238,13 @@ class TestHarness(implicit val p: Parameters) extends Module with HasRouterCtrlC
 
     when (addr === CTRL_EPOCH_CYCLES.U) {
       ctrl.enable := true.B
-      ctrl.wdata  := 128.U
+      ctrl.wdata  := 100.U
     } .elsewhen (inRange(addr, CTRL_IN_RATELIMITER_OFFSET, CTRL_MAX_INS)) {
       ctrl.enable := true.B
       ctrl.wdata  := 1.U
     } .elsewhen (inRange(addr, CTRL_IN_RATE_OFFSET, CTRL_MAX_INS)) {
       ctrl.enable := true.B
-      ctrl.wdata  := 64.U
+      ctrl.wdata  := 75.U
     }
   }
 
