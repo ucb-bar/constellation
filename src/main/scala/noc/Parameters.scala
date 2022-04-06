@@ -86,13 +86,15 @@ object InternalNoCParams {
       }
     }.flatten.flatten
 
-    val ingressParams = nocParams.ingresses.zipWithIndex.map { case (u,i) =>
+    val ingressParams = nocParams.ingresses.zipWithIndex.map { case (u,i) => {
+      require(u.destId < nNodes)
       IngressChannelParams(
         user = u,
         ingressId = i,
         uniqueId = getUniqueChannelId())
-    }
-    val egressParams = nocParams.egresses.zipWithIndex.map { case (u,e) =>
+    }}
+    val egressParams = nocParams.egresses.zipWithIndex.map { case (u,e) => {
+      require(u.srcId < nNodes)
       EgressChannelParams(
         user = u,
         egressId = e,
@@ -101,7 +103,7 @@ object InternalNoCParams {
           PacketRoutingInfo(e, i.vNetId, u.srcId)
         }.toSet
       )
-    }
+    }}
 
     ingressParams.foreach(_.possibleEgresses.foreach(e => require(e < egressParams.size)))
 
