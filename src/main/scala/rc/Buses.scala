@@ -89,3 +89,58 @@ class ConstellationMemoryBus(mbus_params: MemoryBusParams, noc_params: TLNoCPara
 
   val builtInDevices: BuiltInDevices = BuiltInDevices.attach(mbus_params, outwardNode)
 }
+
+case class ConstellationPeripheryBusParams(
+  params: PeripheryBusParams,
+  inNodeMapping: Seq[Int],
+  outNodeMapping: Seq[Int],
+  privateNoC: Option[NoCParams]
+) extends TLBusWrapperInstantiationLike {
+  def instantiate(context: HasTileLinkLocations, loc: Location[TLBusWrapper])(implicit p: Parameters): ConstellationPeripheryBus = {
+    val base_noc_params = TLNoCParams(loc.name, inNodeMapping, outNodeMapping, privateNoC)
+    val noc_params = context match {
+      case c: CanHaveGlobalTLInterconnect =>
+        base_noc_params.copy(globalTerminalChannels = Some(() => c.getSubnetTerminalChannels(MBUS)))
+      case _ => base_noc_params
+    }
+    val constellation = LazyModule(new ConstellationPeripheryBus(loc.name, params, noc_params))
+
+    constellation.suggestName(loc.name)
+    context.tlBusWrapperLocationMap += (loc -> constellation)
+    constellation
+  }
+}
+
+class ConstellationPeripheryBus(name: String, pbus_params: PeripheryBusParams, noc_params: TLNoCParams)
+  (implicit p: Parameters) extends TLBusWrapper(pbus_params, name) {
+
+  private val replicator = pbus_params.replication.map(r => LazyModule(new RegionReplicator(r)))
+  val prefixNode = replicator.map { r =>
+    r.prefix := addressPrefixNexusNode
+    addressPrefixNexusNode
+  }
+
+  private val fixer = LazyModule(new TLFIFOFixer(TLFIFOFixer.all))
+  private val node: TLNode = pbus_params.atomics.map { pa =>
+    val in_xbar = LazyModule(new TLXbar)
+    val out_noc = LazyModule(new TLNoC(noc_params))
+    val fixer_node = replicator.map(fixer.node :*= _.node).getOrElse(fixer.node)
+    (out_noc.node
+      :*= fixer_node
+      :*= TLBuffer(pa.buffer)
+      :*= (pa.widenBytes.filter(_ > beatBytes).map { w =>
+          TLWidthWidget(w) :*= TLAtomicAutomata(arithmetic = pa.arithmetic)
+        } .getOrElse { TLAtomicAutomata(arithmetic = pa.arithmetic) })
+      :*= in_xbar.node)
+  } .getOrElse {
+    val noc = LazyModule(new TLNoC(noc_params))
+    noc.node :*= fixer.node
+  }
+
+  def inwardNode: TLInwardNode = node
+  def outwardNode: TLOutwardNode = node
+  def busView: TLEdge = fixer.node.edges.in.head
+
+  val builtInDevices: BuiltInDevices = BuiltInDevices.attach(pbus_params, outwardNode)
+
+}
