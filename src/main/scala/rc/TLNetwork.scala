@@ -237,9 +237,9 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
     val requestEIIds = VecInit(requestEIO.map(OHToUInt(_)))
 
     require(in.size == inNodeMapping.size,
-      s"TL Inwards count must match mapping size ${in.size} != ${inNodeMapping.size}")
+      s"TL Inwards count at $nocName must match mapping size ${in.size} != ${inNodeMapping.size}")
     require(out.size == outNodeMapping.size,
-      s"TL Outwards count must match mapping size ${out.size} != ${outNodeMapping.size}")
+      s"TL Outwards count at $nocName must match mapping size ${out.size} != ${outNodeMapping.size}")
 
 
     def isAIn (i: Int) = i <  in.size * 3 && i % 3 == 0
@@ -401,7 +401,8 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
           routerParams = (i: Int) => nocParams.routerParams(i).copy(payloadBits = actualPayloadWidth),
           ingresses = ingressParams.map(i => i.copy(destId = i.destId + ingressOffset)),
           egresses = egressParams.map(e => e.copy(srcId = e.srcId + egressOffset)),
-          nocName = nocName
+          nocName = nocName,
+          hasCtrl = false
         )
       }))).module)
     }
@@ -409,8 +410,6 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
     noc.map { n =>
       n.io.router_clocks.foreach(_.clock := clock)
       n.io.router_clocks.foreach(_.reset := reset)
-      n.io.router_ctrl.foreach(_ := DontCare)
-      n.io.router_ctrl.foreach(_.enable := false.B)
     }
 
     val ingresses: Seq[TerminalChannel] = noc.map(_.io.ingress).getOrElse(globalSink.get.in(0)._1.ingress)
@@ -440,6 +439,7 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
       val outD = egresses  (i*2+1)
       val inE  = ingresses (i*3+2)
       val masterNames = edgesIn(i).master.masters.map(_.name).mkString(",")
+
       println(s"Constellation TLNoC $nocName: in  $i @ ${inNodeMapping(i)}: $masterNames")
       println(s"Constellation TLNoC $nocName:   ingress (${i*3} ${i*3+1} ${i*3+2}) egress (${i*2} ${i*2+1})")
 

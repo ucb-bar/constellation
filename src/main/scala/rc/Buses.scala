@@ -25,7 +25,7 @@ case class ConstellationSystemBusParams(
         base_noc_params.copy(globalTerminalChannels = Some(() => c.getSubnetTerminalChannels(SBUS)))
       case _ => base_noc_params
     }
-    val constellation = LazyModule(new ConstellationSystemBus(params, noc_params))
+    val constellation = LazyModule(new ConstellationSystemBus(params, noc_params, loc.name))
 
     constellation.suggestName(loc.name)
     context.tlBusWrapperLocationMap += (loc -> constellation)
@@ -34,8 +34,8 @@ case class ConstellationSystemBusParams(
 }
 
 
-class ConstellationSystemBus(sbus_params: SystemBusParams, noc_params: TLNoCParams)
-  (implicit p: Parameters) extends TLBusWrapper(sbus_params, "system_bus_noc") {
+class ConstellationSystemBus(sbus_params: SystemBusParams, noc_params: TLNoCParams, name: String)
+  (implicit p: Parameters) extends TLBusWrapper(sbus_params, name) {
   private val replicator = sbus_params.replication.map(r => LazyModule(new RegionReplicator(r)))
   val prefixNode = replicator.map { r =>
     r.prefix := addressPrefixNexusNode
@@ -63,7 +63,7 @@ case class ConstellationMemoryBusParams(
         base_noc_params.copy(globalTerminalChannels = Some(() => c.getSubnetTerminalChannels(MBUS)))
       case _ => base_noc_params
     }
-    val constellation = LazyModule(new ConstellationMemoryBus(params, noc_params))
+    val constellation = LazyModule(new ConstellationMemoryBus(params, noc_params, loc.name))
 
     constellation.suggestName(loc.name)
     context.tlBusWrapperLocationMap += (loc -> constellation)
@@ -71,8 +71,8 @@ case class ConstellationMemoryBusParams(
   }
 }
 
-class ConstellationMemoryBus(mbus_params: MemoryBusParams, noc_params: TLNoCParams)
-  (implicit p: Parameters) extends TLBusWrapper(mbus_params, "memory_bus_noc") {
+class ConstellationMemoryBus(mbus_params: MemoryBusParams, noc_params: TLNoCParams, name: String)
+  (implicit p: Parameters) extends TLBusWrapper(mbus_params, name) {
   private val replicator = mbus_params.replication.map(r => LazyModule(new RegionReplicator(r)))
   val prefixNode = replicator.map { r =>
     r.prefix := addressPrefixNexusNode

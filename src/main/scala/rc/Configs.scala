@@ -55,10 +55,19 @@ class WithConstellationNoCMemoryBus(inNodeMapping: Seq[Int], outNodeMapping: Seq
   }
 })
 
+// Use a noc based control bus. By default instantiates a private noc within the bus
+class WithConstellationNoCNetworkControlBus(inNodeMapping: Seq[Int], outNodeMapping: Seq[Int]) extends Config((site, here, up) => {
+  case TLNetworkTopologyLocated(InSubsystem) => up(TLNetworkTopologyLocated(InSubsystem)) ++ Seq(
+    NoCControlBusTopologyParams(nbus=ConstellationPeripheryBusParams(
+      site(PeripheryBusKey), inNodeMapping, outNodeMapping, Some(up(NoCKey))
+    ))
+  )
+})
+
 
 // connect them to the global noc instead
 class WithSbusGlobalNoC extends Config((site, here, up) => {
-  case InstantiateGlobalTLInterconnect => {
+  case GlobalTLInterconnectKey => {
     val instantiation = up(TLNetworkTopologyLocated(InSubsystem)).map(topo => topo match {
       case j: TLBusWrapperTopology => j.instantiations
       case _ => Nil
@@ -67,8 +76,8 @@ class WithSbusGlobalNoC extends Config((site, here, up) => {
       case s: ConstellationSystemBusParams => (s.inNodeMapping, s.outNodeMapping)
       case _ => require(false); (Nil, Nil)
     }
-    up(InstantiateGlobalTLInterconnect).copy(busMap =
-      up(InstantiateGlobalTLInterconnect).busMap + (SBUS -> (inNodeMapping, outNodeMapping))
+    up(GlobalTLInterconnectKey).copy(busMap =
+      up(GlobalTLInterconnectKey).busMap + (SBUS -> (inNodeMapping, outNodeMapping))
     )
   }
   case TLNetworkTopologyLocated(InSubsystem) => {
@@ -89,7 +98,7 @@ class WithSbusGlobalNoC extends Config((site, here, up) => {
 })
 
 class WithMbusGlobalNoC extends Config((site, here, up) => {
-  case InstantiateGlobalTLInterconnect => {
+  case GlobalTLInterconnectKey => {
     val instantiation = up(TLNetworkTopologyLocated(InSubsystem)).map(topo => topo match {
       case j: TLBusWrapperTopology => j.instantiations
       case _ => Nil
@@ -98,8 +107,8 @@ class WithMbusGlobalNoC extends Config((site, here, up) => {
       case s: ConstellationMemoryBusParams => (s.inNodeMapping, s.outNodeMapping)
       case _ => require(false); (Nil, Nil)
     }
-    up(InstantiateGlobalTLInterconnect).copy(busMap =
-      up(InstantiateGlobalTLInterconnect).busMap + (MBUS -> (inNodeMapping, outNodeMapping))
+    up(GlobalTLInterconnectKey).copy(busMap =
+      up(GlobalTLInterconnectKey).busMap + (MBUS -> (inNodeMapping, outNodeMapping))
     )
   }
   case TLNetworkTopologyLocated(InSubsystem) => {
@@ -118,3 +127,4 @@ class WithMbusGlobalNoC extends Config((site, here, up) => {
     })
   }
 })
+

@@ -11,16 +11,16 @@ import freechips.rocketchip.util._
 
 import constellation.router.{HasRouterCtrlConsts, RouterCtrlBundle}
 
-class TLNoCControl(baseAddress: BigInt, routerId: Int, nocName: String,
+class TLNoCControl(base: BigInt, routerId: Int, nocName: String,
   routerRegionSize: Int = 4096)(implicit p: Parameters) extends LazyModule with HasRouterCtrlConsts {
 
   val device = new SimpleDevice(s"$nocName-router$routerId-ctrl", Nil)
-  val address = baseAddress + routerId * routerRegionSize
+  val address = base + routerId * routerRegionSize
   val node = TLRegisterNode(
     Seq(AddressSet(address, routerRegionSize-1)),
     device,
     "reg/control",
-    beatBytes=4
+    beatBytes=8
   )
 
   lazy val module = new LazyModuleImp(this) {

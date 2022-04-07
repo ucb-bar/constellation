@@ -8,6 +8,7 @@ import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.subsystem._
 import freechips.rocketchip.util._
+import freechips.rocketchip.prci._
 
 import constellation.noc.{NoC, NoCKey, NoCTerminalIO}
 import constellation.channel.{TerminalChannel, UserIngressParams, UserEgressParams}
@@ -17,13 +18,15 @@ import scala.collection.immutable.ListMap
 
 case class GlobalTLNoCParams(
   busMap: ListMap[TLBusWrapperLocation, (Seq[Int], Seq[Int])] = ListMap[TLBusWrapperLocation, (Seq[Int], Seq[Int])](),
-  payloadWidth: Int = 80)
+  payloadWidth: Int = 80
+)
 
-case object InstantiateGlobalTLInterconnect extends Field[GlobalTLNoCParams](GlobalTLNoCParams())
+case object GlobalTLInterconnectKey extends Field[GlobalTLNoCParams](GlobalTLNoCParams())
 
 trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
-  def globalNoCWidth = p(InstantiateGlobalTLInterconnect).payloadWidth
-  def busMap = p(InstantiateGlobalTLInterconnect).busMap
+  val globalTLParams = p(GlobalTLInterconnectKey)
+  def globalNoCWidth = globalTLParams.payloadWidth
+  def busMap = globalTLParams.busMap
   def supportedBuses = busMap.keys.toList
   def hasGlobalTLInterconnect = supportedBuses.size > 0
   def inNodeMapping(bus: TLBusWrapperLocation) = busMap(bus)._1
@@ -113,35 +116,52 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
     (ingressParams, egressParams)
   }).unzip
 
-  val noc = hasGlobalTLInterconnect.option(LazyModule(new NoC()(p.alterPartial({
+  lazy val nocClockDomain = this { LazyModule(new ClockSinkDomain) }
+  nocClockDomain.clockNode := locateTLBusWrapper(SBUS).fixedClockNode
+  val nocP = p.alterPartial({
     case NoCKey => p(NoCKey).copy(
       routerParams = (i: Int) => p(NoCKey).routerParams(i).copy(payloadBits = globalNoCWidth),
       ingresses = ingressParams.flatten,
       egresses = egressParams.flatten,
-      nocName = "global_tl"
+      nocName = "global_tl",
+      hasCtrl = true
     )
-  }))))
+  })
+  val noc = nocClockDomain { hasGlobalTLInterconnect.option(LazyModule(new NoC()(nocP))) }
+  val global_noc_ctrl = nocClockDomain { hasGlobalTLInterconnect.option(
+    (0 until p(NoCKey).topology.nNodes).map { i => LazyModule(new TLNoCControl(0x3000000, i, "global-tl"))}
+  ) }
+
   if (hasGlobalTLInterconnect) {
     require(p(NoCKey).nVirtualNetworks >= 5 * supportedBuses.size)
+    val tlbus = locateTLBusWrapper(NBUS)
+    global_noc_ctrl.get.zipWithIndex.foreach { case (c,i) =>
+      tlbus.toVariableWidthSlave(Some(s"noc-ctrl-$i")) { c.node } }
   }
 
+
   // TODO: for now use the implicit clock/reset
-  InModuleBody {
-    noc.map(_.module.io.router_clocks.foreach(_.clock := module.clock))
-    noc.map(_.module.io.router_clocks.foreach(_.reset := module.reset))
-  }
+  nocClockDomain { InModuleBody {
+    val clockBundle = nocClockDomain.clockBundle
+    noc.map(_.module.clock := clockBundle.clock)
+    noc.map(_.module.reset := clockBundle.reset)
+    noc.map(_.module.io.router_clocks.foreach(_.clock := clockBundle.clock))
+    noc.map(_.module.io.router_clocks.foreach(_.reset := clockBundle.reset))
+    (noc.get.module.io.router_ctrl zip global_noc_ctrl.get).map { case (r,l) => l.module.io.ctrl <> r }
+  } }
+
 
 
   def getSubnetTerminalChannels(bus: TLBusWrapperLocation): BundleBridgeSink[NoCTerminalIO] = {
-    val source = this { BundleBridgeSource[NoCTerminalIO](() =>
-      new NoCTerminalIO(
-        noc.get.allIngressParams.drop(ingressOffset(bus)).take(nIngresses(bus)),
-        noc.get.allEgressParams .drop( egressOffset(bus)).take( nEgresses(bus))
-      )
+    val source = nocClockDomain { BundleBridgeSource[NoCTerminalIO](() => {
+      val ingressParams = noc.get.allIngressParams.drop(ingressOffset(bus)).take(nIngresses(bus))
+      val egressParams  = noc.get.allEgressParams .drop( egressOffset(bus)).take( nEgresses(bus))
+
+      new NoCTerminalIO(ingressParams, egressParams)(nocP)}
     )}
     val sink = BundleBridgeSink[NoCTerminalIO]()
     sink := source
-    this { InModuleBody { /* connect source to noc */
+    nocClockDomain { InModuleBody { /* connect source to noc */
       (noc.get.module.io.ingress.drop(ingressOffset(bus)).take(nIngresses(bus)) zip source.out(0)._1.ingress)
         .map(t => {
           t._1 <> t._2
@@ -155,6 +175,5 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
     } }
     sink
   }
-
 }
 
