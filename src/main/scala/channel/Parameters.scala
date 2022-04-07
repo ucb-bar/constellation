@@ -9,6 +9,11 @@ import constellation.routing.{ChannelRoutingInfo, PacketRoutingInfo}
 import constellation.noc.{HasNoCParams, NoCKey}
 
 
+case class FlowParams(
+  ingressId: Int,
+  egressId: Int,
+  vNetId: Int)
+
 // User-facing params, for adjusting config options
 case class UserVirtualChannelParams(
   bufferSize: Int = 1
@@ -27,19 +32,18 @@ case class UserChannelParams(
 /** Represents an ingress into the network
  *
  *  @param destId node identifier for the network node this ingress connects to
- *  @param possibleEgresses set of all egresses this ingress may route to
  *  @param vNetId virtual network id
  *  @param payloadBits width of the wire providing the input for the ingress
  */
 case class UserIngressParams(
   destId: Int,
-  possibleEgresses: Set[Int] = Set[Int](),
   vNetId: Int = 0,
   payloadBits: Int = 64
 )
 
 case class UserEgressParams(
   srcId: Int,
+  vNetId: Int = 0,
   payloadBits: Int = 64
 )
 
@@ -60,7 +64,7 @@ case class VirtualChannelParams(
 trait BaseChannelParams {
   def srcId: Int
   def destId: Int
-  def possiblePackets(implicit p: Parameters): Set[PacketRoutingInfo]
+  def possiblePackets: Set[PacketRoutingInfo]
   def nVirtualChannels: Int
   def channelRoutingInfos: Seq[ChannelRoutingInfo]
   def payloadBits: Int
@@ -87,8 +91,7 @@ case class ChannelParams(
   val nVirtualChannels = virtualChannelParams.size
   val maxBufferSize = virtualChannelParams.map(_.bufferSize).max
 
-  val _possiblePackets = virtualChannelParams.map(_.possiblePackets).reduce(_++_)
-  def possiblePackets(implicit p: Parameters) = _possiblePackets
+  val possiblePackets = virtualChannelParams.map(_.possiblePackets).reduce(_++_)
   val traversable = virtualChannelParams.map(_.traversable).reduce(_||_)
 
   val channelRoutingInfos = (0 until nVirtualChannels).map(i => ChannelRoutingInfo(srcId, i, destId, nVirtualChannels))
@@ -120,12 +123,11 @@ case class IngressChannelParams(
   ingressId: Int,
   uniqueId: Int,
   destId: Int,
-  possibleEgresses: Set[Int],
+  possiblePackets: Set[PacketRoutingInfo],
   vNetId: Int,
   payloadBits: Int
 ) extends TerminalChannelParams {
   val srcId = -1
-  def possiblePackets(implicit p: Parameters) = possibleEgresses.map { e => PacketRoutingInfo(e, vNetId, p(NoCKey).egresses(e).srcId) }
   val channelRoutingInfos = Seq(ChannelRoutingInfo(-1, 0, destId, 1))
 }
 
@@ -133,12 +135,19 @@ object IngressChannelParams {
   def apply(
     ingressId: Int,
     uniqueId: Int,
-    user: UserIngressParams): IngressChannelParams = {
+    flows: Seq[FlowParams],
+    user: UserIngressParams,
+    egresses: Seq[UserEgressParams]
+  ): IngressChannelParams = {
+    val ourFlows = flows.filter(_.ingressId == ingressId)
+    ourFlows.foreach(f => require(f.vNetId == user.vNetId && f.vNetId == egresses(f.egressId).vNetId))
     IngressChannelParams(
       ingressId = ingressId,
       uniqueId = uniqueId,
       destId = user.destId,
-      possibleEgresses = user.possibleEgresses,
+      possiblePackets = ourFlows.map(f =>
+        PacketRoutingInfo(f.egressId, user.vNetId, egresses(f.egressId).srcId)
+      ).toSet,
       vNetId = user.vNetId,
       payloadBits = user.payloadBits
     )
@@ -150,25 +159,31 @@ object IngressChannelParams {
 case class EgressChannelParams(
   egressId: Int,
   uniqueId: Int,
-  _possiblePackets: Set[PacketRoutingInfo],
+  possiblePackets: Set[PacketRoutingInfo],
   srcId: Int,
   payloadBits: Int
 ) extends TerminalChannelParams {
   val destId = -1
   val channelRoutingInfos = Seq(ChannelRoutingInfo(srcId, 0, -1, 1))
-  def possiblePackets(implicit p: Parameters) = _possiblePackets
 }
 
 object EgressChannelParams {
   def apply(
     egressId: Int,
     uniqueId: Int,
-    possiblePackets: Set[PacketRoutingInfo],
+    flows: Seq[FlowParams],
     user: UserEgressParams): EgressChannelParams = {
+    val ourFlows = flows.filter(_.egressId == egressId)
+    val vNetIds = ourFlows.map(_.vNetId).toSet
+    require(vNetIds.size <= 1)
+    if (ourFlows.size > 0)
+      require(vNetIds.head == user.vNetId)
     EgressChannelParams(
       egressId = egressId,
       uniqueId = uniqueId,
-      _possiblePackets = possiblePackets,
+      possiblePackets = ourFlows.map(f =>
+        PacketRoutingInfo(egressId, vNetIds.head, user.srcId)
+      ).toSet,
       srcId = user.srcId,
       payloadBits = user.payloadBits
     )

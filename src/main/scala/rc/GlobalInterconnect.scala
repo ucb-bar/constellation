@@ -11,7 +11,7 @@ import freechips.rocketchip.util._
 import freechips.rocketchip.prci._
 
 import constellation.noc.{NoC, NoCKey, NoCTerminalIO}
-import constellation.channel.{TerminalChannel, UserIngressParams, UserEgressParams}
+import constellation.channel.{TerminalChannel, UserIngressParams, UserEgressParams, FlowParams}
 import constellation.topology.{TerminalPlaneTopology}
 
 import scala.collection.immutable.ListMap
@@ -50,7 +50,7 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
   def vNetOffset(bus: TLBusWrapperLocation) = supportedBuses.indexOf(bus) * 5
 
 
-  val (ingressParams, egressParams) = supportedBuses.map(bus => {
+  val (ingressParams, egressParams, flowParams) = supportedBuses.map(bus => {
     val (in, out) = (inNodeMapping(bus), outNodeMapping(bus))
     def isAIn (i: Int) = i <  in.size * 3 && i % 3 == 0
     def isAOut(o: Int) = o >= in.size * 2 && (o - in.size*2) % 3 == 0
@@ -67,22 +67,6 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
     def isEIn (i: Int) = i <  in.size * 3 && i % 3 == 2
     def isEOut(o: Int) = o >= in.size * 2 && (o - in.size*2) % 3 == 2
 
-    def connectivity(src: Int, dst: Int, vNetId: Int) = {
-      if (isAIn(src) && isAOut(dst)) {
-        vNetId == 4
-      } else if (isBIn(src) && isBOut(dst)) {
-        vNetId == 3
-      } else if (isCIn(src) && isCOut(dst)) {
-        vNetId == 2
-      } else if (isDIn(src) && isDOut(dst)) {
-        vNetId == 1
-      } else if (isEIn(src) && isEOut(dst)) {
-        vNetId == 0
-      } else {
-        false
-      }
-    }
-
     def ingressVNets(i: Int) = {
       if (isAIn(i)) {
         4
@@ -98,23 +82,50 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
       }
     }
 
+    def egressVNets(i: Int) = {
+      if (isAOut(i)) {
+        4
+      } else if (isBOut(i)) {
+        3
+      } else if (isCOut(i)) {
+        2
+      } else if (isDOut(i)) {
+        1
+      } else {
+        require(isEOut(i))
+        0
+      }
+    }
+
+    val flowParams = (0 until in.size).map { iId => (0 until out.size).map { oId => {
+      val a = FlowParams(iId * 3    , in.size * 2 + oId * 3    , 4)
+      val c = FlowParams(iId * 3 + 1, in.size * 2 + oId * 3 + 1, 2)
+      val e = FlowParams(iId * 3 + 2, in.size * 2 + oId * 3 + 2, 0)
+
+      val b = FlowParams(in.size * 3 + oId * 2    , iId * 2    , 3)
+      val d = FlowParams(in.size * 3 + oId * 2 + 1, iId * 2 + 1, 1)
+      Seq(a, b, c, d, e)
+    }}}.flatten.flatten.map(f => f.copy(
+      vNetId = f.vNetId + vNetOffset(bus),
+      ingressId = f.ingressId + ingressOffset(bus),
+      egressId = f.egressId + egressOffset(bus)
+    ))
+
+
     val ingressParams = (inNodeMapping(bus).map(i => Seq(i, i, i)) ++ outNodeMapping(bus).map(i => Seq(i, i)))
       .flatten.zipWithIndex.map { case (i, iId) => UserIngressParams(
         destId = i + ingressTerminalOffset,
-        possibleEgresses = (0 until nEgresses(bus))
-          .filter(e => connectivity(iId, e, ingressVNets(iId)))
-          .map(_ + egressOffset(bus))
-          .toSet,
         vNetId = ingressVNets(iId) + vNetOffset(bus),
         payloadBits = globalNoCWidth
       )}
     val egressParams = (inNodeMapping(bus).map(i => Seq(i, i)) ++ outNodeMapping(bus).map(i => Seq(i, i, i)))
       .flatten.zipWithIndex.map { case (e, eId) => UserEgressParams(
         srcId = e + egressTerminalOffset,
+        vNetId = egressVNets(eId) + vNetOffset(bus),
         payloadBits = globalNoCWidth
       )}
-    (ingressParams, egressParams)
-  }).unzip
+    (ingressParams, egressParams, flowParams)
+  }).unzip3
 
   lazy val nocClockDomain = this { LazyModule(new ClockSinkDomain) }
   nocClockDomain.clockNode := locateTLBusWrapper(SBUS).fixedClockNode
@@ -123,6 +134,7 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
       routerParams = (i: Int) => p(NoCKey).routerParams(i).copy(payloadBits = globalNoCWidth),
       ingresses = ingressParams.flatten,
       egresses = egressParams.flatten,
+      flows = flowParams.flatten,
       nocName = "global_tl",
       hasCtrl = true
     )

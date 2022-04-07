@@ -19,6 +19,7 @@ case class NoCParams(
   channelParamGen: (Int, Int) => UserChannelParams = (a: Int, b: Int) => UserChannelParams(),
   ingresses: Seq[UserIngressParams] = Nil,
   egresses: Seq[UserEgressParams] = Nil,
+  flows: Seq[FlowParams] = Nil,
   routingRelation: RoutingRelation = RoutingRelation.allLegal,
   routerParams: Int => UserRouterParams = (i: Int) => UserRouterParams(),
   // (blocker, blockee) => bool
@@ -86,12 +87,21 @@ object InternalNoCParams {
       }
     }.flatten.flatten
 
+    nocParams.flows.foreach(f => {
+      require(f.ingressId < nocParams.ingresses.size)
+      require(f.egressId < nocParams.egresses.size)
+      require(f.vNetId < nocParams.nVirtualNetworks)
+    })
+
     val ingressParams = nocParams.ingresses.zipWithIndex.map { case (u,i) => {
       require(u.destId < nNodes)
       IngressChannelParams(
         user = u,
         ingressId = i,
-        uniqueId = getUniqueChannelId())
+        flows = nocParams.flows,
+        uniqueId = getUniqueChannelId(),
+        egresses = nocParams.egresses
+      )
     }}
     val egressParams = nocParams.egresses.zipWithIndex.map { case (u,e) => {
       require(u.srcId < nNodes)
@@ -99,13 +109,9 @@ object InternalNoCParams {
         user = u,
         egressId = e,
         uniqueId = getUniqueChannelId(),
-        possiblePackets = ingressParams.filter(_.possibleEgresses.contains(e)).map { i =>
-          PacketRoutingInfo(e, i.vNetId, u.srcId)
-        }.toSet
+        flows = nocParams.flows
       )
     }}
-
-    ingressParams.foreach(_.possibleEgresses.foreach(e => require(e < egressParams.size)))
 
 
     // Check sanity of routingRelation, all inputs can route to all outputs
@@ -129,10 +135,7 @@ object InternalNoCParams {
       ingressParams.zipWithIndex.filter(_._1.vNetId == vNetId).map { case (iP,iIdx) =>
         val iId = iP.destId
         //println(s"Constellation: $nocName Checking connectivity from ingress $iIdx")
-        iP.possibleEgresses.toSeq.sorted.map { oIdx =>
-          val oP = egressParams(oIdx)
-          val oId = oP.srcId
-          val pInfo = PacketRoutingInfo(oIdx, vNetId, oId)
+        iP.possiblePackets.map { pInfo =>
           val flowPossiblePackets = scala.collection.mutable.Set[ChannelRoutingInfo]()
 
           var stack: Seq[ChannelRoutingInfo] = iP.channelRoutingInfos
@@ -141,7 +144,7 @@ object InternalNoCParams {
             stack = stack.tail
 
             // This channel is the destination
-            val atDest = head.dst == oId
+            val atDest = head.dst == pInfo.dst
             // In this call to checkConnectivity, a previously searched ingress point
             // generated a packet that could route to its destination through head
             // We don't have to search further along this path.
@@ -162,7 +165,7 @@ object InternalNoCParams {
               }.flatten
               // If the packet can't route to any VCs, this is an error
               require(nexts.size > 0,
-                s"Failed to route from $iId to $oId at $head for vnet $vNetId")
+                s"Failed to route from $iId to ${pInfo.dst} at $head for vnet $vNetId")
               val toAdd = nexts.filter(n => !flowPossiblePackets.contains(n))
               nexts.foreach(n => flowPossiblePackets += n)
               stack = toAdd ++ stack

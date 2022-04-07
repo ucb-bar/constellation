@@ -10,7 +10,7 @@ import freechips.rocketchip.subsystem._
 import freechips.rocketchip.util._
 
 import constellation.noc.{NoC, NoCKey, NoCParams, NoCTerminalIO}
-import constellation.channel.{IOFlit, UserIngressParams, UserEgressParams, TerminalChannel}
+import constellation.channel.{IOFlit, UserIngressParams, UserEgressParams, TerminalChannel, FlowParams}
 import constellation.topology.{TerminalPlaneTopology}
 
 case class TLNoCParams(
@@ -257,23 +257,6 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
     def isEIn (i: Int) = i <  in.size * 3 && i % 3 == 2
     def isEOut(o: Int) = o >= in.size * 2 && (o - in.size*2) % 3 == 2
 
-
-    def connectivity(src: Int, dst: Int, vNetId: Int) = {
-      if (isAIn(src) && isAOut(dst)) {
-        connectAIO(src/3)((dst-in.size*2)/3) && vNetId == 4
-      } else if (isBIn(src) && isBOut(dst)) {
-        connectBOI((src-in.size*3)/2)(dst/2) && vNetId == 3
-      } else if (isCIn(src) && isCOut(dst)) {
-        connectCIO(src/3)((dst-in.size*2)/3) && vNetId == 2
-      } else if (isDIn(src) && isDOut(dst)) {
-        connectDOI((src-in.size*3)/2)(dst/2) && vNetId == 1
-      } else if (isEIn(src) && isEOut(dst)) {
-        connectEIO(src/3)((dst-in.size*2)/3) && vNetId == 0
-      } else {
-        false
-      }
-    }
-
     def ingressVNets(i: Int) = {
       if (isAIn(i)) {
         4
@@ -285,6 +268,21 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
         1
       } else {
         require(isEIn(i))
+        0
+      }
+    }
+
+    def egressVNets(i: Int) = {
+      if (isAOut(i)) {
+        4
+      } else if (isBOut(i)) {
+        3
+      } else if (isCOut(i)) {
+        2
+      } else if (isDOut(i)) {
+        1
+      } else {
+        require(isEOut(i))
         0
       }
     }
@@ -376,16 +374,26 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
     val nIngresses = in.size * 3 + out.size * 2
     val nEgresses = out.size * 3 + in.size * 2
 
+    val flowParams = (0 until in.size).map { iId => (0 until out.size).map { oId => {
+      val a = connectAIO(iId)(oId).option(FlowParams(iId * 3    , in.size * 2 + oId * 3    , 4))
+      val c = connectCIO(iId)(oId).option(FlowParams(iId * 3 + 1, in.size * 2 + oId * 3 + 1, 2))
+      val e = connectEIO(iId)(oId).option(FlowParams(iId * 3 + 2, in.size * 2 + oId * 3 + 2, 0))
+
+      val b = connectBOI(oId)(iId).option(FlowParams(in.size * 3 + oId * 2    , iId * 2    , 3))
+      val d = connectDOI(oId)(iId).option(FlowParams(in.size * 3 + oId * 2 + 1, iId * 2 + 1, 1))
+      a ++ b ++ c ++ d ++ e
+    }}}.flatten.flatten
+
     val ingressParams = (inNodeMapping.map(i => Seq(i, i, i)) ++ outNodeMapping.map(i => Seq(i, i)))
       .flatten.zipWithIndex.map { case (i,iId) => UserIngressParams(
         destId = i,
-        possibleEgresses = (0 until nEgresses).filter(e => connectivity(iId, e, ingressVNets(iId))).toSet,
         vNetId = ingressVNets(iId),
         payloadBits = actualPayloadWidth
       )}
     val egressParams = (inNodeMapping.map(i => Seq(i, i)) ++ outNodeMapping.map(i => Seq(i, i, i)))
       .flatten.zipWithIndex.map { case (e,eId) => UserEgressParams(
         srcId = e,
+        vNetId = egressVNets(eId),
         payloadBits = actualPayloadWidth
       )}
 
@@ -401,6 +409,7 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
           routerParams = (i: Int) => nocParams.routerParams(i).copy(payloadBits = actualPayloadWidth),
           ingresses = ingressParams.map(i => i.copy(destId = i.destId + ingressOffset)),
           egresses = egressParams.map(e => e.copy(srcId = e.srcId + egressOffset)),
+          flows = flowParams,
           nocName = nocName,
           hasCtrl = false
         )

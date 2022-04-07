@@ -55,8 +55,15 @@ class WithEgressPayloadBits(width: Int) extends Config((site, here, up) => {
 })
 
 class WithFullyConnectedIngresses extends Config((site, here, up) => {
-  case NoCKey => up(NoCKey, site).copy(ingresses = up(NoCKey, site).ingresses.map(i => i.copy(possibleEgresses =
-    i.possibleEgresses ++ (0 until up(NoCKey, site).egresses.size).toSet)))
+  case NoCKey => up(NoCKey, site).copy(
+    flows = up(NoCKey, site).ingresses.zipWithIndex.map { case (ingress, i) => {
+      up(NoCKey, site).egresses
+        .zipWithIndex
+        .filter { case (egress,e) => egress.vNetId == ingress.vNetId }
+        .map(_._2)
+        .map(e => FlowParams(i, e, ingress.vNetId))
+    }}.flatten
+  )
 })
 
 class WithIngresses(ingresses: Seq[Int]) extends Config((site, here, up) => {
