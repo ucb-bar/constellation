@@ -163,7 +163,7 @@ object RoutingRelation {
         }
         dsts(nxtY).contains(pInfo.dst % height)
       }
-    }) && noRoutingAtEgress
+    })
   }
 
   def bidirectionalTree(nNodes: Int, dAry: Int) = {
@@ -185,7 +185,7 @@ object RoutingRelation {
         } else {
           isAncestor(nxtC.dst, nodeId)
         }
-    }) && noRoutingAtEgress
+    })
   }
 
 
