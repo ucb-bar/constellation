@@ -26,12 +26,13 @@ case object GlobalTLInterconnectKey extends Field[GlobalTLNoCParams](GlobalTLNoC
 
 trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
   val globalTLParams = p(GlobalTLInterconnectKey)
-  def nocParams = globalTLParams.nocParams
-  def globalNoCWidth = globalTLParams.payloadWidth
-  def supportedBuses = globalTLParams.supportedBuses.toSeq
-  def hasGlobalTLInterconnect = supportedBuses.size > 0
-  def inNodeMapping(bus: TLBusWrapperLocation) = p(ConstellationTLNetworkNodeMappingKey(bus)).inNodeMapping
-  def outNodeMapping(bus: TLBusWrapperLocation) = p(ConstellationTLNetworkNodeMappingKey(bus)).outNodeMapping
+  val nocParams = globalTLParams.nocParams
+  val globalNoCWidth = globalTLParams.payloadWidth
+  val supportedBuses = globalTLParams.supportedBuses.toSeq
+  val hasGlobalTLInterconnect = supportedBuses.size > 0
+  val nodeMappings = supportedBuses.map(b => b -> p(ConstellationTLNetworkNodeMappingKey(b))).toMap
+  def inNodeMapping(bus: TLBusWrapperLocation) = nodeMappings(bus).inNodeMapping
+  def outNodeMapping(bus: TLBusWrapperLocation) = nodeMappings(bus).outNodeMapping
   def nIngresses(bus: TLBusWrapperLocation) = {
     val (in, out) = (inNodeMapping(bus), outNodeMapping(bus))
     in.size * 3 + out.size * 2
@@ -49,7 +50,6 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
   def egressOffset(bus: TLBusWrapperLocation) = supportedBuses.map(b => nEgresses(b))
     .scanLeft(0)(_ + _).toSeq(supportedBuses.indexOf(bus))
   def vNetOffset(bus: TLBusWrapperLocation) = supportedBuses.indexOf(bus) * 5
-
 
   val (ingressParams, egressParams, flowParams) = supportedBuses.map(bus => {
     val (in, out) = (inNodeMapping(bus), outNodeMapping(bus))
@@ -97,7 +97,6 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
         0
       }
     }
-
     val flowParams = (0 until in.size).map { iId => (0 until out.size).map { oId => {
       val a = FlowParams(iId * 3    , in.size * 2 + oId * 3    , 4)
       val c = FlowParams(iId * 3 + 1, in.size * 2 + oId * 3 + 1, 2)
@@ -111,7 +110,6 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
       ingressId = f.ingressId + ingressOffset(bus),
       egressId = f.egressId + egressOffset(bus)
     ))
-
 
     val ingressParams = (inNodeMapping(bus).values.map(i => Seq(i, i, i)) ++ outNodeMapping(bus).values.map(i => Seq(i, i)))
       .flatten.zipWithIndex.map { case (i, iId) => UserIngressParams(
