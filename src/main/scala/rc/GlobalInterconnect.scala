@@ -10,27 +10,28 @@ import freechips.rocketchip.subsystem._
 import freechips.rocketchip.util._
 import freechips.rocketchip.prci._
 
-import constellation.noc.{NoC, NoCKey, NoCTerminalIO}
+import constellation.noc.{NoC, NoCTerminalIO, NoCParams, NoCKey}
 import constellation.channel.{TerminalChannel, UserIngressParams, UserEgressParams, FlowParams}
 import constellation.topology.{TerminalPlaneTopology}
 
-import scala.collection.immutable.ListMap
+import scala.collection.immutable.{ListSet}
 
 case class GlobalTLNoCParams(
-  busMap: ListMap[TLBusWrapperLocation, (Seq[Int], Seq[Int])] = ListMap[TLBusWrapperLocation, (Seq[Int], Seq[Int])](),
-  payloadWidth: Int = 80
+  supportedBuses: ListSet[TLBusWrapperLocation] = ListSet[TLBusWrapperLocation](),
+  payloadWidth: Int = 80,
+  nocParams: NoCParams = NoCParams()
 )
 
 case object GlobalTLInterconnectKey extends Field[GlobalTLNoCParams](GlobalTLNoCParams())
 
 trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
   val globalTLParams = p(GlobalTLInterconnectKey)
+  def nocParams = globalTLParams.nocParams
   def globalNoCWidth = globalTLParams.payloadWidth
-  def busMap = globalTLParams.busMap
-  def supportedBuses = busMap.keys.toList
+  def supportedBuses = globalTLParams.supportedBuses.toSeq
   def hasGlobalTLInterconnect = supportedBuses.size > 0
-  def inNodeMapping(bus: TLBusWrapperLocation) = busMap(bus)._1
-  def outNodeMapping(bus: TLBusWrapperLocation) = busMap(bus)._2
+  def inNodeMapping(bus: TLBusWrapperLocation) = p(ConstellationTLNetworkNodeMappingKey(bus)).inNodeMapping
+  def outNodeMapping(bus: TLBusWrapperLocation) = p(ConstellationTLNetworkNodeMappingKey(bus)).outNodeMapping
   def nIngresses(bus: TLBusWrapperLocation) = {
     val (in, out) = (inNodeMapping(bus), outNodeMapping(bus))
     in.size * 3 + out.size * 2
@@ -39,7 +40,7 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
     val (in, out) = (inNodeMapping(bus), outNodeMapping(bus))
     out.size * 3 + in.size * 2
   }
-  val (ingressTerminalOffset, egressTerminalOffset) = p(NoCKey).topology match {
+  val (ingressTerminalOffset, egressTerminalOffset) = nocParams.topology match {
     case t: TerminalPlaneTopology => (t.base.nNodes, t.base.nNodes * 2)
     case _ => (0, 0)
   }
@@ -112,13 +113,13 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
     ))
 
 
-    val ingressParams = (inNodeMapping(bus).map(i => Seq(i, i, i)) ++ outNodeMapping(bus).map(i => Seq(i, i)))
+    val ingressParams = (inNodeMapping(bus).values.map(i => Seq(i, i, i)) ++ outNodeMapping(bus).values.map(i => Seq(i, i)))
       .flatten.zipWithIndex.map { case (i, iId) => UserIngressParams(
         destId = i + ingressTerminalOffset,
         vNetId = ingressVNets(iId) + vNetOffset(bus),
         payloadBits = globalNoCWidth
       )}
-    val egressParams = (inNodeMapping(bus).map(i => Seq(i, i)) ++ outNodeMapping(bus).map(i => Seq(i, i, i)))
+    val egressParams = (inNodeMapping(bus).values.map(i => Seq(i, i)) ++ outNodeMapping(bus).values.map(i => Seq(i, i, i)))
       .flatten.zipWithIndex.map { case (e, eId) => UserEgressParams(
         srcId = e + egressTerminalOffset,
         vNetId = egressVNets(eId) + vNetOffset(bus),
@@ -130,8 +131,8 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
   lazy val nocClockDomain = this { LazyModule(new ClockSinkDomain) }
   nocClockDomain.clockNode := locateTLBusWrapper(SBUS).fixedClockNode
   val nocP = p.alterPartial({
-    case NoCKey => p(NoCKey).copy(
-      routerParams = (i: Int) => p(NoCKey).routerParams(i).copy(payloadBits = globalNoCWidth),
+    case NoCKey => nocParams.copy(
+      routerParams = (i: Int) => nocParams.routerParams(i).copy(payloadBits = globalNoCWidth),
       ingresses = ingressParams.flatten,
       egresses = egressParams.flatten,
       flows = flowParams.flatten,
@@ -141,11 +142,11 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
   })
   val noc = nocClockDomain { hasGlobalTLInterconnect.option(LazyModule(new NoC()(nocP))) }
   val global_noc_ctrl = nocClockDomain { hasGlobalTLInterconnect.option(
-    (0 until p(NoCKey).topology.nNodes).map { i => LazyModule(new TLNoCControl(0x3000000, i, "global-tl"))}
+    (0 until nocParams.topology.nNodes).map { i => LazyModule(new TLNoCControl(0x3000000, i, "global-tl"))}
   ) }
 
   if (hasGlobalTLInterconnect) {
-    require(p(NoCKey).nVirtualNetworks >= 5 * supportedBuses.size)
+    require(nocParams.nVirtualNetworks >= 5 * supportedBuses.size)
     val tlbus = locateTLBusWrapper(NBUS)
     global_noc_ctrl.get.zipWithIndex.foreach { case (c,i) =>
       tlbus.toVariableWidthSlave(Some(s"noc-ctrl-$i")) { c.node } }
@@ -159,7 +160,8 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
     noc.map(_.module.reset := clockBundle.reset)
     noc.map(_.module.io.router_clocks.foreach(_.clock := clockBundle.clock))
     noc.map(_.module.io.router_clocks.foreach(_.reset := clockBundle.reset))
-    (noc.get.module.io.router_ctrl zip global_noc_ctrl.get).map { case (r,l) => l.module.io.ctrl <> r }
+    if (noc.isDefined)
+      (noc.get.module.io.router_ctrl zip global_noc_ctrl.get).map { case (r,l) => l.module.io.ctrl <> r }
   } }
 
 

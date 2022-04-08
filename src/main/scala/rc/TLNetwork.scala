@@ -15,8 +15,7 @@ import constellation.topology.{TerminalPlaneTopology}
 
 case class TLNoCParams(
   nocName: String,
-  inNodeMapping: Seq[Int],
-  outNodeMapping: Seq[Int],
+  nodeMappings: ConstellationTLNetworkNodeMapping,
   // if set, generates a private noc using the config,
   // else use globalNoC params to connect to global interconnect
   privateNoC: Option[NoCParams],
@@ -25,8 +24,8 @@ case class TLNoCParams(
 
 class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
   val nocName = params.nocName
-  val inNodeMapping = params.inNodeMapping
-  val outNodeMapping = params.outNodeMapping
+  val inNodeMapping = params.nodeMappings.inNodeMapping
+  val outNodeMapping = params.nodeMappings.outNodeMapping
   val privateNoC = params.privateNoC
   val globalSink: Option[BundleBridgeSink[NoCTerminalIO]] = if (privateNoC.isEmpty) {
     Some(params.globalTerminalChannels.get())
@@ -236,12 +235,6 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
     val requestDOIds = VecInit(requestDOI.map(OHToUInt(_)))
     val requestEIIds = VecInit(requestEIO.map(OHToUInt(_)))
 
-    require(in.size == inNodeMapping.size,
-      s"TL Inwards count at $nocName must match mapping size ${in.size} != ${inNodeMapping.size}")
-    require(out.size == outNodeMapping.size,
-      s"TL Outwards count at $nocName must match mapping size ${out.size} != ${outNodeMapping.size}")
-
-
     def isAIn (i: Int) = i <  in.size * 3 && i % 3 == 0
     def isAOut(o: Int) = o >= in.size * 2 && (o - in.size*2) % 3 == 0
 
@@ -369,33 +362,29 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
       when (i.fire() && i.bits.tail) { is_const := true.B }
     }
 
-
-    require(in.size == inNodeMapping.size && out.size == outNodeMapping.size)
     val nIngresses = in.size * 3 + out.size * 2
     val nEgresses = out.size * 3 + in.size * 2
 
-    val flowParams = (0 until in.size).map { iId => (0 until out.size).map { oId => {
-      val a = connectAIO(iId)(oId).option(FlowParams(iId * 3    , in.size * 2 + oId * 3    , 4))
-      val c = connectCIO(iId)(oId).option(FlowParams(iId * 3 + 1, in.size * 2 + oId * 3 + 1, 2))
-      val e = connectEIO(iId)(oId).option(FlowParams(iId * 3 + 2, in.size * 2 + oId * 3 + 2, 0))
+    def getIndex(nodeMapping: Seq[String], l: String) = {
+      val matches = nodeMapping.map(k => l.contains(k))
+      require(matches.filter(i => i).size == 1, s"Unable to find valid mapping for $l")
+      matches.indexWhere(i => i)
+    }
 
-      val b = connectBOI(oId)(iId).option(FlowParams(in.size * 3 + oId * 2    , iId * 2    , 3))
-      val d = connectDOI(oId)(iId).option(FlowParams(in.size * 3 + oId * 2 + 1, iId * 2 + 1, 1))
-      a ++ b ++ c ++ d ++ e
-    }}}.flatten.flatten
+    def genUniqueName(all: Seq[Seq[String]]) = {
+      all.zipWithIndex.map { case (strs, i) =>
+        val matches = all.take(i).map(_.mkString).count(_ == strs.mkString)
+        strs.map(s => s"${s}[${matches}]").mkString(",")
+      }
+    }
 
-    val ingressParams = (inNodeMapping.map(i => Seq(i, i, i)) ++ outNodeMapping.map(i => Seq(i, i)))
-      .flatten.zipWithIndex.map { case (i,iId) => UserIngressParams(
-        destId = i,
-        vNetId = ingressVNets(iId),
-        payloadBits = actualPayloadWidth
-      )}
-    val egressParams = (inNodeMapping.map(i => Seq(i, i)) ++ outNodeMapping.map(i => Seq(i, i, i)))
-      .flatten.zipWithIndex.map { case (e,eId) => UserEgressParams(
-        srcId = e,
-        vNetId = egressVNets(eId),
-        payloadBits = actualPayloadWidth
-      )}
+    val inNames  = genUniqueName(edgesIn.map(_.master.masters.map(_.name)))
+    val outNames = genUniqueName(edgesOut.map(_.slave.slaves.map(_.name)))
+
+    require(in.size == inNodeMapping.size,
+      s"TL Inwards count at $nocName must match mapping size ${in.size} != ${inNodeMapping.size}")
+    require(out.size == outNodeMapping.size,
+      s"TL Outwards count at $nocName must match mapping size ${out.size} != ${outNodeMapping.size}")
 
     val noc = privateNoC.map { nocParams =>
       // If desired, create a private noc
@@ -404,11 +393,40 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
         case t: TerminalPlaneTopology => (t.base.nNodes, t.base.nNodes * 2)
         case _ => (0, 0)
       }
+
+      val flowParams = inNames.map { inN => outNames.map { outN =>
+        val iId = getIndex(inNodeMapping.keys.toSeq, inN)
+        val oId = getIndex(outNodeMapping.keys.toSeq, outN)
+
+        val a = connectAIO(iId)(oId).option(FlowParams(iId * 3    , in.size * 2 + oId * 3    , 4))
+        val c = connectCIO(iId)(oId).option(FlowParams(iId * 3 + 1, in.size * 2 + oId * 3 + 1, 2))
+        val e = connectEIO(iId)(oId).option(FlowParams(iId * 3 + 2, in.size * 2 + oId * 3 + 2, 0))
+
+        val b = connectBOI(oId)(iId).option(FlowParams(in.size * 3 + oId * 2    , iId * 2    , 3))
+        val d = connectDOI(oId)(iId).option(FlowParams(in.size * 3 + oId * 2 + 1, iId * 2 + 1, 1))
+        (a ++ b ++ c ++ d ++ e)
+      }}.flatten.flatten
+
+      val ingressParams = (inNodeMapping.values.map(i => Seq(i, i, i)) ++ outNodeMapping.values.map(i => Seq(i, i)))
+        .toSeq
+        .flatten.zipWithIndex.map { case (i,iId) => UserIngressParams(
+          destId = i + ingressOffset,
+          vNetId = ingressVNets(iId),
+          payloadBits = actualPayloadWidth
+        )}
+      val egressParams = (inNodeMapping.values.map(i => Seq(i, i)) ++ outNodeMapping.values.map(i => Seq(i, i, i)))
+      .toSeq
+      .flatten.zipWithIndex.map { case (e,eId) => UserEgressParams(
+          srcId = e + egressOffset,
+          vNetId = egressVNets(eId),
+          payloadBits = actualPayloadWidth
+        )}
+
       Module(LazyModule(new NoC()(p.alterPartial({
         case NoCKey => nocParams.copy(
           routerParams = (i: Int) => nocParams.routerParams(i).copy(payloadBits = actualPayloadWidth),
-          ingresses = ingressParams.map(i => i.copy(destId = i.destId + ingressOffset)),
-          egresses = egressParams.map(e => e.copy(srcId = e.srcId + egressOffset)),
+          ingresses = ingressParams,
+          egresses = egressParams,
           flows = flowParams,
           nocName = nocName,
           hasCtrl = false
@@ -439,18 +457,16 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
       }
     }
 
-
-
     for (i <- 0 until in.size) {
-      val inA  = ingresses (i*3)
-      val outB = egresses  (i*2)
-      val inC  = ingresses (i*3+1)
-      val outD = egresses  (i*2+1)
-      val inE  = ingresses (i*3+2)
-      val masterNames = edgesIn(i).master.masters.map(_.name).mkString(",")
+      val idx = getIndex(inNodeMapping.keys.toSeq, inNames(i))
+      val inA  = ingresses (idx*3)
+      val outB = egresses  (idx*2)
+      val inC  = ingresses (idx*3+1)
+      val outD = egresses  (idx*2+1)
+      val inE  = ingresses (idx*3+2)
 
-      println(s"Constellation TLNoC $nocName: in  $i @ ${inNodeMapping(i)}: $masterNames")
-      println(s"Constellation TLNoC $nocName:   ingress (${i*3} ${i*3+1} ${i*3+2}) egress (${i*2} ${i*2+1})")
+      println(s"Constellation TLNoC $nocName: in  $i @ ${inNodeMapping.values.toSeq(i)}: ${inNames(i)}")
+      println(s"Constellation TLNoC $nocName:   ingress (${idx*3} ${idx*3+1} ${idx*3+2}) egress (${idx*2} ${idx*2+1})")
 
       splitToFlit(
         in(i).a, inA.flit, firstAI(i), lastAI(i), (in.size*2+0).U +& (requestAIIds(i) * 3.U),
@@ -478,14 +494,15 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
     }
 
     for (i <- 0 until out.size) {
-      val outA  = egresses  (in.size*2+i*3)
-      val inB   = ingresses (in.size*3+i*2)
-      val outC  = egresses  (in.size*2+i*3+1)
-      val inD   = ingresses (in.size*3+i*2+1)
-      val outE  = egresses  (in.size*2+i*3+2)
-      val slaveNames = edgesOut(i).slave.slaves.map(_.name).mkString(",")
-      println(s"Constellation TLNoC $nocName: out $i @ ${outNodeMapping(i)}: $slaveNames")
-      println(s"Constellation TLNoC $nocName:   ingress (${in.size*3+i*2} ${in.size*3+i*2+1}) egress (${in.size*2+i*3} ${in.size*2+i*3+1} ${in.size*2+i*3+2})")
+      val idx = getIndex(outNodeMapping.keys.toSeq, outNames(i))
+      val outA  = egresses  (in.size*2+idx*3)
+      val inB   = ingresses (in.size*3+idx*2)
+      val outC  = egresses  (in.size*2+idx*3+1)
+      val inD   = ingresses (in.size*3+idx*2+1)
+      val outE  = egresses  (in.size*2+idx*3+2)
+
+      println(s"Constellation TLNoC $nocName: out $i @ ${outNodeMapping.values.toSeq(i)}: ${outNames(i)}")
+      println(s"Constellation TLNoC $nocName:   ingress (${in.size*3+idx*2} ${in.size*3+idx*2+1}) egress (${in.size*2+idx*3} ${in.size*2+idx*3+1} ${in.size*2+idx*3+2})")
 
       combineFromFlit (outA.flit, out(i).a)
       combineFromFlit (outC.flit, out(i).c)

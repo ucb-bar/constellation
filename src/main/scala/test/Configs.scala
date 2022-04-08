@@ -433,6 +433,13 @@ class TestConfig59 extends Config(
   new constellation.channel.WithIngresses(4 until 16) ++
   new constellation.channel.WithEgresses(0 until 4) ++
   new constellation.topology.WithMesh2DTopology(4, 4, RoutingRelation.mesh2DEscapeRouter))
+class TestConfig60 extends Config(
+  new constellation.noc.WithTerminalPlane ++
+  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
+  new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngresses(0 until 16) ++
+  new constellation.channel.WithEgresses(0 until 16) ++
+  new constellation.topology.WithMesh2DTopology(4, 4, RoutingRelation.mesh2DEscapeRouter))
 
 
 
