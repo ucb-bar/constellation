@@ -9,26 +9,30 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.subsystem._
 import freechips.rocketchip.util._
 
-import constellation.{NoC, NoCKey, NoCConfig}
-import constellation.channel.{IOFlit, UserIngressParams, UserEgressParams, TerminalChannel}
+import constellation.noc.{NoC, NoCKey, NoCParams, NoCTerminalIO}
+import constellation.channel.{IOFlit, UserIngressParams, UserEgressParams, TerminalChannel, FlowParams}
+import constellation.topology.{TerminalPlaneTopology}
 
 case class TLNoCParams(
   nocName: String,
-  inNodeMapping: Seq[Int],
-  outNodeMapping: Seq[Int],
+  nodeMappings: ConstellationTLNetworkNodeMapping,
   // if set, generates a private noc using the config,
-  // else use globalNoC params to connect to global interconncet
-  privateNoC: Option[NoCConfig],
-  globalNoCIngressGen: Option[Int => ModuleValue[TerminalChannel]] = None,
-  globalNoCEgressGen: Option[Int => ModuleValue[TerminalChannel]] = None,
-  globalNoCVNetMapping: Int => Int = i => i)
-
+  // else use globalNoC params to connect to global interconnect
+  privateNoC: Option[NoCParams],
+  globalTerminalChannels: Option[() => BundleBridgeSink[NoCTerminalIO]] = None,
+)
 
 class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
   val nocName = params.nocName
-  val inNodeMapping = params.inNodeMapping
-  val outNodeMapping = params.outNodeMapping
+  val inNodeMapping = params.nodeMappings.inNodeMapping
+  val outNodeMapping = params.nodeMappings.outNodeMapping
   val privateNoC = params.privateNoC
+  val globalSink: Option[BundleBridgeSink[NoCTerminalIO]] = if (privateNoC.isEmpty) {
+    Some(params.globalTerminalChannels.get())
+  } else {
+    None
+  }
+
   override lazy val module = new LazyModuleImp(this) {
     val (io_in, edgesIn) = node.in.unzip
     val (io_out, edgesOut) = node.out.unzip
@@ -231,12 +235,6 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
     val requestDOIds = VecInit(requestDOI.map(OHToUInt(_)))
     val requestEIIds = VecInit(requestEIO.map(OHToUInt(_)))
 
-    require(in.size == inNodeMapping.size,
-      s"TL Inwards count must match mapping size ${in.size} != ${inNodeMapping.size}")
-    require(out.size == outNodeMapping.size,
-      s"TL Outwards count must match mapping size ${out.size} != ${outNodeMapping.size}")
-
-
     def isAIn (i: Int) = i <  in.size * 3 && i % 3 == 0
     def isAOut(o: Int) = o >= in.size * 2 && (o - in.size*2) % 3 == 0
 
@@ -252,23 +250,6 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
     def isEIn (i: Int) = i <  in.size * 3 && i % 3 == 2
     def isEOut(o: Int) = o >= in.size * 2 && (o - in.size*2) % 3 == 2
 
-
-    def connectivity(src: Int, dst: Int, vNetId: Int) = {
-      if (isAIn(src) && isAOut(dst)) {
-        connectAIO(src/3)((dst-in.size*2)/3) && vNetId == 4
-      } else if (isBIn(src) && isBOut(dst)) {
-        connectBOI((src-in.size*3)/2)(dst/2) && vNetId == 3
-      } else if (isCIn(src) && isCOut(dst)) {
-        connectCIO(src/3)((dst-in.size*2)/3) && vNetId == 2
-      } else if (isDIn(src) && isDOut(dst)) {
-        connectDOI((src-in.size*3)/2)(dst/2) && vNetId == 1
-      } else if (isEIn(src) && isEOut(dst)) {
-        connectEIO(src/3)((dst-in.size*2)/3) && vNetId == 0
-      } else {
-        false
-      }
-    }
-
     def ingressVNets(i: Int) = {
       if (isAIn(i)) {
         4
@@ -280,6 +261,21 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
         1
       } else {
         require(isEIn(i))
+        0
+      }
+    }
+
+    def egressVNets(i: Int) = {
+      if (isAOut(i)) {
+        4
+      } else if (isBOut(i)) {
+        3
+      } else if (isCOut(i)) {
+        2
+      } else if (isDOut(i)) {
+        1
+      } else {
+        require(isEOut(i))
         0
       }
     }
@@ -366,44 +362,88 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
       when (i.fire() && i.bits.tail) { is_const := true.B }
     }
 
-
-
     val nIngresses = in.size * 3 + out.size * 2
     val nEgresses = out.size * 3 + in.size * 2
 
-    if (privateNoC.isEmpty) {
-      // Generate connections to the global NoC, check that the global NoC params are acceptable
-      require(p(NoCKey).ingresses.map(_.payloadBits >= actualPayloadWidth).reduce(_&&_))
-      require(p(NoCKey).egresses.map(_.payloadBits >= actualPayloadWidth).reduce(_&&_))
-      require(p(NoCKey).nVirtualNetworks >= 5)
-    } else {
-      println(s"Constellation TLNoC: $nocName has width $actualPayloadWidth")
+    def getIndex(nodeMapping: Seq[String], l: String) = {
+      val matches = nodeMapping.map(k => l.contains(k))
+      require(matches.filter(i => i).size == 1, s"Unable to find valid mapping for $l")
+      matches.indexWhere(i => i)
     }
 
-    val noc = privateNoC.map { n => Module(LazyModule(new NoC()(p.alterPartial({
-      case NoCKey =>
-        n.copy(
-          routerParams = (i: Int) => n.routerParams(i).copy(
-            payloadBits = actualPayloadWidth),
-          ingresses = ((Seq.tabulate (in.size) { i => Seq.fill(3) { inNodeMapping(i) } } ++
-            Seq.tabulate(out.size) { i => Seq.fill(2) { outNodeMapping(i) } }).flatten
-          ).zipWithIndex.map { case (i,iId) => UserIngressParams(
-            destId = i,
-            possibleEgresses = (0 until nEgresses).filter(e => connectivity(iId, e, ingressVNets(iId))).toSet,
-            vNetId = ingressVNets(iId),
-            payloadBits = actualPayloadWidth
-          )},
-          egresses = ((Seq.tabulate (in.size) { i => Seq.fill(2) { inNodeMapping(i) } } ++
-            Seq.tabulate(out.size) { i => Seq.fill(3) { outNodeMapping(i) } }).flatten
-          ).zipWithIndex.map { case (e,eId) => UserEgressParams(
-            srcId = e,
-            payloadBits = actualPayloadWidth
-          )},
-          nocName = nocName
+    def genUniqueName(all: Seq[Seq[String]]) = {
+      all.zipWithIndex.map { case (strs, i) =>
+        val matches = all.take(i).map(_.mkString).count(_ == strs.mkString)
+        strs.map(s => s"${s}[${matches}]").mkString(",")
+      }
+    }
+
+    val inNames  = genUniqueName(edgesIn.map(_.master.masters.map(_.name)))
+    val outNames = genUniqueName(edgesOut.map(_.slave.slaves.map(_.name)))
+
+    require(in.size == inNodeMapping.size,
+      s"TL Inwards count at $nocName must match mapping size ${in.size} != ${inNodeMapping.size}")
+    require(out.size == outNodeMapping.size,
+      s"TL Outwards count at $nocName must match mapping size ${out.size} != ${outNodeMapping.size}")
+
+    val noc = privateNoC.map { nocParams =>
+      // If desired, create a private noc
+      require(nocParams.nVirtualNetworks == 5)
+      val (ingressOffset, egressOffset) = nocParams.topology match {
+        case t: TerminalPlaneTopology => (t.base.nNodes, t.base.nNodes * 2)
+        case _ => (0, 0)
+      }
+
+      val flowParams = inNames.map { inN => outNames.map { outN =>
+        val iId = getIndex(inNodeMapping.keys.toSeq, inN)
+        val oId = getIndex(outNodeMapping.keys.toSeq, outN)
+
+        val a = connectAIO(iId)(oId).option(FlowParams(iId * 3    , in.size * 2 + oId * 3    , 4))
+        val c = connectCIO(iId)(oId).option(FlowParams(iId * 3 + 1, in.size * 2 + oId * 3 + 1, 2))
+        val e = connectEIO(iId)(oId).option(FlowParams(iId * 3 + 2, in.size * 2 + oId * 3 + 2, 0))
+
+        val b = connectBOI(oId)(iId).option(FlowParams(in.size * 3 + oId * 2    , iId * 2    , 3))
+        val d = connectDOI(oId)(iId).option(FlowParams(in.size * 3 + oId * 2 + 1, iId * 2 + 1, 1))
+        (a ++ b ++ c ++ d ++ e)
+      }}.flatten.flatten
+
+      val ingressParams = (inNodeMapping.values.map(i => Seq(i, i, i)) ++ outNodeMapping.values.map(i => Seq(i, i)))
+        .toSeq
+        .flatten.zipWithIndex.map { case (i,iId) => UserIngressParams(
+          destId = i + ingressOffset,
+          vNetId = ingressVNets(iId),
+          payloadBits = actualPayloadWidth
+        )}
+      val egressParams = (inNodeMapping.values.map(i => Seq(i, i)) ++ outNodeMapping.values.map(i => Seq(i, i, i)))
+      .toSeq
+      .flatten.zipWithIndex.map { case (e,eId) => UserEgressParams(
+          srcId = e + egressOffset,
+          vNetId = egressVNets(eId),
+          payloadBits = actualPayloadWidth
+        )}
+
+      Module(LazyModule(new NoC()(p.alterPartial({
+        case NoCKey => nocParams.copy(
+          routerParams = (i: Int) => nocParams.routerParams(i).copy(payloadBits = actualPayloadWidth),
+          ingresses = ingressParams,
+          egresses = egressParams,
+          flows = flowParams,
+          nocName = nocName,
+          hasCtrl = false
         )
-    }))).module)}
-    noc.map(_.io.router_clocks.foreach(_.clock := clock))
-    noc.map(_.io.router_clocks.foreach(_.reset := reset))
+      }))).module)
+    }
+    // If we have privateNoC
+    noc.map { n =>
+      n.io.router_clocks.foreach(_.clock := clock)
+      n.io.router_clocks.foreach(_.reset := reset)
+    }
+
+    val ingresses: Seq[TerminalChannel] = noc.map(_.io.ingress).getOrElse(globalSink.get.in(0)._1.ingress)
+    val egresses: Seq[TerminalChannel] = noc.map(_.io.egress).getOrElse(globalSink.get.in(0)._1.egress)
+
+    for (t <- ingresses) { require(t.payloadBits >= actualPayloadWidth) }
+    for (t <-  egresses) { require(t.payloadBits >= actualPayloadWidth) }
 
     val tsc = RegInit(0.U(32.W))
     tsc := tsc + 1.U
@@ -417,17 +457,16 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
       }
     }
 
-
-
     for (i <- 0 until in.size) {
-      val inA  = noc.map(_.io.ingress (i*3)  ).get
-      val outB = noc.map(_.io.egress  (i*2)  ).get
-      val inC  = noc.map(_.io.ingress (i*3+1)).get
-      val outD = noc.map(_.io.egress  (i*2+1)).get
-      val inE  = noc.map(_.io.ingress (i*3+2)).get
-      val masterNames = edgesIn(i).master.masters.map(_.name).mkString(",")
-      println(s"Constellation TLNoC: in  $i @ ${inNodeMapping(i)}: $masterNames")
-      println(s"Constellation TLNoC:   ingress (${i*3} ${i*3+1} ${i*3+2}) egress (${i*2} ${i*2+1})")
+      val idx = getIndex(inNodeMapping.keys.toSeq, inNames(i))
+      val inA  = ingresses (idx*3)
+      val outB = egresses  (idx*2)
+      val inC  = ingresses (idx*3+1)
+      val outD = egresses  (idx*2+1)
+      val inE  = ingresses (idx*3+2)
+
+      println(s"Constellation TLNoC $nocName: in  $i @ ${inNodeMapping.values.toSeq(i)}: ${inNames(i)}")
+      println(s"Constellation TLNoC $nocName:   ingress (${idx*3} ${idx*3+1} ${idx*3+2}) egress (${idx*2} ${idx*2+1})")
 
       splitToFlit(
         in(i).a, inA.flit, firstAI(i), lastAI(i), (in.size*2+0).U +& (requestAIIds(i) * 3.U),
@@ -455,14 +494,15 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
     }
 
     for (i <- 0 until out.size) {
-      val outA  = noc.map(_.io.egress  (in.size*2+i*3)  ).get
-      val inB   = noc.map(_.io.ingress (in.size*3+i*2)  ).get
-      val outC  = noc.map(_.io.egress  (in.size*2+i*3+1)).get
-      val inD   = noc.map(_.io.ingress (in.size*3+i*2+1)).get
-      val outE  = noc.map(_.io.egress  (in.size*2+i*3+2)).get
-      val slaveNames = edgesOut(i).slave.slaves.map(_.name).mkString(",")
-      println(s"Constellation TLNoC: out $i @ ${outNodeMapping(i)}: $slaveNames")
-      println(s"Constellation TLNoC:   ingress (${in.size*3+i*2} ${in.size*3+i*2+1}) egress (${in.size*2+i*3} ${in.size*2+i*3+1} ${in.size*2+i*3+2})")
+      val idx = getIndex(outNodeMapping.keys.toSeq, outNames(i))
+      val outA  = egresses  (in.size*2+idx*3)
+      val inB   = ingresses (in.size*3+idx*2)
+      val outC  = egresses  (in.size*2+idx*3+1)
+      val inD   = ingresses (in.size*3+idx*2+1)
+      val outE  = egresses  (in.size*2+idx*3+2)
+
+      println(s"Constellation TLNoC $nocName: out $i @ ${outNodeMapping.values.toSeq(i)}: ${outNames(i)}")
+      println(s"Constellation TLNoC $nocName:   ingress (${in.size*3+idx*2} ${in.size*3+idx*2+1}) egress (${in.size*2+idx*3} ${in.size*2+idx*3+1} ${in.size*2+idx*3+2})")
 
       combineFromFlit (outA.flit, out(i).a)
       combineFromFlit (outC.flit, out(i).c)

@@ -6,6 +6,11 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 import constellation.channel._
 
+class OutputCreditAlloc extends Bundle {
+  val alloc = Bool()
+  val tail = Bool()
+}
+
 class AbstractOutputUnitIO(
   val inParams: Seq[ChannelParams],
   val ingressParams: Seq[IngressChannelParams],
@@ -17,7 +22,9 @@ class AbstractOutputUnitIO(
   val credit_available = Output(Vec(nVirtualChannels, Bool()))
   val channel_available = Output(Vec(nVirtualChannels, Bool()))
   val allocs = Input(Vec(nVirtualChannels, Bool()))
+  val credit_alloc = Input(Vec(nVirtualChannels, new OutputCreditAlloc))
 }
+
 
 abstract class AbstractOutputUnit(
   val inParams: Seq[ChannelParams],
@@ -34,7 +41,6 @@ class OutputUnit(inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannel
 
   val io = IO(new AbstractOutputUnitIO(inParams, ingressParams, cParam) {
     val out = new Channel(cParam.asInstanceOf[ChannelParams])
-    val credit_alloc = Input(Vec(nVirtualChannels, Bool()))
   })
 
   val g_i :: g_a :: g_c :: Nil = Enum(3)
@@ -67,7 +73,7 @@ class OutputUnit(inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannel
 
   states.zipWithIndex.map { case (s,i) =>
     val free = io.out.credit_return(i)
-    val alloc = io.credit_alloc(i)
+    val alloc = io.credit_alloc(i).alloc
     if (virtualChannelParams(i).traversable) {
       s.c := s.c +& free - alloc
     }

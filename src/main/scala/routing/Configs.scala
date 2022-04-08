@@ -1,7 +1,7 @@
 package constellation.routing
 
 import freechips.rocketchip.config.{Field, Parameters, Config}
-import constellation.{NoCKey}
+import constellation.noc.{NoCKey}
 
 /** Creates N non-blocking virtual networks. Non-blocking virtual networks can share the physical
  *  resources of the NoC. However, if one virtual network is blocked, the others are not.

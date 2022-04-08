@@ -1,14 +1,20 @@
+#!/usr/bin/python3
+
 import networkx as nx
 import os
 import sys
+import argparse
 import matplotlib.animation
 import matplotlib.pyplot as plt
 from matplotlib import cm
 
-generated_src_dir = sys.argv[1]
+parser = argparse.ArgumentParser()
+parser.add_argument("nocpath", help="path to noc debug info. Path should end in .noc.")
+parser.add_argument("--animate", help="path to output log file for animating noc diagram", default="")
+args = parser.parse_args()
 
 def get_file(ext):
-    return sys.argv[1] + ext
+    return args.nocpath + ext
 
 adjlist = get_file("adjlist")
 xys = get_file("xy")
@@ -56,8 +62,7 @@ for e in G.edges:
     edge_offsets[e] = str(offset)
     edge_indices[t] += 1
 
-animate = len(sys.argv) > 2
-if animate:
+if args.animate:
     trace = open(sys.argv[2]).read().splitlines()
     trace = list(filter(lambda x: "nocsample" in x, trace))
     trace = {(int(t), e0, e1): int(n) for _, t, e0, e1, n in [l.split() for l in trace]}
@@ -77,7 +82,7 @@ else:
 
 
 def getPercentage(tsc, prev_tsc, e0, e1):
-    if animate:
+    if args.animate:
         packets = timestamps[tsc][(e0, e1)] - timestamps[prev_tsc][(e0, e1)]
         delta = tsc - prev_tsc
         return packets / (tsc - prev_tsc)
@@ -117,7 +122,7 @@ def update(num):
         edge_indices[t] += 1
     ax.set_title("{} to {}".format(prev_tsc, tsc))
 
-if animate:
+if args.animate:
     ani = matplotlib.animation.FuncAnimation(fig, update, frames=int(len(sorted_tscs)/multiplier) - 1, interval=30, repeat=True)
 else:
     update(0)

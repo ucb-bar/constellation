@@ -30,7 +30,9 @@ class IterativeVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) extend
 
 
 
-  val allocator = Module(new GrantHoldArbiter(Bool(), nOutChannels, (_: Bool) => true.B))
+  val allocator = Module(new GrantHoldArbiter(Bool(), nOutChannels, (_: Bool) => true.B,
+    policy=ArbiterPolicy.RoundRobin
+  ))
   allocator.io.in.foreach(_.bits := false.B)
   allocator.io.prios.foreach(_ := 0.U)
   allocator.io.out(0).ready := true.B

@@ -3,7 +3,7 @@ package constellation.topology
 import scala.math.pow
 import freechips.rocketchip.config.{Field, Parameters, Config}
 
-import constellation.{NoCKey}
+import constellation.noc.{NoCKey}
 import constellation.routing.{RoutingRelation}
 import constellation.channel.{UserIngressParams, UserEgressParams}
 
@@ -101,5 +101,4 @@ class WithBidirectionalTorus2DTopology(
     routingRelation = RoutingRelation.dimensionOrderedBidirectionalTorus2DDateline(nX, nY),
   )
 })
-
 

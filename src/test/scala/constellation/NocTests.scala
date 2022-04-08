@@ -4,6 +4,7 @@ import chipsalliance.rocketchip.config.{Config, Parameters}
 import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
 import chisel3._
+import constellation.test._
 
 class NoCChiselTester(implicit val p: Parameters) extends Module {
   val th = Module(new TestHarness)
@@ -81,10 +82,22 @@ class NoCTest44 extends NoCTest(Seq(new TestConfig44))
 class NoCTest45 extends NoCTest(Seq(new TestConfig45))
 class NoCTest46 extends NoCTest(Seq(new TestConfig46))
 class NoCTest47 extends NoCTest(Seq(new TestConfig47))
-class NoCTest48 extends NoCTest(Seq(new TestConfig49))
+class NoCTest48 extends NoCTest(Seq(new TestConfig48))
 class NoCTest49 extends NoCTest(Seq(new TestConfig49))
+class NoCTest50 extends NoCTest(Seq(new TestConfig50))
+class NoCTest51 extends NoCTest(Seq(new TestConfig51))
+class NoCTest52 extends NoCTest(Seq(new TestConfig52))
+class NoCTest53 extends NoCTest(Seq(new TestConfig53))
+class NoCTest54 extends NoCTest(Seq(new TestConfig54))
+class NoCTest55 extends NoCTest(Seq(new TestConfig55))
+class NoCTest56 extends NoCTest(Seq(new TestConfig56))
+class NoCTest57 extends NoCTest(Seq(new TestConfig57))
+class NoCTest58 extends NoCTest(Seq(new TestConfig58))
+class NoCTest59 extends NoCTest(Seq(new TestConfig59))
+class NoCTest60 extends NoCTest(Seq(new TestConfig60))
 
 class NoCTestTL00 extends TLNoCTest(Seq(new TLTestConfig00))
 class NoCTestTL01 extends TLNoCTest(Seq(new TLTestConfig01))
 class NoCTestTL02 extends TLNoCTest(Seq(new TLTestConfig02))
 class NoCTestTL03 extends TLNoCTest(Seq(new TLTestConfig03))
+class NoCTestTL04 extends TLNoCTest(Seq(new TLTestConfig04))

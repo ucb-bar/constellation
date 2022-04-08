@@ -4,17 +4,22 @@ import chisel3._
 import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
-import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp, BundleBridgeSource}
+import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.util.{PlusArg}
 
 import constellation.channel._
 import constellation.routing.{RoutingRelation}
-import constellation.{NoCKey, HasNoCParams}
+import constellation.noc.{HasNoCParams}
 
 case class UserRouterParams(
+  // Payload width. Must match payload width on all channels attached to this routing node
   payloadBits: Int = 64,
+  // Combines SA and ST stages (removes pipeline register)
   combineSAST: Boolean = false,
+  // Combines RC and VA stages (removes pipeline register)
   combineRCVA: Boolean = false,
+  // Adds combinational path from SA to VA
+  coupleSAVA: Boolean = false,
   earlyRC: Boolean = false,
   vcAllocator: VCAllocatorParams => Parameters => VCAllocator = (vP) => (p) => new IterativeVCAllocator(vP)(p)
 )
@@ -73,6 +78,7 @@ class Router(
   val egressNodes = egressParams.map(u => TerminalChannelSourceNode(u))
 
   val debugNode = BundleBridgeSource(() => new DebugBundle(nAllInputs))
+  val ctrlNode = if (hasCtrl) Some(BundleBridgeSource(() => new RouterCtrlBundle)) else None
 
   lazy val module = new LazyModuleImp(this) {
     val io_in = destNodes.map(_.in(0)._1)
@@ -99,7 +105,7 @@ class Router(
       Module(new OutputUnit(inParams, ingressParams, u))
         .suggestName(s"output_unit_${i}_to_${u.destId}")}
     val egress_units = egressParams.zipWithIndex.map { case (u,i) =>
-      Module(new EgressUnit(inParams, ingressParams, u))
+      Module(new EgressUnit(routerParams.user.coupleSAVA, inParams, ingressParams, u))
         .suggestName(s"egress_unit_${i+nOutputs}_to_${u.egressId}")}
     val all_output_units = output_units ++ egress_units
 
@@ -145,7 +151,7 @@ class Router(
     })
     (all_input_units zip switch_allocator.io.req).foreach {
       case (u,r) => r <> u.io.salloc_req }
-    (output_units zip switch_allocator.io.credit_alloc).foreach {
+    (all_output_units zip switch_allocator.io.credit_alloc).foreach {
       case (u,a) => u.io.credit_alloc := a }
 
     (switch.io.in zip all_input_units).foreach {
@@ -157,6 +163,17 @@ class Router(
     } else {
       RegNext(switch_allocator.io.switch_sel)
     })
+
+    if (hasCtrl) {
+      val io_ctrl = ctrlNode.get.out(0)._1
+      val ctrl = Module(new RouterControlUnit(routerParams, inParams, outParams, ingressParams, egressParams))
+      io_ctrl <> ctrl.io.ctrl
+      (all_input_units   zip ctrl.io.in_block  ).foreach { case (l,r) => l.io.block := r }
+      (all_input_units   zip ctrl.io.in_fire   ).foreach { case (l,r) => r := l.io.out.map(_.valid) }
+    } else {
+      input_units.foreach(_.io.block := false.B)
+      ingress_units.foreach(_.io.block := false.B)
+    }
 
     (io_debug.va_stall zip all_input_units.map(_.io.debug.va_stall)).map { case (l,r) => l := r }
     (io_debug.sa_stall zip all_input_units.map(_.io.debug.sa_stall)).map { case (l,r) => l := r }

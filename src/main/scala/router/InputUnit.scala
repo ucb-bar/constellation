@@ -8,7 +8,6 @@ import freechips.rocketchip.util._
 
 import constellation.channel._
 import constellation.routing.{PacketRoutingBundle}
-import constellation.{NoCKey}
 import constellation.util.{GrantHoldArbiter, WrapInc, ArbiterPolicy}
 
 class AbstractInputUnitIO(
@@ -34,6 +33,7 @@ class AbstractInputUnitIO(
     val va_stall = UInt(log2Ceil(nVirtualChannels).W)
     val sa_stall = UInt(log2Ceil(nVirtualChannels).W)
   })
+  val block = Input(Bool())
 }
 
 abstract class AbstractInputUnit(
@@ -45,25 +45,24 @@ abstract class AbstractInputUnit(
 
   def io: AbstractInputUnitIO
 
-  def filterVCSel(in: MixedVec[Vec[Bool]], srcV: Int): MixedVec[Vec[Bool]] = {
-    val out = WireInit(in)
+  def filterVCSel(sel: MixedVec[Vec[Bool]], srcV: Int) = {
     if (virtualChannelParams(srcV).traversable) {
       outParams.zipWithIndex.map { case (oP, oI) =>
         (0 until oP.nVirtualChannels).map { oV =>
-          val allow = virtualChannelParams(srcV).possiblePackets.map { pI =>
-            p(NoCKey).routingRelation(
+          var allow = false
+          virtualChannelParams(srcV).possiblePackets.foreach { pI =>
+            allow = allow || nocParams.routingRelation(
               nodeId,
               cParam.channelRoutingInfos(srcV),
               oP.channelRoutingInfos(oV),
               pI
             )
-          }.reduce(_||_)
+          }
           if (!allow)
-            out(oI)(oV) := false.B
+            sel(oI)(oV) := false.B
         }
       }
     }
-    out
   }
 
   def atDest(egress: UInt) = egressSrcIds.zipWithIndex.filter(_._1 == nodeId).map(_._2.U === egress).orR
@@ -78,7 +77,6 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   val io = IO(new AbstractInputUnitIO(cParam, outParams, egressParams) {
     val in = Flipped(new Channel(cParam.asInstanceOf[ChannelParams]))
   })
-
   val g_i :: g_r :: g_r_stall :: g_v :: g_v_stall :: g_a :: g_c :: Nil = Enum(7)
 
   class InputState extends Bundle {
@@ -161,7 +159,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     states(id).g := g_v
     for (i <- 0 until nVirtualChannels) {
       when (i.U === id) {
-        states(i).vc_sel := filterVCSel(io.router_resp.bits.vc_sel, i)
+        states(i).vc_sel := io.router_resp.bits.vc_sel
       }
     }
   }
@@ -189,7 +187,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     val id = io.vcalloc_resp.bits.in_virt_channel
     for (i <- 0 until nVirtualChannels) {
       when (i.U === id) {
-        states(i).vc_sel := filterVCSel(io.vcalloc_resp.bits.vc_sel, i)
+        states(i).vc_sel := io.vcalloc_resp.bits.vc_sel
       }
     }
     states(id).g := g_a
@@ -219,6 +217,10 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   }
   io.debug.sa_stall := PopCount(salloc_arb.io.in.map(r => r.valid && !r.ready))
   io.salloc_req <> salloc_arb.io.out
+  when (io.block) {
+    salloc_arb.io.out.foreach(_.ready := false.B)
+    io.salloc_req.foreach(_.valid := false.B)
+  }
 
   class OutBundle extends Bundle {
     val valid = Bool()
@@ -232,7 +234,6 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   } else {
     Reg(Vec(cParam.destMultiplier, new OutBundle))
   }
-
 
   io.in.credit_return := salloc_arb.io.out.zipWithIndex.map { case (o, i) =>
     Mux(o.fire(), salloc_arb.io.chosen_oh(i), 0.U)
@@ -258,8 +259,8 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
 
   (0 until nVirtualChannels).map { i =>
     if (!virtualChannelParams(i).traversable) states(i) := DontCare
+    filterVCSel(states(i).vc_sel, i)
   }
-
   when (reset.asBool) {
     states.foreach(_.g := g_i)
   }

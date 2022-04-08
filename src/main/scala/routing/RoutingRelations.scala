@@ -1,6 +1,8 @@
 package constellation.routing
 
 import scala.math.{pow, min, max}
+import scala.collection.mutable.HashMap
+import freechips.rocketchip.config.{Parameters}
 
 /** Routing and channel allocation policy
  *
@@ -13,37 +15,15 @@ import scala.math.{pow, min, max}
  *                 for deadlock-freedom by verifying lack of a cyclic dependency.
  */
 class RoutingRelation(
-  f: (Int, ChannelRoutingInfo, ChannelRoutingInfo, PacketRoutingInfoInternal) => Boolean,
+  f: (Int, ChannelRoutingInfo, ChannelRoutingInfo, PacketRoutingInfo) => Boolean,
   val isEscape: (ChannelRoutingInfo, Int) => Boolean = (_,_) => true) {
 
+  val memoize = new HashMap[(Int, ChannelRoutingInfo, ChannelRoutingInfo, PacketRoutingInfo), Boolean]()
   def apply(nodeId: Int, srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, pInfo: PacketRoutingInfo): Boolean = {
-    apply(nodeId, srcC, nxtC, PacketRoutingInfoInternal(pInfo.dst, pInfo.vNet))
-  }
-  def apply(nodeId: Int, srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, pInfo: PacketRoutingInfoInternal): Boolean = {
     require(nodeId == srcC.dst && nodeId == nxtC.src)
-    f(nodeId, srcC, nxtC, pInfo)
+    val key = (nodeId, srcC, nxtC, pInfo)
+    memoize.getOrElseUpdate(key, f(nodeId, srcC, nxtC, pInfo))
   }
-
-  def unary_!()               = new RoutingRelation(
-    (n, srcC, nxtC, pInfo) => !f(n, srcC, nxtC, pInfo),
-    isEscape
-  )
-  def ||(a2: RoutingRelation) = new RoutingRelation(
-    (n, srcC, nxtC, pInfo) => f(n, srcC, nxtC, pInfo) || a2(n, srcC, nxtC, pInfo),
-    (c, v) => isEscape(c, v) || a2.isEscape(c, v)
-  )
-  def ||(a2: Boolean)         = new RoutingRelation(
-    (n, srcC, nxtC, pInfo) => f(n, srcC, nxtC, pInfo) || a2,
-    isEscape
-  )
-  def &&(a2: RoutingRelation) = new RoutingRelation(
-    (n, srcC, nxtC, pInfo) => f(n, srcC, nxtC, pInfo) && a2(n, srcC, nxtC, pInfo),
-    (c, v) => isEscape(c, v) || a2.isEscape(c, v)
-  )
-  def &&(a2: Boolean)         = new RoutingRelation(
-    (n, srcC, nxtC, pInfo) => f(n, srcC, nxtC, pInfo) && a2,
-    isEscape
-  )
 }
 
 
@@ -79,8 +59,6 @@ object RoutingRelation {
     })
   }
 
-  def noRoutingAtEgress = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => pInfo.dst != nodeId)
-
 
   // Usable policies
   val allLegal = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => true)
@@ -96,7 +74,7 @@ object RoutingRelation {
    */
   val bidirectionalLine = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
     if (nodeId < nxtC.dst) pInfo.dst >= nxtC.dst else pInfo.dst <= nxtC.dst
-  }) && noRoutingAtEgress
+  })
 
   def unidirectionalTorus1DDateline(nNodes: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
     if (srcC.src == -1)  {
@@ -108,7 +86,7 @@ object RoutingRelation {
     } else {
       nxtC.vc <= srcC.vc && nxtC.vc != 0
     }
-  }) && noRoutingAtEgress
+  })
 
 
 
@@ -145,7 +123,7 @@ object RoutingRelation {
       true
     }
     distSel && bidirectionalTorus1DDateline(nNodes)(nodeId, srcC, nxtC, pInfo)
-  }) && noRoutingAtEgress
+  })
 
   def bidirectionalTorus1DRandom(nNodes: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
     val sel = if (srcC.src == -1) {
@@ -156,7 +134,7 @@ object RoutingRelation {
       (nodeId + nNodes - nxtC.dst) % nNodes == 1
     }
     sel && bidirectionalTorus1DDateline(nNodes)(nodeId, srcC, nxtC, pInfo)
-  }) && noRoutingAtEgress
+  })
 
   def butterfly(kAry: Int, nFly: Int) = {
     require(kAry >= 2 && nFly >= 2)
@@ -261,13 +239,14 @@ object RoutingRelation {
     val (nodeX, nodeY) = (nodeId % nX, nodeId / nX)
     val (dstX, dstY)   = (pInfo.dst % nX , pInfo.dst / nX)
 
-    (if (dstY > nodeY && dstX != nodeX) {
-      mesh2DMinimal(nX, nY) && nxtY != nodeY + 1
+    val minimal = mesh2DMinimal(nX, nY)(nodeId, srcC, nxtC, pInfo)
+    if (dstY > nodeY && dstX != nodeX) {
+      minimal && nxtY != nodeY + 1
     } else if (dstY > nodeY) {
-      new RoutingRelation((nodeId, srcC, nxtC, pInfo) => nxtY == nodeY + 1)
+      nxtY == nodeY + 1
     } else {
-      mesh2DMinimal(nX, nY)
-    })(nodeId, srcC, nxtC, pInfo)
+      minimal
+    }
   })
 
 
@@ -279,16 +258,16 @@ object RoutingRelation {
     val (srcX, srcY)   = (srcC.src % nX , srcC.src / nX)
 
     val turn = nxtX != srcX && nxtY != srcY
-    val canRouteThis = mesh2DDimensionOrdered(srcC.vc % 2)(nX, nY)
-    val canRouteNext = mesh2DDimensionOrdered(nxtC.vc % 2)(nX, nY)
+    val canRouteThis = mesh2DDimensionOrdered(srcC.vc % 2)(nX, nY)(nodeId, srcC, nxtC, pInfo)
+    val canRouteNext = mesh2DDimensionOrdered(nxtC.vc % 2)(nX, nY)(nodeId, srcC, nxtC, pInfo)
 
     val sel = if (srcC.src == -1) {
       canRouteNext
     } else {
       (canRouteThis && nxtC.vc % 2 == srcC.vc % 2 && nxtC.vc <= srcC.vc) || (canRouteNext && nxtC.vc % 2 != srcC.vc % 2 && nxtC.vc <= srcC.vc)
     }
-    (mesh2DMinimal(nX, nY) && sel)(nodeId, srcC, nxtC, pInfo)
-  }) && noRoutingAtEgress
+    mesh2DMinimal(nX, nY)(nodeId, srcC, nxtC, pInfo) && sel
+  })
 
 
   def mesh2DEscapeRouter(nX: Int, nY: Int) = escapeChannels(mesh2DDimensionOrdered()(nX, nY), mesh2DMinimal(nX, nY))
@@ -361,7 +340,7 @@ object RoutingRelation {
     } else {
       nxtX == nodeX
     }
-    (unidirectionalTorus2DDateline(nX, nY) && sel)(nodeId, srcC, nxtC, pInfo)
+    unidirectionalTorus2DDateline(nX, nY)(nodeId, srcC, nxtC, pInfo) && sel
   })
 
   def dimensionOrderedBidirectionalTorus2DDateline(nX: Int, nY: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
@@ -462,5 +441,29 @@ object RoutingRelation {
     }
   }, (c, v) => {
     c.vc >= v && f.isEscape(c.copy(vc=c.vc - v * nDedicated, n_vc=c.n_vc - v * nDedicated), 0)
+  })
+
+  def terminalPlane(f: RoutingRelation, nNodes: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
+    if (srcC.isIngress && nxtC.dst < nNodes) {
+      true
+    } else if (nxtC.dst == pInfo.dst) {
+      true
+    } else if (nodeId < nNodes && nxtC.dst < nNodes && nodeId != pInfo.dst - 2 * nNodes) {
+      if (srcC.src >= nNodes) {
+        f(nodeId,
+          srcC.copy(src=(-1), vc=0, n_vc=1),
+          nxtC,
+          pInfo.copy(dst=pInfo.dst-2*nNodes))
+      } else {
+        f(nodeId,
+          srcC,
+          nxtC,
+          pInfo.copy(dst=pInfo.dst-2*nNodes))
+      }
+    } else {
+      false
+    }
+  }, (c, v) => {
+    c.src >= nNodes || c.dst >= nNodes || f.isEscape(c, v)
   })
 }

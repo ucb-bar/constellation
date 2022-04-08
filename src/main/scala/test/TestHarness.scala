@@ -1,4 +1,4 @@
-package constellation
+package constellation.test
 
 import chisel3._
 import chisel3.util._
@@ -9,9 +9,10 @@ import freechips.rocketchip.config.{Field, Parameters, Config}
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.util._
 
+import constellation.noc.{NoCKey, HasNoCParams, NoC}
 import constellation.channel._
 import constellation.rc.{TLNoC, TLNoCParams}
-
+import constellation.router.{HasRouterCtrlConsts}
 
 object SelectFirstNUInt
 {
@@ -28,7 +29,20 @@ object SelectFirstNUInt
   }
 }
 
-class InputGen(idx: Int, cParams: IngressChannelParams, inputStallProbability: Double, maxFlits: Int)(implicit val p: Parameters) extends Module with HasNoCParams {
+case class NoCTesterParams(
+  robSz: Int = 128,
+  totalTxs: Int = 50000,
+  inputStallProbability: Double = 0.0,
+  outputStallProbability: Double = 0.0,
+  maxFlits: Int = 8,
+  constPacketSize: Boolean = false
+)
+
+case object NoCTesterKey extends Field[NoCTesterParams](NoCTesterParams())
+
+class InputGen(idx: Int, cParams: IngressChannelParams)(implicit val p: Parameters) extends Module with HasNoCParams {
+  val maxFlits = p(NoCTesterKey).maxFlits
+  val inputStallProbability = p(NoCTesterKey).inputStallProbability
   val flitIdBits = log2Ceil(maxFlits+1)
   val io = IO(new Bundle {
     val out = Decoupled(new IOFlit(cParams))
@@ -45,8 +59,8 @@ class InputGen(idx: Int, cParams: IngressChannelParams, inputStallProbability: D
 
   val can_fire = (flits_left === 0.U) && io.rob_ready
 
-  val packet_remaining = (LFSR(20) % maxFlits.U)
-  val random_delay = LFSR(20) < (inputStallProbability * (1 << 10)).toInt.U
+  val packet_remaining = if (p(NoCTesterKey).constPacketSize) maxFlits.U else (LFSR(20) % maxFlits.U)
+  val random_delay = LFSR(20) < (inputStallProbability * (1 << 20)).toInt.U
   io.out.valid := !random_delay && flits_left === 0.U && io.rob_ready
   io.out.bits.head := true.B
   io.out.bits.tail := packet_remaining === 0.U
@@ -80,11 +94,10 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
   require(allPayloadBits.size == 1 && allPayloadBits.head >= 64)
   val payloadBits = allPayloadBits.head
 
-  val robSz = 128
-  val totalTxs = 50000
-  val inputStallProbability = 0.0
-  val outputStallProbability = 0.0
-  val maxFlits = 8
+  val robSz = p(NoCTesterKey).robSz
+  val totalTxs = p(NoCTesterKey).totalTxs
+  val outputStallProbability = p(NoCTesterKey).outputStallProbability
+  val maxFlits = p(NoCTesterKey).maxFlits
   val flitIdBits = log2Ceil(maxFlits+1)
 
   val io = IO(new Bundle {
@@ -138,7 +151,7 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
 
   val tx_fire = Wire(Vec(nInputs, Bool()))
   io.to_noc.zipWithIndex.map { case (i,idx) =>
-    val igen = Module(new InputGen(idx, inputParams(idx), inputStallProbability, maxFlits))
+    val igen = Module(new InputGen(idx, inputParams(idx)))
     val rob_idx = WireInit(rob_alloc_ids(idx))
     igen.io.rob_idx := rob_idx
     igen.io.rob_ready := (rob_alloc_avail(idx) && rob_alloc_fires(idx) &&
@@ -199,7 +212,7 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
 
 
 
-class TestHarness(implicit val p: Parameters) extends Module {
+class TestHarness(implicit val p: Parameters) extends Module with HasRouterCtrlConsts {
   val io = IO(new Bundle {
     val success = Output(Bool())
   })
@@ -207,62 +220,37 @@ class TestHarness(implicit val p: Parameters) extends Module {
   val noc = Module(lazyNoC.module)
   noc.io.router_clocks.foreach(_.clock := clock)
   noc.io.router_clocks.foreach(_.reset := reset)
-  val noc_tester = Module(new NoCTester(lazyNoC.globalIngressParams, lazyNoC.globalEgressParams))
+
+  noc.io.router_ctrl.foreach{ ctrl =>
+    val read = RegInit(false.B)
+    val addr = RegInit(0.U(CTRL_ADDR_SZ.W))
+    addr := Mux(addr === CTRL_MAX_ADDR.U, 0.U, addr + 1.U)
+    when (addr === CTRL_MAX_ADDR.U) { read := true.B }
+
+    ctrl.enable := read
+    ctrl.write  := !read
+    ctrl.addr   := addr
+    ctrl.wdata  := DontCare
+
+    def inRange(i: UInt, lower: Int, bound: Int) = {
+      i >= lower.U && i < (lower + bound).U
+    }
+
+    when (addr === CTRL_EPOCH_CYCLES.U) {
+      ctrl.enable := true.B
+      ctrl.wdata  := 100.U
+    } .elsewhen (inRange(addr, CTRL_IN_RATELIMITER_OFFSET, CTRL_MAX_INS)) {
+      ctrl.enable := true.B
+      ctrl.wdata  := 1.U
+    } .elsewhen (inRange(addr, CTRL_IN_RATE_OFFSET, CTRL_MAX_INS)) {
+      ctrl.enable := true.B
+      ctrl.wdata  := 75.U
+    }
+  }
+
+  val noc_tester = Module(new NoCTester(lazyNoC.allIngressParams, lazyNoC.allEgressParams))
   noc.io.ingress <> noc_tester.io.to_noc
   noc_tester.io.from_noc <> noc.io.egress
   io.success := noc_tester.io.success
-  ElaborationArtefacts.add("plusArgs", PlusArgArtefacts.serialize_cHeader)
-}
-
-case class TLNoCTesterParams(
-  inNodeMapping: Seq[Int],
-  outNodeMapping: Seq[Int],
-  txns: Int = 1000
-)
-
-case object TLNoCTesterKey extends Field[TLNoCTesterParams](TLNoCTesterParams(Nil, Nil))
-
-class WithTLNoCTesterParams(p: TLNoCTesterParams) extends Config((site, here, up) => {
-  case TLNoCTesterKey => p
-})
-
-class TLNoCTester(implicit p: Parameters) extends LazyModule {
-  val tParams = p(TLNoCTesterKey)
-  val txns = tParams.txns
-  val inNodeMapping = tParams.inNodeMapping
-  val outNodeMapping = tParams.outNodeMapping
-  val nManagers = outNodeMapping.size
-  val nClients = inNodeMapping.size
-  val xbar = LazyModule(new TLNoC(TLNoCParams("test", inNodeMapping, outNodeMapping, Some(p(NoCKey)))))
-
-  val fuzzers = (0 until nClients) map { n =>
-    val fuzz = LazyModule(new TLFuzzer(txns))
-    xbar.node := TLDelayer(0.1) := fuzz.node
-    fuzz
-  }
-
-  (0 until nManagers) foreach { n =>
-    val ram = LazyModule(new TLRAM(AddressSet(0x0+0x400*n, 0x3ff)))
-    DisableMonitors { implicit p => ram.node := TLFragmenter(4, 256) } := TLDelayer(0.1) := xbar.node
-  }
-
-  lazy val module = new LazyModuleImp(this) {
-    val io = IO(new Bundle {
-      val finished = Output(Bool())
-    })
-    io.finished := fuzzers.last.module.io.finished
-  }
-}
-
-class TLTestHarness(implicit val p: Parameters) extends Module {
-  val io = IO(new Bundle {
-    val success = Output(Bool())
-  })
-  val tester = Module(LazyModule(new TLNoCTester).module)
-  io.success := tester.io.finished
-
-  // Dummy plusarg to avoid breaking verilator builds with emulator.cc
-  val useless_plusarg = PlusArg("useless_plusarg", width=1)
-  dontTouch(useless_plusarg)
   ElaborationArtefacts.add("plusArgs", PlusArgArtefacts.serialize_cHeader)
 }
