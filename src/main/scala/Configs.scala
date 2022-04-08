@@ -351,21 +351,22 @@ class TestConfig50 extends Config(
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithIngresses(0 until 6 by 2) ++
   new constellation.channel.WithEgresses(1 until 6 by 2) ++
-  new constellation.topology.WithBidirectionalTreeTopology(6, 2))
+  new constellation.topology.WithBidirectionalTreeTopology(3, 2))
 
 class TestConfig51 extends Config(
   new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithIngresses(0 until 6 by 2) ++
   new constellation.channel.WithEgresses(1 until 6 by 2) ++
-  new constellation.topology.WithBidirectionalTreeTopology(6, 2))
+  new constellation.topology.WithBidirectionalTreeTopology(3, 2))
 
 class TestConfig52 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
+  new constellation.channel.WithUniformNVirtualChannels(1, UserVirtualChannelParams(1)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 12 by 2) ++
-  new constellation.channel.WithEgresses(1 until 12 by 2) ++
-  new constellation.topology.WithBidirectionalTreeTopology(12, 3))
+  new constellation.channel.WithIngresses(0 until 6 by 2) ++
+  new constellation.channel.WithEgresses(1 until 6 by 2) ++
+  new constellation.channel.WithFatTreeChannels(1) ++
+  new constellation.topology.WithBidirectionalTreeTopology(3, 2))
 
 class TLTestConfig00 extends Config(
   new WithTLNoCTesterParams(TLNoCTesterParams(Seq(0), Seq(1))) ++

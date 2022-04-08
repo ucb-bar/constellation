@@ -2,9 +2,12 @@ package constellation.channel
 
 import freechips.rocketchip.config.{Field, Parameters, Config}
 import constellation.{NoCKey}
+import constellation.topology.BidirectionalTree
+
+import scala.math.{floor, log10, pow, max}
 
 class WithUniformChannels(f: UserChannelParams => UserChannelParams) extends Config((site, here, up) => {
-  case NoCKey => up(NoCKey, site).copy(channelParamGen = (src: Int, dst: Int) => { // TODO (ANIMESH) -> channelParamGen takes in a src/dst pair and emits the channel parameters for that pair. Use this + WithUniformChannelSrcMultiplier to figure out how to make it fat
+  case NoCKey => up(NoCKey, site).copy(channelParamGen = (src: Int, dst: Int) => {
     f(up(NoCKey, site).channelParamGen(src, dst))
   })
 })
@@ -39,6 +42,19 @@ class WithUniformChannelDestMultiplier(mult: Int) extends WithUniformChannels(p 
   p.copy(destMultiplier = mult)
 })
 
+
+/* the channels from leaf -> parent use mult, with channel width doubling at each level increase */
+class WithFatTreeChannels(mult: Int) extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(channelParamGen = (src: Int, dst: Int) => {
+    def f(p: UserChannelParams) = {
+      val height = up(NoCKey, site).topology.asInstanceOf[BidirectionalTree].height
+      val dAry = up(NoCKey, site).topology.asInstanceOf[BidirectionalTree].dAry
+      def level(id: Int) = floor(log10(id + 1) / log10(dAry))
+      p.copy(srcMultiplier = pow(2, height - max(level(src), level(dst))).toInt)
+    }
+    f(up(NoCKey, site).channelParamGen(src, dst))
+  })
+})
 
 class WithIngressVNets(f: Int => Int) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(ingresses = up(NoCKey, site).ingresses.zipWithIndex.map { case (u,i) =>

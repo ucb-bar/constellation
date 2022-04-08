@@ -56,18 +56,16 @@ class Butterfly(kAry: Int, nFly: Int) extends PhysicalTopology(pow(kAry, nFly-1)
   val plotter = new ButterflyPlotter(kAry, nFly)
 }
 
-/** An n-node tree topology. Nodes populate the tree top-down; the leaf layer will not be fully
+/** An dary**height-node tree topology. Nodes populate the tree top-down; the leaf layer will not be fully
   * populated if n is not a power of dAry.
   */
-class BidirectionalTree(nNodes: Int, dAry: Int = 2) extends PhysicalTopology(nNodes) { // TODO (ANIMESH): input params should be (height of tree, arity) not (nNodes, arity)
+class BidirectionalTree(val height: Int, val dAry: Int = 2) extends PhysicalTopology(((dAry * pow(dAry, height) - 1) / (dAry - 1)).toInt) {
   require(dAry > 1)
-  val height = floor(log10(nNodes) / log10(dAry)).toInt
 
   /** Given the node id, returns the level of the tree the node is placed in. Levels are 0-indexed. */
   def level(id: Int) = height - floor(log10(id + 1) / log10(dAry))
 
   def topo(src: Int, dest: Int) = {
-    // println(s"TOPO: ${src} ${dest} ${(level(src) != level(dest)) && (src == floor((dest - 1) / dAry) || (src >= (dAry * dest + 1) && src <= (dAry * dest + dAry)))}")
     (level(src) != level(dest)) && (src == floor((dest - 1) / dAry) || (src >= (dAry * dest + 1) && src <= (dAry * dest + dAry)))
   }
 
