@@ -1,6 +1,6 @@
 package constellation.topology
 
-import scala.math.{pow, cos, sin, Pi, atan2}
+import scala.math.{pow, cos, sin, Pi, atan2, floor}
 
 class LinePlotter extends PhysicalTopologyPlotter {
   def node(n: Double) = (n, 0)
@@ -88,3 +88,50 @@ class TerminalPlanePlotter(base: PhysicalTopologyPlotter, baseNodes: Int) extend
     base.egress(t, nT, n - 2 * baseNodes)
   }
 }
+
+class TreePlotter(val height: Int, val dAry: Int) extends PhysicalTopologyPlotter {
+  val nNodes = ((dAry * pow(dAry, height) - 1) / (dAry - 1)).toInt
+  def isLeaf(node: Double) = (node >= (nNodes - 1 - (pow(dAry, height) - 1))) && (node <= nNodes - 1)
+
+  /* Returns the total number of nodes under NODE in the tree */
+  def nodesUnder(node: Double): Double = {
+    if (isLeaf(node)) { 0 } else { dAry * (nodesUnder(dAry * node + 1)) }
+  }
+
+  /* Returns true if CHILD is on the left of parent. */
+  def toLeft(child: Double, parent: Double): Boolean = {
+    (dAry * parent + floor(dAry / 2)) >= child
+  }
+
+  /* Given a child node id, returns the parent node's id. */
+  def parent(node: Double): Option[Double] = {
+    if (node == 0) { None } else { Some( floor((node - 1) / dAry)) }
+  }
+
+  def node(nodeId: Double) = {
+    parent(nodeId) match {
+      case None =>
+        (0, 0)
+      case Some(p) =>
+        val parentCoords = node(p)
+        if (toLeft(nodeId, p)) {
+          // tree is skewed because using nodeId directly -- nodeID will keep increasing (want to use something like pos_under_parent)
+          (parentCoords._1 - (dAry - nodeId) * (nodesUnder(nodeId) + 1), parentCoords._2 - 1)
+        } else {
+          (parentCoords._1 + nodeId * (nodesUnder(nodeId) + 1), parentCoords._2 - 1)
+        }
+    }
+  }
+
+  def ingress(iId: Double, nI: Double, nodeId: Double) = {
+    val nodeCoords = node(nodeId)
+    (nodeCoords._1 - 0.5 * (iId + 1), nodeCoords._2)
+  }
+
+  def egress (eId: Double, nE: Double, nodeId: Double) = {
+    val nodeCoords = node(nodeId)
+    (nodeCoords._1 + 0.5 * (eId + 1), nodeCoords._2)
+  }
+}
+
+

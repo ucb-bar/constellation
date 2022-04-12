@@ -69,7 +69,7 @@ class BidirectionalTree(val height: Int, val dAry: Int = 2) extends PhysicalTopo
     (level(src) != level(dest)) && (src == floor((dest - 1) / dAry) || (src >= (dAry * dest + 1) && src <= (dAry * dest + dAry)))
   }
 
-  val plotter = new Mesh2DPlotter(nNodes, nNodes) // TODO (ANIMESH): create tree plotter
+  val plotter = new TreePlotter(height, dAry)
 }
 
 /** A 2D mesh network with nX * nY nodes. Bidirectional channels exist between nodes that are a
