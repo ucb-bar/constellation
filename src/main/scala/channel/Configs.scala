@@ -46,13 +46,13 @@ class WithUniformChannelDestMultiplier(mult: Int) extends WithUniformChannels(p 
 /* the channels from leaf -> parent use mult, with channel width doubling at each level increase */
 class WithFatTreeChannels(mult: Int) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(channelParamGen = (src: Int, dst: Int) => {
-    def f(p: UserChannelParams) = {
+    val p = up(NoCKey, site).channelParamGen(src, dst)
       val height = up(NoCKey, site).topology.asInstanceOf[BidirectionalTree].height
       val dAry = up(NoCKey, site).topology.asInstanceOf[BidirectionalTree].dAry
       def level(id: Int) = floor(log10(id + 1) / log10(dAry))
-      p.copy(srcMultiplier = pow(2, height - max(level(src), level(dst))).toInt)
-    }
-    f(up(NoCKey, site).channelParamGen(src, dst))
+      val multiplier = pow(2, height - max(level(src), level(dst))).toInt
+      p.copy(srcMultiplier = multiplier,
+             destMultiplier = multiplier)
   })
 })
 
