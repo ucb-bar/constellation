@@ -461,7 +461,7 @@ class TestConfig63 extends Config(
   new constellation.channel.WithUniformNVirtualChannels(1, UserVirtualChannelParams(1)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithIngresses(0 until 15) ++
-  new constellation.channel.WithEgresses(1 until 15) ++
+  new constellation.channel.WithEgresses(0 until 15) ++
   new constellation.channel.WithFatTreeChannels(1) ++
   new constellation.topology.WithBidirectionalTreeTopology(4, 2))
 

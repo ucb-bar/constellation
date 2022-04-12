@@ -65,8 +65,24 @@ class BidirectionalTree(val height: Int, val dAry: Int = 2) extends PhysicalTopo
   /** Given the node id, returns the level of the tree the node is placed in. Levels are 0-indexed. */
   def level(id: Int) = height - floor(log10(id + 1) / log10(dAry))
 
+  /** Given a src and dst ID, return true if dst is reachable from src. */
+  def reachable(src: Int, dst: Int): Boolean = {
+    if (src == dst) {
+      true
+    } else if (src > dst) {
+      false
+    } else {
+      List.range(1, dAry + 1).map((c: Int) => reachable(src * dAry + c, dst)).foldLeft(false)((a: Boolean, b: Boolean) => a || b)
+    }
+  }
+
   def topo(src: Int, dest: Int) = {
-    (level(src) != level(dest)) && (src == floor((dest - 1) / dAry) || (src >= (dAry * dest + 1) && src <= (dAry * dest + dAry)))
+    // reachable(src, dest) || reachable(dest, src)
+    val dstChildOfSrc = List.range(1, dAry + 1).map((c: Int) => src * dAry + c).contains(dest)
+    val srcChildOfDst = List.range(1, dAry + 1).map((c: Int) => dest * dAry + c).contains(src)
+
+    srcChildOfDst || dstChildOfSrc
+    // (level(src) != level(dest)) && (src == floor((dest - 1) / dAry) || (src >= (dAry * dest + 1) && src <= (dAry * dest + dAry)))
   }
 
   val plotter = new TreePlotter(height, dAry)
