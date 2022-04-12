@@ -450,19 +450,20 @@ class TestConfig61 extends Config(
   new constellation.topology.WithBidirectionalTreeTopology(3, 2))
 
 class TestConfig62 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 6 by 2) ++
-  new constellation.channel.WithEgresses(1 until 6 by 2) ++
-  new constellation.topology.WithBidirectionalTreeTopology(3, 2))
-
-class TestConfig63 extends Config(
   new constellation.channel.WithUniformNVirtualChannels(1, UserVirtualChannelParams(1)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithIngresses(0 until 6 by 2) ++
   new constellation.channel.WithEgresses(1 until 6 by 2) ++
   new constellation.channel.WithFatTreeChannels(1) ++
   new constellation.topology.WithBidirectionalTreeTopology(3, 2))
+
+class TestConfig63 extends Config(
+  new constellation.channel.WithUniformNVirtualChannels(1, UserVirtualChannelParams(1)) ++
+  new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngresses(0 until 15) ++
+  new constellation.channel.WithEgresses(1 until 15) ++
+  new constellation.channel.WithFatTreeChannels(1) ++
+  new constellation.topology.WithBidirectionalTreeTopology(4, 2))
 
 // test configs for TL network
 class TLTestConfig00 extends Config(

@@ -95,7 +95,7 @@ class TreePlotter(val height: Int, val dAry: Int) extends PhysicalTopologyPlotte
 
   /* Returns the total number of nodes under NODE in the tree */
   def nodesUnder(node: Double): Double = {
-    if (isLeaf(node)) { 0 } else { dAry * (nodesUnder(dAry * node + 1)) }
+    if (isLeaf(node)) { 0 } else { dAry * (nodesUnder(dAry * node + 1)) + dAry }
   }
 
   /* Returns true if CHILD is on the left of parent. */
@@ -114,23 +114,25 @@ class TreePlotter(val height: Int, val dAry: Int) extends PhysicalTopologyPlotte
         (0, 0)
       case Some(p) =>
         val parentCoords = node(p)
-        if (toLeft(nodeId, p)) {
-          // tree is skewed because using nodeId directly -- nodeID will keep increasing (want to use something like pos_under_parent)
-          (parentCoords._1 - (dAry - nodeId) * (nodesUnder(nodeId) + 1), parentCoords._2 - 1)
-        } else {
-          (parentCoords._1 + nodeId * (nodesUnder(nodeId) + 1), parentCoords._2 - 1)
-        }
+        val childIndex = nodeId - (dAry * p + 1)
+        val rowLength = (nodesUnder(p) + nodesUnder(p) % 2)
+        // take nodesUnderParent + nodesUnderParent % 2 space
+        // start point: parentCoords._1 - (nodesUnderParent + nodesUnderParent % 2) / 2
+        // rowLength * (childIndex / dAry)
+
+        // println(s"Node ${nodeId} Parent ${p}\n\t${childIndex} ${rowLength}\n\t${rowLength * (childIndex / dAry)}")
+        (parentCoords._1 - rowLength / 2 + rowLength * (childIndex / (dAry - 1)), parentCoords._2 - 1)
     }
   }
 
   def ingress(iId: Double, nI: Double, nodeId: Double) = {
     val nodeCoords = node(nodeId)
-    (nodeCoords._1 - 0.5 * (iId + 1), nodeCoords._2)
+    (nodeCoords._1 - (iId + 1), nodeCoords._2)
   }
 
   def egress (eId: Double, nE: Double, nodeId: Double) = {
     val nodeCoords = node(nodeId)
-    (nodeCoords._1 + 0.5 * (eId + 1), nodeCoords._2)
+    (nodeCoords._1 + (eId + 1), nodeCoords._2)
   }
 }
 
