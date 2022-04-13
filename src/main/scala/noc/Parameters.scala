@@ -31,22 +31,8 @@ case class NoCParams(
 )
 case object NoCKey extends Field[NoCParams](NoCParams())
 
-trait HasNoCParams {
-  implicit val p: Parameters
-  val nocParams = p(NoCKey)
 
-  val nNodes = nocParams.topology.nNodes
-  val nVirtualNetworks = nocParams.nVirtualNetworks
-  val nocName = nocParams.nocName
-  val skipValidationChecks = nocParams.skipValidationChecks
-  val hasCtrl = nocParams.hasCtrl
-
-  val nodeIdBits = log2Ceil(nNodes)
-  val vNetBits = log2Up(nocParams.nVirtualNetworks)
-  val nEgresses = nocParams.egresses.size
-  val egressIdBits = log2Up(nocParams.egresses.size)
-  val egressSrcIds = nocParams.egresses.map(_.srcId)
-}
+case object InternalNoCKey extends Field[InternalNoCParams]
 
 case class InternalNoCParams(
   userParams: NoCParams,
@@ -55,6 +41,23 @@ case class InternalNoCParams(
   egressParams: Seq[EgressChannelParams],
   routerParams: Seq[RouterParams]
 )
+
+trait HasNoCParams {
+  implicit val p: Parameters
+  val nocParams = p(InternalNoCKey)
+
+  val nNodes = nocParams.userParams.topology.nNodes
+  val nVirtualNetworks = nocParams.userParams.nVirtualNetworks
+  val nocName = nocParams.userParams.nocName
+  val hasCtrl = nocParams.userParams.hasCtrl
+
+  val nodeIdBits = log2Ceil(nNodes)
+  val vNetBits = log2Up(nocParams.userParams.nVirtualNetworks)
+  val nEgresses = nocParams.egressParams.size
+  val egressIdBits = log2Up(nEgresses)
+  val egressSrcIds = nocParams.egressParams.map(_.srcId)
+  val routingRelation = nocParams.userParams.routingRelation
+}
 
 object InternalNoCParams {
   def apply(nocParams: NoCParams): InternalNoCParams = {

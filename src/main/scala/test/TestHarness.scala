@@ -248,7 +248,7 @@ class TestHarness(implicit val p: Parameters) extends Module with HasRouterCtrlC
     }
   }
 
-  val noc_tester = Module(new NoCTester(lazyNoC.allIngressParams, lazyNoC.allEgressParams))
+  val noc_tester = Module(new NoCTester(lazyNoC.allIngressParams, lazyNoC.allEgressParams)(lazyNoC.iP))
   noc.io.ingress <> noc_tester.io.to_noc
   noc_tester.io.from_noc <> noc.io.egress
   io.success := noc_tester.io.success

@@ -29,7 +29,7 @@ case class RouterParams(
   user: UserRouterParams
 )
 
-trait HasRouterOutputParams extends HasNoCParams {
+trait HasRouterOutputParams {
   def outParams: Seq[ChannelParams]
   def egressParams: Seq[EgressChannelParams]
 
@@ -40,7 +40,7 @@ trait HasRouterOutputParams extends HasNoCParams {
   def nAllOutputs = allOutParams.size
 }
 
-trait HasRouterInputParams extends HasNoCParams {
+trait HasRouterInputParams {
   def inParams: Seq[ChannelParams]
   def ingressParams: Seq[IngressChannelParams]
 
@@ -68,7 +68,7 @@ class Router(
   val outParams: Seq[ChannelParams],
   val ingressParams: Seq[IngressChannelParams],
   val egressParams: Seq[EgressChannelParams]
-)(implicit p: Parameters) extends LazyModule with HasRouterParams {
+)(implicit p: Parameters) extends LazyModule with HasRouterParams with HasNoCParams {
   allOutParams.foreach(u => require(u.srcId == nodeId && u.payloadBits == routerParams.user.payloadBits))
   allInParams.foreach(u => require(u.destId == nodeId && u.payloadBits == routerParams.user.payloadBits))
 

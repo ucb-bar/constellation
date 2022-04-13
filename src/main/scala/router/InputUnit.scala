@@ -9,6 +9,7 @@ import freechips.rocketchip.util._
 import constellation.channel._
 import constellation.routing.{PacketRoutingBundle}
 import constellation.util.{GrantHoldArbiter, WrapInc, ArbiterPolicy}
+import constellation.noc.{HasNoCParams}
 
 class AbstractInputUnitIO(
   val cParam: BaseChannelParams,
@@ -40,7 +41,7 @@ abstract class AbstractInputUnit(
   val cParam: BaseChannelParams,
   val outParams: Seq[ChannelParams],
   val egressParams: Seq[EgressChannelParams]
-)(implicit val p: Parameters) extends Module with HasRouterOutputParams with HasChannelParams {
+)(implicit val p: Parameters) extends Module with HasRouterOutputParams with HasChannelParams with HasNoCParams {
   val nodeId = cParam.destId
 
   def io: AbstractInputUnitIO
@@ -51,7 +52,7 @@ abstract class AbstractInputUnit(
         (0 until oP.nVirtualChannels).map { oV =>
           var allow = false
           virtualChannelParams(srcV).possiblePackets.foreach { pI =>
-            allow = allow || nocParams.routingRelation(
+            allow = allow || routingRelation(
               nodeId,
               cParam.channelRoutingInfos(srcV),
               oP.channelRoutingInfos(oV),

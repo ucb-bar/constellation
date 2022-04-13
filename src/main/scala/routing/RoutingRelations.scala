@@ -166,7 +166,7 @@ object RoutingRelation {
     })
   }
 
-  def bidirectionalTree(nNodes: Int, dAry: Int) = {
+  def bidirectionalTree(dAry: Int) = {
 
     /** Returns a boolean indicating whether src is an ancestor node of dst */
     def isAncestor(src: Int, dst: Int): Boolean = {

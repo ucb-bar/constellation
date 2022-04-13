@@ -56,10 +56,10 @@ class Butterfly(kAry: Int, nFly: Int) extends PhysicalTopology(pow(kAry, nFly-1)
   val plotter = new ButterflyPlotter(kAry, nFly)
 }
 
-/** An dary**height-node tree topology. Nodes populate the tree top-down; the leaf layer will not be fully
-  * populated if n is not a power of dAry.
+/** An dary**height tree topology.
   */
-class BidirectionalTree(val height: Int, val dAry: Int = 2) extends PhysicalTopology(((dAry * pow(dAry, height) - 1) / (dAry - 1)).toInt) {
+class BidirectionalTree(val height: Int, val dAry: Int = 2)
+  extends PhysicalTopology(((dAry * pow(dAry, height) - 1) / (dAry - 1)).toInt) {
   require(dAry > 1)
 
   def topo(src: Int, dest: Int) = {
