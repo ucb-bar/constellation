@@ -1,6 +1,6 @@
 package constellation.topology
 
-import scala.math.{pow, cos, sin, Pi, atan2}
+import scala.math.{pow, cos, sin, Pi, atan2, floor}
 
 class LinePlotter extends PhysicalTopologyPlotter {
   def node(n: Double) = (n, 0)
@@ -47,6 +47,44 @@ class Mesh2DPlotter(nX: Int, nY: Int) extends PhysicalTopologyPlotter {
     (cos(rad) * 0.4 + n.toInt % nX, sin(rad) * 0.4 + n.toInt / nX)
   }
 }
+
+class TreePlotter(val height: Int, val dAry: Int) extends PhysicalTopologyPlotter {
+  val nNodes = ((dAry * pow(dAry, height) - 1) / (dAry - 1)).toInt
+  def isLeaf(node: Double) = (node >= (nNodes - 1 - (pow(dAry, height) - 1))) && (node <= nNodes - 1)
+
+  /* Returns the total number of nodes under NODE in the tree */
+  def nodesUnder(node: Double): Double = {
+    if (isLeaf(node)) { 0 } else { dAry * (nodesUnder(dAry * node + 1)) + dAry }
+  }
+
+  /* Given a child node id, returns the parent node's id. */
+  def parent(node: Double): Option[Double] = {
+    if (node == 0) { None } else { Some( floor((node - 1) / dAry)) }
+  }
+
+  def node(nodeId: Double) = {
+    parent(nodeId) match {
+      case None =>
+        (0, 0)
+      case Some(p) =>
+        val parentCoords = node(p)
+        val childIndex = nodeId - (dAry * p + 1)
+        val rowLength = (nodesUnder(p) + nodesUnder(p) % 2)
+        (parentCoords._1 - rowLength / 2 + rowLength * (childIndex / (dAry - 1)), parentCoords._2 - 1)
+    }
+  }
+
+  def ingress(iId: Double, nI: Double, nodeId: Double) = {
+    val nodeCoords = node(nodeId)
+    (nodeCoords._1 - (iId + 1), nodeCoords._2)
+  }
+
+  def egress (eId: Double, nE: Double, nodeId: Double) = {
+    val nodeCoords = node(nodeId)
+    (nodeCoords._1 + (eId + 1), nodeCoords._2)
+  }
+}
+
 
 class TerminalPlanePlotter(base: PhysicalTopologyPlotter, baseNodes: Int) extends PhysicalTopologyPlotter {
   def node(n: Double) = {

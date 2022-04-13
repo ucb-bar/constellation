@@ -60,6 +60,16 @@ class WithButterflyTopology(
   }
 })
 
+class WithBidirectionalTreeTopology(
+  height: Int = 3,
+  dAry: Int = 2,
+) extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(
+    topology = new BidirectionalTree(height, dAry),
+    routingRelation = RoutingRelation.bidirectionalTree(dAry),
+  )
+})
+
 class WithMesh2DTopology(
   nX: Int = 3,
   nY: Int = 3,

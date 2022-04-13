@@ -8,7 +8,7 @@ import freechips.rocketchip.diplomacy.{ClockCrossingType, NoCrossing}
 import constellation.routing.{ChannelRoutingInfo, PacketRoutingInfo}
 import constellation.noc.{HasNoCParams}
 
-trait HasChannelParams extends HasNoCParams {
+trait HasChannelParams {
   val cParam: BaseChannelParams
 
   val payloadBits = cParam.payloadBits

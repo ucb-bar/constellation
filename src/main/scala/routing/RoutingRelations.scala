@@ -166,6 +166,29 @@ object RoutingRelation {
     })
   }
 
+  def bidirectionalTree(dAry: Int) = {
+
+    /** Returns a boolean indicating whether src is an ancestor node of dst */
+    def isAncestor(src: Int, dst: Int): Boolean = {
+      if (src == dst) {
+        true
+      } else if (src > dst) {
+        false
+      } else {
+        ((dAry * src + 1) to (dAry * src + dAry)).foldLeft(false)((sofar, nextChild) => sofar || isAncestor(nextChild, dst))
+      }
+    }
+
+    new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
+      if (isAncestor(nodeId, pInfo.dst)) {
+        isAncestor(nxtC.dst, pInfo.dst) && (nxtC.dst >= nodeId)
+      } else {
+        isAncestor(nxtC.dst, nodeId)
+      }
+    })
+  }
+
+
 
   def mesh2DDimensionOrdered(firstDim: Int = 0)(nX: Int, nY: Int) = new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
     val (nxtX, nxtY)   = (nxtC.dst % nX , nxtC.dst / nX)

@@ -56,6 +56,22 @@ class Butterfly(kAry: Int, nFly: Int) extends PhysicalTopology(pow(kAry, nFly-1)
   val plotter = new ButterflyPlotter(kAry, nFly)
 }
 
+/** An dary**height tree topology.
+  */
+class BidirectionalTree(val height: Int, val dAry: Int = 2)
+  extends PhysicalTopology(((dAry * pow(dAry, height) - 1) / (dAry - 1)).toInt) {
+  require(dAry > 1)
+
+  def topo(src: Int, dest: Int) = {
+    val dstChildOfSrc = List.range(1, dAry + 1).map((c: Int) => src * dAry + c).contains(dest)
+    val srcChildOfDst = List.range(1, dAry + 1).map((c: Int) => dest * dAry + c).contains(src)
+
+    srcChildOfDst || dstChildOfSrc
+  }
+
+  val plotter = new TreePlotter(height, dAry)
+}
+
 /** A 2D mesh network with nX * nY nodes. Bidirectional channels exist between nodes that are a
  *  Manhattan distance of 1 away from each other. Node i can be thought of as being located
  *  at euclidean coordinate (i % nX, i / nX) where nX is as described below.
@@ -87,7 +103,7 @@ class UnidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology(nX * nY) 
   val plotter = new Mesh2DPlotter(nX, nY)
 }
 
-/** A 2D bidirectional torus network with nX * nY nodes. 
+/** A 2D bidirectional torus network with nX * nY nodes.
  *
  *  @param nX maximum x-coordinate of a node
  *  @param nY maximum y-coordinate of a node

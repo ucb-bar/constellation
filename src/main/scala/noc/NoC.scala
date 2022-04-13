@@ -22,14 +22,15 @@ class NoCTerminalIO(
 }
 
 class NoC(implicit p: Parameters) extends LazyModule {
+  val internalParams = InternalNoCParams(p(NoCKey))
+  val allChannelParams = internalParams.channelParams
+  val allIngressParams = internalParams.ingressParams
+  val allEgressParams = internalParams.egressParams
+  val allRouterParams = internalParams.routerParams
 
-  val validatedParams = InternalNoCParams(p(NoCKey))
-  val allChannelParams = validatedParams.channelParams
-  val allIngressParams = validatedParams.ingressParams
-  val allEgressParams = validatedParams.egressParams
-  val allRouterParams = validatedParams.routerParams
+  val iP = p.alterPartial({ case InternalNoCKey => internalParams })
 
-  val nocParams = p(NoCKey)
+  val nocParams = internalParams.userParams
 
   val nNodes = nocParams.topology.nNodes
   val nocName = nocParams.nocName
@@ -61,7 +62,7 @@ class NoC(implicit p: Parameters) extends LazyModule {
         outParams = outParams,
         ingressParams = ingressParams,
         egressParams = egressParams,
-      )))
+      )(iP)))
     }
   }}.flatten
 
@@ -77,19 +78,23 @@ class NoC(implicit p: Parameters) extends LazyModule {
       require (sourceNodes.size == destNodes.size)
       (sourceNodes zip destNodes).foreach { case (src, dst) =>
         val channelParam = allChannelParams.find(c => c.srcId == i && c.destId == j).get
-        router_sink_domains(j) { dst := channelParam.channelGen(p)(src) }
+        router_sink_domains(j) {
+          implicit val p: Parameters = iP
+          dst := channelParam.channelGen(p)(src)
+        }
       }
     }
   }}
 
-  routers.foreach { dst =>
+  routers.foreach { dst => {
+    implicit val p: Parameters = iP
     dst.ingressNodes.foreach(n =>
       n := ingressNodes(n.destParams.asInstanceOf[IngressChannelParams].ingressId)
     )
     dst.egressNodes.foreach(n =>
       egressNodes(n.sourceParams.asInstanceOf[EgressChannelParams].egressId) := n
     )
-  }
+  }}
 
   val debugNodes = routers.map { r =>
     val sink = BundleBridgeSink[DebugBundle]()
@@ -111,7 +116,7 @@ class NoC(implicit p: Parameters) extends LazyModule {
   println(s"Constellation: $nocName Finished parameter validation")
   lazy val module = new LazyModuleImp(this) {
     println(s"Constellation: $nocName Starting NoC RTL generation")
-    val io = IO(new NoCTerminalIO(allIngressParams, allEgressParams)(p) {
+    val io = IO(new NoCTerminalIO(allIngressParams, allEgressParams)(iP) {
       val router_clocks = Vec(nNodes, Input(new ClockBundle(ClockBundleParameters())))
       val router_ctrl = if (nocParams.hasCtrl) Vec(nNodes, new RouterCtrlBundle) else Nil
     })

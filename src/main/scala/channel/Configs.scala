@@ -2,6 +2,9 @@ package constellation.channel
 
 import freechips.rocketchip.config.{Field, Parameters, Config}
 import constellation.noc.{NoCKey}
+import constellation.topology.BidirectionalTree
+
+import scala.math.{floor, log10, pow, max}
 
 class WithUniformChannels(f: UserChannelParams => UserChannelParams) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(channelParamGen = (src: Int, dst: Int) => {
@@ -39,6 +42,19 @@ class WithUniformChannelDestMultiplier(mult: Int) extends WithUniformChannels(p 
   p.copy(destMultiplier = mult)
 })
 
+
+/* Sets the multiplier of branches to leaf nodes to MULT and doubles the multiplier at each increasing level. */
+class WithFatTreeChannels(mult: Int) extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(channelParamGen = (src: Int, dst: Int) => {
+    val p = up(NoCKey, site).channelParamGen(src, dst)
+      val height = up(NoCKey, site).topology.asInstanceOf[BidirectionalTree].height
+      val dAry = up(NoCKey, site).topology.asInstanceOf[BidirectionalTree].dAry
+      def level(id: Int) = floor(log10(id + 1) / log10(dAry))
+      val multiplier = pow(2, height - max(level(src), level(dst))).toInt
+      p.copy(srcMultiplier = multiplier,
+             destMultiplier = multiplier)
+  })
+})
 
 class WithIngressVNets(f: Int => Int) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(ingresses = up(NoCKey, site).ingresses.zipWithIndex.map { case (u,i) =>

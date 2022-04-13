@@ -9,6 +9,7 @@ import freechips.rocketchip.rocket.DecodeLogic
 
 import constellation.channel._
 import constellation.routing.{PacketRoutingBundle}
+import constellation.noc.{HasNoCParams}
 
 class RouteComputerReq(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   val src_virt_id = UInt(virtualChannelBits.W)
@@ -32,7 +33,7 @@ class RouteComputer(
   val outParams: Seq[ChannelParams],
   val ingressParams: Seq[IngressChannelParams],
   val egressParams: Seq[EgressChannelParams]
-)(implicit val p: Parameters) extends Module with HasRouterParams {
+)(implicit val p: Parameters) extends Module with HasRouterParams with HasNoCParams {
   val io = IO(new Bundle {
     val req = MixedVec(allInParams.map { u => Flipped(Decoupled(new RouteComputerReq(u))) })
     val resp = MixedVec(allInParams.map { u => Valid(new RouteComputerResp(u, outParams, egressParams)) })
@@ -51,7 +52,7 @@ class RouteComputer(
           (0 until outParams(o).nVirtualChannels).map { outVId =>
             val table = allInParams(i).possiblePackets.toSeq.distinct.map { pI =>
               allInParams(i).channelRoutingInfos.map { cI =>
-                val v = nocParams.routingRelation(
+                val v = routingRelation(
                   nodeId,
                   cI,
                   outParams(o).channelRoutingInfos(outVId),

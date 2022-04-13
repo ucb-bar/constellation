@@ -6,7 +6,9 @@ import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.config.{Parameters}
 import freechips.rocketchip.util._
 
-class NoCMonitor(val cParam: ChannelParams)(implicit val p: Parameters) extends Module with HasChannelParams {
+import constellation.noc.{HasNoCParams}
+
+class NoCMonitor(val cParam: ChannelParams)(implicit val p: Parameters) extends Module with HasChannelParams with HasNoCParams {
   val io = IO(new Bundle {
     val in = Input(new Channel(cParam))
   })

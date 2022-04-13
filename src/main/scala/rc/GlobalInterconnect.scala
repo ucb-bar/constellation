@@ -169,7 +169,7 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
       val ingressParams = noc.get.allIngressParams.drop(ingressOffset(bus)).take(nIngresses(bus))
       val egressParams  = noc.get.allEgressParams .drop( egressOffset(bus)).take( nEgresses(bus))
 
-      new NoCTerminalIO(ingressParams, egressParams)(nocP)}
+      new NoCTerminalIO(ingressParams, egressParams)(noc.get.iP)}
     )}
     val sink = BundleBridgeSink[NoCTerminalIO]()
     sink := source

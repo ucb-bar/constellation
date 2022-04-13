@@ -5,9 +5,9 @@ import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 import constellation.routing.{PacketRoutingBundle}
+import constellation.noc.{HasNoCParams}
 
-
-class IOFlit(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
+class IOFlit(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams with HasNoCParams {
   val head = Bool()
   val tail = Bool()
   val egress_id = UInt(egressIdBits.W)
