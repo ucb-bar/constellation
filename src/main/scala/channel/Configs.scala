@@ -43,7 +43,7 @@ class WithUniformChannelDestMultiplier(mult: Int) extends WithUniformChannels(p 
 })
 
 
-/* the channels from leaf -> parent use mult, with channel width doubling at each level increase */
+/* Sets the multiplier of branches to leaf nodes to MULT and doubles the multiplier at each increasing level. */
 class WithFatTreeChannels(mult: Int) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(channelParamGen = (src: Int, dst: Int) => {
     val p = up(NoCKey, site).channelParamGen(src, dst)
