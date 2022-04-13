@@ -1,6 +1,6 @@
 package constellation.routing
 
-import scala.math.{pow, min, max}
+import scala.math.pow
 import scala.collection.mutable.HashMap
 import freechips.rocketchip.config.{Parameters}
 
@@ -180,11 +180,11 @@ object RoutingRelation {
     }
 
     new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
-        if (isAncestor(nodeId, pInfo.dst)) {
-          isAncestor(nxtC.dst, pInfo.dst) && (nxtC.dst >= nodeId)
-        } else {
-          isAncestor(nxtC.dst, nodeId)
-        }
+      if (isAncestor(nodeId, pInfo.dst)) {
+        isAncestor(nxtC.dst, pInfo.dst) && (nxtC.dst >= nodeId)
+      } else {
+        isAncestor(nxtC.dst, nodeId)
+      }
     })
   }
 

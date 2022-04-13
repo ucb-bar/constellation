@@ -98,11 +98,6 @@ class TreePlotter(val height: Int, val dAry: Int) extends PhysicalTopologyPlotte
     if (isLeaf(node)) { 0 } else { dAry * (nodesUnder(dAry * node + 1)) + dAry }
   }
 
-  /* Returns true if CHILD is on the left of parent. */
-  def toLeft(child: Double, parent: Double): Boolean = {
-    (dAry * parent + floor(dAry / 2)) >= child
-  }
-
   /* Given a child node id, returns the parent node's id. */
   def parent(node: Double): Option[Double] = {
     if (node == 0) { None } else { Some( floor((node - 1) / dAry)) }
@@ -116,11 +111,6 @@ class TreePlotter(val height: Int, val dAry: Int) extends PhysicalTopologyPlotte
         val parentCoords = node(p)
         val childIndex = nodeId - (dAry * p + 1)
         val rowLength = (nodesUnder(p) + nodesUnder(p) % 2)
-        // take nodesUnderParent + nodesUnderParent % 2 space
-        // start point: parentCoords._1 - (nodesUnderParent + nodesUnderParent % 2) / 2
-        // rowLength * (childIndex / dAry)
-
-        // println(s"Node ${nodeId} Parent ${p}\n\t${childIndex} ${rowLength}\n\t${rowLength * (childIndex / dAry)}")
         (parentCoords._1 - rowLength / 2 + rowLength * (childIndex / (dAry - 1)), parentCoords._2 - 1)
     }
   }

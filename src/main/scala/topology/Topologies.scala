@@ -1,6 +1,6 @@
 package constellation.topology
 
-import scala.math.{pow, cos, sin, floor, log10, Pi}
+import scala.math.{pow, cos, sin, Pi}
 
 /** A network where sequential nodes are connected unidirectionally */
 class UnidirectionalLine(n: Int) extends PhysicalTopology(n) {
@@ -61,9 +61,6 @@ class Butterfly(kAry: Int, nFly: Int) extends PhysicalTopology(pow(kAry, nFly-1)
   */
 class BidirectionalTree(val height: Int, val dAry: Int = 2) extends PhysicalTopology(((dAry * pow(dAry, height) - 1) / (dAry - 1)).toInt) {
   require(dAry > 1)
-
-  /** Given the node id, returns the level of the tree the node is placed in. Levels are 0-indexed. */
-  def level(id: Int) = height - floor(log10(id + 1) / log10(dAry))
 
   def topo(src: Int, dest: Int) = {
     val dstChildOfSrc = List.range(1, dAry + 1).map((c: Int) => src * dAry + c).contains(dest)
