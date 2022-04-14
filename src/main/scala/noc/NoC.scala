@@ -17,8 +17,8 @@ import constellation.topology.{PhysicalTopology, UnidirectionalLine}
 class NoCTerminalIO(
   val ingressParams: Seq[IngressChannelParams],
   val egressParams: Seq[EgressChannelParams])(implicit val p: Parameters) extends Bundle {
-  val ingress = MixedVec(ingressParams.map { u => Flipped(new TerminalChannel(u)) })
-  val egress = MixedVec(egressParams.map { u => new TerminalChannel(u) })
+  val ingress = MixedVec(ingressParams.map { u => Flipped(new IngressChannel(u)) })
+  val egress = MixedVec(egressParams.map { u => new EgressChannel(u) })
 }
 
 class NoC(implicit p: Parameters) extends LazyModule {
@@ -66,8 +66,8 @@ class NoC(implicit p: Parameters) extends LazyModule {
     }
   }}.flatten
 
-  val ingressNodes = allIngressParams.map { u => TerminalChannelSourceNode(u) }
-  val egressNodes = allEgressParams.map { u => TerminalChannelDestNode(u) }
+  val ingressNodes = allIngressParams.map { u => IngressChannelSourceNode(u) }
+  val egressNodes = allEgressParams.map { u => EgressChannelDestNode(u) }
 
   Seq.tabulate(nNodes, nNodes) { case (i, j) => if (i != j) {
     val routerI = routers.find(_.nodeId == i)

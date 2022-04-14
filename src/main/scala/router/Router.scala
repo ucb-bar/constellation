@@ -74,8 +74,8 @@ class Router(
 
   val destNodes = inParams.map(u => ChannelDestNode(u))
   val sourceNodes = outParams.map(u => ChannelSourceNode(u))
-  val ingressNodes = ingressParams.map(u => TerminalChannelDestNode(u))
-  val egressNodes = egressParams.map(u => TerminalChannelSourceNode(u))
+  val ingressNodes = ingressParams.map(u => IngressChannelDestNode(u))
+  val egressNodes = egressParams.map(u => EgressChannelSourceNode(u))
 
   val debugNode = BundleBridgeSource(() => new DebugBundle(nAllInputs))
   val ctrlNode = if (hasCtrl) Some(BundleBridgeSource(() => new RouterCtrlBundle)) else None

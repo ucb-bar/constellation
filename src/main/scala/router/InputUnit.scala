@@ -113,11 +113,11 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
       val id = io.in.flit(i).bits.virt_channel_id
       assert(id < nVirtualChannels.U)
       assert(states(id).g === g_i)
-      val at_dest = atDest(io.in.flit(i).bits.egress_id)
+      val at_dest = atDest(io.in.flit(i).bits.flow.egress_id)
       states(id).g := Mux(at_dest, g_v, g_r)
       states(id).vc_sel.foreach(_.foreach(_ := false.B))
       for (o <- 0 until nEgress) {
-        when (egressParams(o).egressId.U === io.in.flit(i).bits.egress_id) {
+        when (egressParams(o).egressId.U === io.in.flit(i).bits.flow.egress_id) {
           states(id).vc_sel(o+nOutputs)(0) := true.B
         }
       }
@@ -169,8 +169,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     if (virtualChannelParams(idx).traversable) {
       i.valid := s.g === g_v
       i.bits.vc_sel := s.vc_sel
-      i.bits.ingress_id := s.flow.ingress
-      i.bits.egress_id := s.flow.egress
+      i.bits.flow := s.flow
       when (i.fire()) { s.g := g_v_stall }
       if (combineRCVA) {
         when (io.router_resp.valid && io.router_resp.bits.src_virt_id === idx.U) {

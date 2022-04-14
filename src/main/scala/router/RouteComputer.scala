@@ -59,20 +59,19 @@ class RouteComputer(
                   outParams(o).channelRoutingInfos(outVId),
                   pI
                 )
-                ((cI.vc, pI.ingressId, pI.egressId, pI.vNet), v)
+                ((cI.vc, pI.ingressId, pI.egressId), v)
               }
             }.flatten
             val trues = table.filter(_._2).map(_._1)
             val falses = table.filter(!_._2).map(_._1)
             val addr = (
               req.bits.src_virt_id,
-              flow.ingress,
-              flow.egress,
-              flow.vnet
+              flow.ingress_id,
+              flow.egress_id
             )
 
-            def eq(a: (Int, Int, Int, Int), b: (UInt, UInt, UInt, UInt)): Bool = {
-              a._1.U === b._1 && a._2.U === b._2 && a._3.U === b._3 && a._4.U === b._4
+            def eq(a: (Int, Int, Int), b: (UInt, UInt, UInt)): Bool = {
+              a._1.U === b._1 && a._2.U === b._2 && a._3.U === b._3
             }
 
             resp.bits.vc_sel(o)(outVId) := (if (falses.size == 0) {

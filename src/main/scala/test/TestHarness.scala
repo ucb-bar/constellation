@@ -51,7 +51,7 @@ class InputGen(idx: Int, cParams: IngressChannelParams)(implicit val p: Paramete
   val inputStallProbability = p(NoCTesterKey).inputStallProbability
   val flitIdBits = log2Ceil(maxFlits+1)
   val io = IO(new Bundle {
-    val out = Decoupled(new IOFlit(cParams))
+    val out = Decoupled(new IngressFlit(cParams))
     val rob_ready = Input(Bool())
     val rob_idx = Input(UInt())
     val tsc = Input(UInt(32.W))
@@ -71,7 +71,6 @@ class InputGen(idx: Int, cParams: IngressChannelParams)(implicit val p: Paramete
   io.out.valid := !random_delay && flits_left === 0.U && io.rob_ready
   io.out.bits.head := true.B
   io.out.bits.tail := packet_remaining === 0.U
-  io.out.bits.ingress_id := 0.U // set internally
   io.out.bits.egress_id := LFSR(20) % nEgresses.U
   val out_payload = Wire(new Payload)
   io.out.bits.payload := out_payload.asUInt
@@ -117,8 +116,8 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
   val flitIdBits = log2Ceil(maxFlits+1)
 
   val io = IO(new Bundle {
-    val to_noc = MixedVec(inputParams.map { u => new TerminalChannel(u) })
-    val from_noc = MixedVec(outputParams.map { u => Flipped(new TerminalChannel(u)) })
+    val to_noc = MixedVec(inputParams.map { u => new IngressChannel(u) })
+    val from_noc = MixedVec(outputParams.map { u => Flipped(new EgressChannel(u)) })
     val success = Output(Bool())
   })
 
@@ -195,8 +194,7 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
       assert(rob_valids(rob_idx), s"out[$i] unexpected response")
       assert(rob_payload(rob_idx).asUInt === o.flit.bits.payload.asUInt, s"out[$i] incorrect payload");
       assert(o.flit.bits.ingress_id === rob_ingress_id(rob_idx), s"out[$i] incorrect source")
-      assert(o.flit.bits.egress_id === i.U && o.flit.bits.egress_id === rob_egress_id(rob_idx),
-        s"out[$i] incorrect destination")
+      assert(i.U === rob_egress_id(rob_idx), s"out[$i] incorrect destination")
       assert(rob_flits_returned(rob_idx) < rob_n_flits(rob_idx), s"out[$i] too many flits returned")
       assert((!packet_valid && o.flit.bits.head) || rob_idx === packet_rob_idx)
 

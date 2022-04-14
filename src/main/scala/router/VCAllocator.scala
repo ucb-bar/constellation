@@ -9,13 +9,13 @@ import freechips.rocketchip.rocket.{DecodeLogic}
 
 import constellation.channel._
 import constellation.noc.{HasNoCParams}
+import constellation.routing.{FlowIdentifierBundle}
 
 class VCAllocReqPerInputVC(
   val outParams: Seq[ChannelParams],
   val egressParams: Seq[EgressChannelParams])
   (implicit val p: Parameters) extends Bundle with HasRouterOutputParams with HasNoCParams {
-  val ingress_id = UInt(ingressIdBits.W)
-  val egress_id = UInt(egressIdBits.W)
+  val flow = new FlowIdentifierBundle
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
 }
 
@@ -26,8 +26,7 @@ class VCAllocReq(
   val outParams: Seq[ChannelParams],
   val egressParams: Seq[EgressChannelParams])
   (implicit val p: Parameters) extends Bundle with HasRouterOutputParams with HasRouterInputParams with HasNoCParams {
-  val ingress_id = UInt(ingressIdBits.W)
-  val egress_id = UInt(egressIdBits.W)
+  val flow = new FlowIdentifierBundle
   val in_id = UInt(log2Ceil(allInParams.size).W)
   val in_virt_channel = UInt(log2Ceil(allInParams.map(_.nVirtualChannels).max).W)
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })

@@ -5,6 +5,7 @@ import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 import constellation.channel._
+import constellation.routing.{FlowIdentifierBundle}
 import constellation.noc.{HasNoCParams}
 
 class OutputCreditAlloc extends Bundle {
@@ -15,14 +16,12 @@ class OutputCreditAlloc extends Bundle {
 class OutputChannelStatus(implicit val p: Parameters) extends Bundle with HasNoCParams {
   val occupied = Bool()
   def available = !occupied
-  val ingress_id = UInt(ingressIdBits.W)
-  val egress_id = UInt(egressIdBits.W)
+  val flow = new FlowIdentifierBundle
 }
 
 class OutputChannelAlloc(implicit val p: Parameters) extends Bundle with HasNoCParams {
   val alloc = Bool()
-  val ingress_id = UInt(ingressIdBits.W)
-  val egress_id = UInt(egressIdBits.W)
+  val flow = new FlowIdentifierBundle
 }
 
 class AbstractOutputUnitIO(
@@ -60,15 +59,13 @@ class OutputUnit(inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannel
   class OutputState(val bufferSize: Int) extends Bundle {
     val occupied = Bool()
     val c = UInt(log2Up(1+bufferSize).W)
-    val ingress_id = UInt(ingressIdBits.W)
-    val egress_id = UInt(egressIdBits.W)
+    val flow = new FlowIdentifierBundle
   }
 
   val states = Reg(MixedVec(virtualChannelParams.map { u => new OutputState(u.bufferSize) }))
   (states zip io.channel_status).map { case (s,a) =>
     a.occupied := s.occupied
-    a.ingress_id := s.ingress_id
-    a.egress_id := s.egress_id
+    a.flow := s.flow
   }
   io.out.flit := io.in
 
@@ -84,8 +81,7 @@ class OutputUnit(inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannel
   (states zip io.allocs).zipWithIndex.map { case ((s,a),i) => if (virtualChannelParams(i).traversable) {
     when (a.alloc) {
       s.occupied := true.B
-      s.ingress_id := a.ingress_id
-      s.egress_id := a.egress_id
+      s.flow := a.flow
     }
   } }
 

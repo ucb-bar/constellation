@@ -18,19 +18,22 @@ class IngressUnit(
   (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, egressParams)(p) {
 
   val io = IO(new AbstractInputUnitIO(cParam, outParams, egressParams) {
-    val in = Flipped(Decoupled(new IOFlit(cParam)))
+    val in = Flipped(Decoupled(new IngressFlit(cParam)))
   })
 
-  val route_buffer = Module(new Queue(new IOFlit(cParam), 2))
+  val route_buffer = Module(new Queue(new Flit(cParam), 2))
   val route_q = Module(new Queue(new RouteComputerResp(cParam, outParams, egressParams), 2,
     flow=combineRCVA))
 
-  route_buffer.io.enq.bits := io.in.bits
-  route_buffer.io.enq.bits.ingress_id := cParam.ingressId.U
+  route_buffer.io.enq.bits.head := io.in.bits.head
+  route_buffer.io.enq.bits.tail := io.in.bits.tail
+  route_buffer.io.enq.bits.flow.ingress_id := cParam.ingressId.U
+  route_buffer.io.enq.bits.flow.egress_id := io.in.bits.egress_id
+  route_buffer.io.enq.bits.fifo_id := io.in.bits.fifo_id
+  route_buffer.io.enq.bits.payload := io.in.bits.payload
+  route_buffer.io.enq.bits.virt_channel_id := DontCare
   io.router_req.bits.src_virt_id := 0.U
-  io.router_req.bits.flow.vnet := cParam.vNetId.U
-  io.router_req.bits.flow.ingress := cParam.ingressId.U
-  io.router_req.bits.flow.egress := io.in.bits.egress_id
+  io.router_req.bits.flow := route_buffer.io.enq.bits.flow
 
   val at_dest = atDest(io.in.bits.egress_id)
   route_buffer.io.enq.valid := io.in.valid && (
@@ -53,15 +56,14 @@ class IngressUnit(
   }
   assert(!(route_q.io.enq.valid && !route_q.io.enq.ready))
 
-  val vcalloc_buffer = Module(new Queue(new IOFlit(cParam), 2))
+  val vcalloc_buffer = Module(new Queue(new Flit(cParam), 2))
   val vcalloc_q = Module(new Queue(new VCAllocResp(cParam, outParams, egressParams),
     1, pipe=true))
 
   vcalloc_buffer.io.enq.bits := route_buffer.io.deq.bits
 
   io.vcalloc_req(0).bits.vc_sel := route_q.io.deq.bits.vc_sel
-  io.vcalloc_req(0).bits.ingress_id := route_buffer.io.deq.bits.ingress_id
-  io.vcalloc_req(0).bits.egress_id := route_buffer.io.deq.bits.egress_id
+  io.vcalloc_req(0).bits.flow := route_buffer.io.deq.bits.flow
 
   val head = route_buffer.io.deq.bits.head
   val tail = route_buffer.io.deq.bits.tail
@@ -99,12 +101,7 @@ class IngressUnit(
   io.out(0) := out_bundle
 
   out_bundle.valid := vcalloc_buffer.io.deq.fire()
-  out_bundle.bits.flit.head := vcalloc_buffer.io.deq.bits.head
-  out_bundle.bits.flit.tail := vcalloc_buffer.io.deq.bits.tail
-  out_bundle.bits.flit.ingress_id := vcalloc_buffer.io.deq.bits.ingress_id
-  out_bundle.bits.flit.egress_id := vcalloc_buffer.io.deq.bits.egress_id
-  out_bundle.bits.flit.payload := vcalloc_buffer.io.deq.bits.payload
-  out_bundle.bits.flit.vnet_id := cParam.vNetId.U
+  out_bundle.bits.flit := vcalloc_buffer.io.deq.bits
   out_bundle.bits.flit.virt_channel_id := 0.U
   val out_channel_oh = vcalloc_q.io.deq.bits.vc_sel.map(_.reduce(_||_))
   out_bundle.bits.out_virt_channel := Mux1H(out_channel_oh, vcalloc_q.io.deq.bits.vc_sel.map(v => OHToUInt(v)))

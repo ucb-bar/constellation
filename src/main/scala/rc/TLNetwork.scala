@@ -10,7 +10,7 @@ import freechips.rocketchip.subsystem._
 import freechips.rocketchip.util._
 
 import constellation.noc.{NoC, NoCKey, NoCParams, NoCTerminalIO}
-import constellation.channel.{IOFlit, UserIngressParams, UserEgressParams, TerminalChannel, FlowParams}
+import constellation.channel._
 import constellation.topology.{TerminalPlaneTopology}
 
 case class TLNoCParams(
@@ -334,7 +334,7 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
     val actualPayloadWidth = payloadWidth + (if (debugPrintLatencies) 64 else 0)
 
     def splitToFlit(
-      i: DecoupledIO[Data], o: DecoupledIO[IOFlit],
+      i: DecoupledIO[Data], o: DecoupledIO[IngressFlit],
       first: Bool, last: Bool, egress: UInt, has_body: Bool, debug: UInt
     ) = {
       val is_body = RegInit(false.B)
@@ -346,14 +346,13 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
       o.bits.head := first && !is_body
       o.bits.tail := last && (is_body || !has_body)
       o.bits.egress_id := egress
-      o.bits.ingress_id := DontCare // set internally in noc
       o.bits.fifo_id := 0.U
       o.bits.payload := Mux(is_body, body, const) | debug << payloadWidth
 
       when (o.fire() && o.bits.head) { is_body := true.B }
       when (o.fire() && o.bits.tail) { is_body := false.B }
     }
-    def combineFromFlit(i: DecoupledIO[IOFlit], o: DecoupledIO[Data]) = {
+    def combineFromFlit(i: DecoupledIO[EgressFlit], o: DecoupledIO[Data]) = {
       val is_const = RegInit(true.B)
       val const = Reg(UInt(constWidth(o.bits).W))
 
@@ -444,15 +443,15 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
       n.io.router_clocks.foreach(_.reset := reset)
     }
 
-    val ingresses: Seq[TerminalChannel] = noc.map(_.io.ingress).getOrElse(globalSink.get.in(0)._1.ingress)
-    val egresses: Seq[TerminalChannel] = noc.map(_.io.egress).getOrElse(globalSink.get.in(0)._1.egress)
+    val ingresses: Seq[IngressChannel] = noc.map(_.io.ingress).getOrElse(globalSink.get.in(0)._1.ingress)
+    val egresses: Seq[EgressChannel] = noc.map(_.io.egress).getOrElse(globalSink.get.in(0)._1.egress)
 
     for (t <- ingresses) { require(t.payloadBits >= actualPayloadWidth) }
     for (t <-  egresses) { require(t.payloadBits >= actualPayloadWidth) }
 
     val tsc = RegInit(0.U(32.W))
     tsc := tsc + 1.U
-    def debugPrint(channel: String, term: TerminalChannel) = {
+    def debugPrint(channel: String, term: EgressChannel) = {
       when (term.flit.fire() && term.flit.bits.tail) {
         val payload = term.flit.bits.payload
         printf(s"TLNoC, $channel, %d, %d, %d\n",

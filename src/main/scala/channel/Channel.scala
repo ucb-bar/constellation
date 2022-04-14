@@ -16,7 +16,7 @@ trait HasChannelParams {
   val virtualChannelBits = log2Up(nVirtualChannels)
   def virtualChannelParams = cParam match {
     case c: ChannelParams         => c.virtualChannelParams
-    case c: TerminalChannelParams => require(false); Nil;
+    case _ => require(false); Nil;
   }
   def maxBufferSize = virtualChannelParams.map(_.bufferSize).max
 }
@@ -28,12 +28,12 @@ class Channel(val cParam: ChannelParams)(implicit val p: Parameters) extends Bun
   val vc_free = Input(UInt(nVirtualChannels.W))
 }
 
-class TerminalChannel(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
-  require(cParam match {
-    case c: TerminalChannelParams => true
-    case _ => false
-  })
-
-  val flit = Decoupled(new IOFlit(cParam))
+class IngressChannel(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
+  require(cParam.isInstanceOf[IngressChannelParams])
+  val flit = Decoupled(new IngressFlit(cParam))
 }
 
+class EgressChannel(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
+  require(cParam.isInstanceOf[EgressChannelParams])
+  val flit = Decoupled(new EgressFlit(cParam))
+}

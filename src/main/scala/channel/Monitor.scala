@@ -29,9 +29,9 @@ class NoCMonitor(val cParam: ChannelParams)(implicit val p: Parameters) extends 
     when (flit.valid && flit.bits.head) {
       cParam match {
         case n: ChannelParams => n.virtualChannelParams.zipWithIndex.foreach { case (v,i) =>
-          assert(flit.bits.virt_channel_id =/= i.U || v.possiblePackets.toSeq.map(_.isFlit(flit.bits)).orR)
+          assert(flit.bits.virt_channel_id =/= i.U || v.possiblePackets.toSeq.map(_.isFlow(flit.bits.flow)).orR)
         }
-        case _ => assert(cParam.possiblePackets.toSeq.map(_.isFlit(flit.bits)).orR)
+        case _ => assert(cParam.possiblePackets.toSeq.map(_.isFlow(flit.bits.flow)).orR)
       }
     }
   }

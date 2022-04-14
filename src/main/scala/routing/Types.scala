@@ -38,14 +38,13 @@ class ChannelRoutingBundle extends Bundle {
 case class PacketRoutingInfo(
   ingressId: Int, egressId: Int, vNet: Int, dst: Int
 ) {
-  def isFlit(f: Flit) = {
-    f.ingress_id === ingressId.U && f.egress_id === egressId.U && f.vnet_id === vNet.U
+  def isFlow(f: FlowIdentifierBundle) = {
+    f.ingress_id === ingressId.U && f.egress_id === egressId.U
   }
 }
 
 class FlowIdentifierBundle(implicit val p: Parameters) extends Bundle with HasNoCParams{
-  val ingress = UInt(ingressIdBits.W)
-  val egress = UInt(egressIdBits.W)
-  val vnet = UInt(vNetBits.W)
+  val ingress_id = UInt(ingressIdBits.W)
+  val egress_id = UInt(egressIdBits.W)
 }
 

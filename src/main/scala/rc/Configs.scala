@@ -10,7 +10,6 @@ import freechips.rocketchip.subsystem._
 import freechips.rocketchip.util._
 
 import constellation.noc.{NoCKey}
-import constellation.channel.{TerminalChannel}
 import scala.collection.immutable.{ListMap}
 
 // Use a noc based system bus. By default instantiates a private noc within the bus

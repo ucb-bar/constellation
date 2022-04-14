@@ -11,7 +11,7 @@ import freechips.rocketchip.util._
 import freechips.rocketchip.prci._
 
 import constellation.noc.{NoC, NoCTerminalIO, NoCParams, NoCKey}
-import constellation.channel.{TerminalChannel, UserIngressParams, UserEgressParams, FlowParams}
+import constellation.channel._
 import constellation.topology.{TerminalPlaneTopology}
 
 import scala.collection.immutable.{ListSet}
@@ -185,7 +185,7 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
       (noc.get.module.io.egress .drop( egressOffset(bus)).take(nEgresses (bus)) zip source.out(0)._1.egress)
         .map(t => {
           t._2 <> t._1
-          t._2.flit.bits.egress_id := t._1.flit.bits.egress_id - egressOffset(bus).U
+          t._2.flit.bits.ingress_id := t._1.flit.bits.ingress_id - ingressOffset(bus).U
         })
     } }
     sink
