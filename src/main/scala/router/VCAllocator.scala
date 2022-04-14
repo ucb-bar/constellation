@@ -8,13 +8,26 @@ import freechips.rocketchip.util._
 import freechips.rocketchip.rocket.{DecodeLogic}
 
 import constellation.channel._
+import constellation.noc.{HasNoCParams}
+
+class VCAllocReqPerInputVC(
+  val outParams: Seq[ChannelParams],
+  val egressParams: Seq[EgressChannelParams])
+  (implicit val p: Parameters) extends Bundle with HasRouterOutputParams with HasNoCParams {
+  val ingress_id = UInt(ingressIdBits.W)
+  val egress_id = UInt(egressIdBits.W)
+  val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
+}
+
 
 class VCAllocReq(
   val inParams: Seq[ChannelParams],
   val ingressParams: Seq[IngressChannelParams],
   val outParams: Seq[ChannelParams],
   val egressParams: Seq[EgressChannelParams])
-  (implicit val p: Parameters) extends Bundle with HasRouterOutputParams with HasRouterInputParams {
+  (implicit val p: Parameters) extends Bundle with HasRouterOutputParams with HasRouterInputParams with HasNoCParams {
+  val ingress_id = UInt(ingressIdBits.W)
+  val egress_id = UInt(egressIdBits.W)
   val in_id = UInt(log2Ceil(allInParams.size).W)
   val in_virt_channel = UInt(log2Ceil(allInParams.map(_.nVirtualChannels).max).W)
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
@@ -43,15 +56,15 @@ abstract class VCAllocator(val vP: VCAllocatorParams)(implicit val p: Parameters
 
   val io = IO(new Bundle {
     val req = MixedVec(allInParams.map { u =>
-      Flipped(Vec(u.nVirtualChannels, Decoupled(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) }))))
+      Flipped(Vec(u.nVirtualChannels, Decoupled(new VCAllocReqPerInputVC(outParams, egressParams))))
     })
     val resp = MixedVec(allInParams.map { u =>
       Valid(new VCAllocResp(u, outParams, egressParams)) })
 
-    val channel_available = MixedVec(allOutParams.map { u =>
-      Vec(u.nVirtualChannels, Input(Bool())) })
+    val channel_status = MixedVec(allOutParams.map { u =>
+      Vec(u.nVirtualChannels, Input(new OutputChannelStatus)) })
     val out_allocs = MixedVec(allOutParams.map { u =>
-      Vec(u.nVirtualChannels, Output(Bool())) })
+      Vec(u.nVirtualChannels, Output(new OutputChannelAlloc)) })
   })
   val nOutChannels = allOutParams.map(_.nVirtualChannels).sum
 

@@ -65,7 +65,9 @@ class SimpleVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) extends V
   }
   (per_input_qs zip io.req).zipWithIndex.map { case ((q,req),i) =>
     (q.io.in zip req).zipWithIndex.map { case ((l,r),v) =>
-      l.bits.vc_sel := r.bits
+      l.bits.vc_sel := r.bits.vc_sel
+      l.bits.ingress_id := r.bits.ingress_id
+      l.bits.egress_id := r.bits.egress_id
       l.bits.in_virt_channel := v.U
       l.bits.in_id := i.U
       l.valid := r.valid
@@ -89,10 +91,18 @@ class SimpleVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) extends V
 
         allocator.io.in(idx)(inId).valid := (r.valid &&
           r.bits.vc_sel(outId)(outVirtId) &&
-          io.channel_available(outId)(outVirtId)
+          io.channel_status(outId)(outVirtId).available
         )
       }
-      io.out_allocs(outId)(outVirtId) := allocator.io.in(idx).map(_.fire()).reduce(_||_)
+      io.out_allocs(outId)(outVirtId).alloc := allocator.io.in(idx).map(_.fire()).reduce(_||_)
+      io.out_allocs(outId)(outVirtId).ingress_id := Mux1H(
+        allocator.io.in(idx).map(_.fire()),
+        reqs.map(_.bits.ingress_id)
+      )
+      io.out_allocs(outId)(outVirtId).ingress_id := Mux1H(
+        allocator.io.in(idx).map(_.fire()),
+        reqs.map(_.bits.egress_id)
+      )
     }
   }
 

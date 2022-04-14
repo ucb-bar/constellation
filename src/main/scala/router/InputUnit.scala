@@ -7,7 +7,7 @@ import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
 import constellation.channel._
-import constellation.routing.{PacketRoutingBundle}
+import constellation.routing.{FlowIdentifierBundle}
 import constellation.util.{GrantHoldArbiter, WrapInc, ArbiterPolicy}
 import constellation.noc.{HasNoCParams}
 
@@ -22,7 +22,7 @@ class AbstractInputUnitIO(
   val router_req = Decoupled(new RouteComputerReq(cParam))
   val router_resp = Flipped(Valid(new RouteComputerResp(cParam, outParams, egressParams)))
 
-  val vcalloc_req = Vec(nVirtualChannels, Decoupled(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })))
+  val vcalloc_req = Vec(nVirtualChannels, Decoupled(new VCAllocReqPerInputVC(outParams, egressParams)))
   val vcalloc_resp = Flipped(Valid(new VCAllocResp(cParam, outParams, egressParams)))
 
   val out_credit_available = Input(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) }))
@@ -83,7 +83,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   class InputState extends Bundle {
     val g = UInt(3.W)
     val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
-    val r = new PacketRoutingBundle
+    val flow = new FlowIdentifierBundle
     val tail_seen = Bool()
   }
   val qs = virtualChannelParams.map { vP => Module(new Queue(new Flit(cParam), vP.bufferSize)) }
@@ -121,13 +121,13 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
           states(id).vc_sel(o+nOutputs)(0) := true.B
         }
       }
-      states(id).r := io.in.flit(i).bits.route_info
+      states(id).flow := io.in.flit(i).bits.flow
       states(id).tail_seen := io.in.flit(i).bits.tail
       if (earlyRC) {
         val rreq = early_route_arbiter.io.in(i+1)
         when (!at_dest) {
           rreq.valid := true.B
-          rreq.bits.route_info := io.in.flit(i).bits.route_info
+          rreq.bits.flow := io.in.flit(i).bits.flow
           rreq.bits.src_virt_id := io.in.flit(i).bits.virt_channel_id
           states(id).g := Mux(rreq.ready, g_r_stall, g_r)
         }
@@ -143,7 +143,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   (route_arbiter.io.in zip states).zipWithIndex.map { case ((i,s),idx) =>
     if (virtualChannelParams(idx).traversable) {
       i.valid := s.g === g_r
-      i.bits.route_info := s.r
+      i.bits.flow := s.flow
       i.bits.src_virt_id := idx.U
       when (i.fire()) { s.g := g_r_stall }
     } else {
@@ -168,7 +168,9 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   (io.vcalloc_req zip states).zipWithIndex.map { case ((i,s),idx) =>
     if (virtualChannelParams(idx).traversable) {
       i.valid := s.g === g_v
-      i.bits := s.vc_sel
+      i.bits.vc_sel := s.vc_sel
+      i.bits.ingress_id := s.flow.ingress
+      i.bits.egress_id := s.flow.egress
       when (i.fire()) { s.g := g_v_stall }
       if (combineRCVA) {
         when (io.router_resp.valid && io.router_resp.bits.src_virt_id === idx.U) {

@@ -25,10 +25,14 @@ class NoCMonitor(val cParam: ChannelParams)(implicit val p: Parameters) extends 
         in_flight(flit.bits.virt_channel_id) := false.B
       }
     }
-    val possiblePackets = cParam.possiblePackets.map(p => Cat(p.egressId.U, p.vNet.U(vNetBits-1,0)))
+    val possiblePackets = cParam.possiblePackets
     when (flit.valid && flit.bits.head) {
-      assert (Cat(flit.bits.egress_id, flit.bits.vnet_id).isOneOf(possiblePackets.toSeq),
-        "Illegal packet found")
+      cParam match {
+        case n: ChannelParams => n.virtualChannelParams.zipWithIndex.foreach { case (v,i) =>
+          assert(flit.bits.virt_channel_id =/= i.U || v.possiblePackets.toSeq.map(_.isFlit(flit.bits)).orR)
+        }
+        case _ => assert(cParam.possiblePackets.toSeq.map(_.isFlit(flit.bits)).orR)
+      }
     }
   }
 }

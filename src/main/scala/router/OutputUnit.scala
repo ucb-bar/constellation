@@ -5,10 +5,24 @@ import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 import constellation.channel._
+import constellation.noc.{HasNoCParams}
 
 class OutputCreditAlloc extends Bundle {
   val alloc = Bool()
   val tail = Bool()
+}
+
+class OutputChannelStatus(implicit val p: Parameters) extends Bundle with HasNoCParams {
+  val occupied = Bool()
+  def available = !occupied
+  val ingress_id = UInt(ingressIdBits.W)
+  val egress_id = UInt(egressIdBits.W)
+}
+
+class OutputChannelAlloc(implicit val p: Parameters) extends Bundle with HasNoCParams {
+  val alloc = Bool()
+  val ingress_id = UInt(ingressIdBits.W)
+  val egress_id = UInt(egressIdBits.W)
 }
 
 class AbstractOutputUnitIO(
@@ -20,8 +34,8 @@ class AbstractOutputUnitIO(
 
   val in = Flipped(Vec(cParam.srcMultiplier, Valid(new Flit(cParam))))
   val credit_available = Output(Vec(nVirtualChannels, Bool()))
-  val channel_available = Output(Vec(nVirtualChannels, Bool()))
-  val allocs = Input(Vec(nVirtualChannels, Bool()))
+  val channel_status = Output(Vec(nVirtualChannels, new OutputChannelStatus))
+  val allocs = Input(Vec(nVirtualChannels, new OutputChannelAlloc))
   val credit_alloc = Input(Vec(nVirtualChannels, new OutputCreditAlloc))
 }
 
@@ -30,7 +44,7 @@ abstract class AbstractOutputUnit(
   val inParams: Seq[ChannelParams],
   val ingressParams: Seq[IngressChannelParams],
   val cParam: BaseChannelParams
-)(implicit val p: Parameters) extends Module with HasRouterInputParams with HasChannelParams {
+)(implicit val p: Parameters) extends Module with HasRouterInputParams with HasChannelParams with HasNoCParams {
   val nodeId = cParam.srcId
 
   def io: AbstractOutputUnitIO
@@ -43,28 +57,36 @@ class OutputUnit(inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannel
     val out = new Channel(cParam.asInstanceOf[ChannelParams])
   })
 
-  val g_i :: g_a :: g_c :: Nil = Enum(3)
-
   class OutputState(val bufferSize: Int) extends Bundle {
-    val g = UInt(2.W)
+    val occupied = Bool()
     val c = UInt(log2Up(1+bufferSize).W)
+    val ingress_id = UInt(ingressIdBits.W)
+    val egress_id = UInt(egressIdBits.W)
   }
 
   val states = Reg(MixedVec(virtualChannelParams.map { u => new OutputState(u.bufferSize) }))
-  (states zip io.channel_available).map { case (s,a) => a := s.g === g_i }
+  (states zip io.channel_status).map { case (s,a) =>
+    a.occupied := s.occupied
+    a.ingress_id := s.ingress_id
+    a.egress_id := s.egress_id
+  }
   io.out.flit := io.in
 
   states.zipWithIndex.map { case (s,i) => if (virtualChannelParams(i).traversable) {
     when (io.out.vc_free(i)) {
-      assert(s.g =/= g_i)
-      s.g := g_i
-      io.channel_available(i) := true.B
+      assert(s.occupied)
+      s.occupied := false.B
+      io.channel_status(i).occupied := false.B
     }
   } }
 
 
   (states zip io.allocs).zipWithIndex.map { case ((s,a),i) => if (virtualChannelParams(i).traversable) {
-    when (a) { s.g := g_a }
+    when (a.alloc) {
+      s.occupied := true.B
+      s.ingress_id := a.ingress_id
+      s.egress_id := a.egress_id
+    }
   } }
 
   (io.credit_available zip states).zipWithIndex.map { case ((c,s),i) =>
@@ -82,7 +104,7 @@ class OutputUnit(inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannel
 
 
   when (reset.asBool) {
-    states.foreach(_.g := g_i)
+    states.foreach(_.occupied := false.B)
     states.foreach(s => s.c := s.bufferSize.U)
   }
 }

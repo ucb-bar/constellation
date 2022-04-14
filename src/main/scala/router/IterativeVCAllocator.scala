@@ -23,7 +23,9 @@ class IterativeVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) extend
       r.ready := arb.io.in(t).ready
       arb.io.in(t).bits.in_id := i.U
       arb.io.in(t).bits.in_virt_channel := v.U
-      arb.io.in(t).bits.vc_sel := r.bits
+      arb.io.in(t).bits.vc_sel := r.bits.vc_sel
+      arb.io.in(t).bits.ingress_id := r.bits.ingress_id
+      arb.io.in(t).bits.egress_id := r.bits.egress_id
       t += 1
     }
   }
@@ -41,8 +43,10 @@ class IterativeVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) extend
       val idx = getIdx(outId, outVirtId)
       allocator.io.in(idx).valid := (arb.io.out(0).valid &&
         arb.io.out(0).bits.vc_sel(outId)(outVirtId) &&
-        io.channel_available(outId)(outVirtId))
-      io.out_allocs(outId)(outVirtId) := allocator.io.in(idx).fire()
+        io.channel_status(outId)(outVirtId).available)
+      io.out_allocs(outId)(outVirtId).alloc := allocator.io.in(idx).fire()
+      io.out_allocs(outId)(outVirtId).ingress_id := arb.io.out(0).bits.ingress_id
+      io.out_allocs(outId)(outVirtId).egress_id := arb.io.out(0).bits.egress_id
     }
   }
 

@@ -26,9 +26,11 @@ class IngressUnit(
     flow=combineRCVA))
 
   route_buffer.io.enq.bits := io.in.bits
+  route_buffer.io.enq.bits.ingress_id := cParam.ingressId.U
   io.router_req.bits.src_virt_id := 0.U
-  io.router_req.bits.route_info.vnet := cParam.vNetId.U
-  io.router_req.bits.route_info.egress := io.in.bits.egress_id
+  io.router_req.bits.flow.vnet := cParam.vNetId.U
+  io.router_req.bits.flow.ingress := cParam.ingressId.U
+  io.router_req.bits.flow.egress := io.in.bits.egress_id
 
   val at_dest = atDest(io.in.bits.egress_id)
   route_buffer.io.enq.valid := io.in.valid && (
@@ -57,7 +59,9 @@ class IngressUnit(
 
   vcalloc_buffer.io.enq.bits := route_buffer.io.deq.bits
 
-  io.vcalloc_req(0).bits := route_q.io.deq.bits.vc_sel
+  io.vcalloc_req(0).bits.vc_sel := route_q.io.deq.bits.vc_sel
+  io.vcalloc_req(0).bits.ingress_id := route_buffer.io.deq.bits.ingress_id
+  io.vcalloc_req(0).bits.egress_id := route_buffer.io.deq.bits.egress_id
 
   val head = route_buffer.io.deq.bits.head
   val tail = route_buffer.io.deq.bits.tail
@@ -97,6 +101,7 @@ class IngressUnit(
   out_bundle.valid := vcalloc_buffer.io.deq.fire()
   out_bundle.bits.flit.head := vcalloc_buffer.io.deq.bits.head
   out_bundle.bits.flit.tail := vcalloc_buffer.io.deq.bits.tail
+  out_bundle.bits.flit.ingress_id := vcalloc_buffer.io.deq.bits.ingress_id
   out_bundle.bits.flit.egress_id := vcalloc_buffer.io.deq.bits.egress_id
   out_bundle.bits.flit.payload := vcalloc_buffer.io.deq.bits.payload
   out_bundle.bits.flit.vnet_id := cParam.vNetId.U

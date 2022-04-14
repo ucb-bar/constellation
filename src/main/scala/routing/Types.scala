@@ -5,6 +5,7 @@ import chisel3.util._
 import freechips.rocketchip.config.{Parameters}
 
 import constellation.noc.{NoCKey, HasNoCParams}
+import constellation.channel.{Flit}
 
 /** A representation for 1 specific virtual channel in wormhole routing
  *
@@ -35,14 +36,16 @@ class ChannelRoutingBundle extends Bundle {
  * @param vNet virtual subnetwork identifier
  */
 case class PacketRoutingInfo(
-  egressId: Int, vNet: Int, dst: Int
-)
+  ingressId: Int, egressId: Int, vNet: Int, dst: Int
+) {
+  def isFlit(f: Flit) = {
+    f.ingress_id === ingressId.U && f.egress_id === egressId.U && f.vnet_id === vNet.U
+  }
+}
 
-class PacketRoutingBundle(implicit val p: Parameters) extends Bundle with HasNoCParams{
+class FlowIdentifierBundle(implicit val p: Parameters) extends Bundle with HasNoCParams{
+  val ingress = UInt(ingressIdBits.W)
   val egress = UInt(egressIdBits.W)
   val vnet = UInt(vNetBits.W)
-  def dst(possible: Set[PacketRoutingInfo]) = MuxLookup(egress, 0.U(nodeIdBits.W),
-    possible.toSeq.map(u => u.egressId.U -> egressSrcIds(u.egressId).U)
-  )(nodeIdBits-1,0)
 }
 

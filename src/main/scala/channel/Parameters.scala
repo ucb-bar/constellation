@@ -12,7 +12,9 @@ import constellation.noc.{HasNoCParams, NoCKey}
 case class FlowParams(
   ingressId: Int,
   egressId: Int,
-  vNetId: Int)
+  vNetId: Int,
+  fifo: Boolean
+)
 
 // User-facing params, for adjusting config options
 case class UserVirtualChannelParams(
@@ -146,7 +148,7 @@ object IngressChannelParams {
       uniqueId = uniqueId,
       destId = user.destId,
       possiblePackets = ourFlows.map(f =>
-        PacketRoutingInfo(f.egressId, user.vNetId, egresses(f.egressId).srcId)
+        PacketRoutingInfo(f.ingressId, f.egressId, user.vNetId, egresses(f.egressId).srcId)
       ).toSet,
       vNetId = user.vNetId,
       payloadBits = user.payloadBits
@@ -182,7 +184,7 @@ object EgressChannelParams {
       egressId = egressId,
       uniqueId = uniqueId,
       possiblePackets = ourFlows.map(f =>
-        PacketRoutingInfo(egressId, vNetIds.head, user.srcId)
+        PacketRoutingInfo(f.ingressId, egressId, vNetIds.head, user.srcId)
       ).toSet,
       srcId = user.srcId,
       payloadBits = user.payloadBits

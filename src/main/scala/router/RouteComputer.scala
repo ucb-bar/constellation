@@ -8,12 +8,12 @@ import freechips.rocketchip.util._
 import freechips.rocketchip.rocket.DecodeLogic
 
 import constellation.channel._
-import constellation.routing.{PacketRoutingBundle}
+import constellation.routing.{FlowIdentifierBundle}
 import constellation.noc.{HasNoCParams}
 
 class RouteComputerReq(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   val src_virt_id = UInt(virtualChannelBits.W)
-  val route_info = new PacketRoutingBundle
+  val flow = new FlowIdentifierBundle
 }
 
 class RouteComputerResp(val cParam: BaseChannelParams,
@@ -47,6 +47,7 @@ class RouteComputer(
       assert(!req.valid)
       resp.bits.vc_sel := DontCare
     } else {
+      val flow = req.bits.flow
       (0 until nAllOutputs).map { o =>
         if (o < nOutputs) {
           (0 until outParams(o).nVirtualChannels).map { outVId =>
@@ -58,19 +59,20 @@ class RouteComputer(
                   outParams(o).channelRoutingInfos(outVId),
                   pI
                 )
-                ((cI.vc, pI.vNet, pI.dst), v)
+                ((cI.vc, pI.ingressId, pI.egressId, pI.vNet), v)
               }
             }.flatten
             val trues = table.filter(_._2).map(_._1)
             val falses = table.filter(!_._2).map(_._1)
             val addr = (
               req.bits.src_virt_id,
-              req.bits.route_info.vnet,
-              req.bits.route_info.dst(allInParams(i).possiblePackets)
+              flow.ingress,
+              flow.egress,
+              flow.vnet
             )
 
-            def eq(a: (Int, Int, Int), b: (UInt, UInt, UInt)): Bool = {
-              a._1.U === b._1 && a._2.U === b._2 && a._3.U === b._3
+            def eq(a: (Int, Int, Int, Int), b: (UInt, UInt, UInt, UInt)): Bool = {
+              a._1.U === b._1 && a._2.U === b._2 && a._3.U === b._3 && a._4.U === b._4
             }
 
             resp.bits.vc_sel(o)(outVId) := (if (falses.size == 0) {

@@ -40,6 +40,12 @@ case class NoCTesterParams(
 
 case object NoCTesterKey extends Field[NoCTesterParams](NoCTesterParams())
 
+class Payload extends Bundle {
+  val tsc         = UInt(32.W)
+  val rob_idx     = UInt(16.W)
+  val flits_fired = UInt(16.W)
+}
+
 class InputGen(idx: Int, cParams: IngressChannelParams)(implicit val p: Parameters) extends Module with HasNoCParams {
   val maxFlits = p(NoCTesterKey).maxFlits
   val inputStallProbability = p(NoCTesterKey).inputStallProbability
@@ -48,14 +54,15 @@ class InputGen(idx: Int, cParams: IngressChannelParams)(implicit val p: Paramete
     val out = Decoupled(new IOFlit(cParams))
     val rob_ready = Input(Bool())
     val rob_idx = Input(UInt())
-    val tsc = Input(UInt(64.W))
+    val tsc = Input(UInt(32.W))
     val fire = Output(Bool())
     val n_flits = Output(UInt(flitIdBits.W))
   })
 
   val flits_left = RegInit(0.U(flitIdBits.W))
   val flits_fired = RegInit(0.U(flitIdBits.W))
-  val head_flit = Reg(new IOFlit(cParams))
+  val egress = Reg(UInt(log2Ceil(nEgresses).W))
+  val payload = Reg(new Payload)
 
   val can_fire = (flits_left === 0.U) && io.rob_ready
 
@@ -64,23 +71,32 @@ class InputGen(idx: Int, cParams: IngressChannelParams)(implicit val p: Paramete
   io.out.valid := !random_delay && flits_left === 0.U && io.rob_ready
   io.out.bits.head := true.B
   io.out.bits.tail := packet_remaining === 0.U
+  io.out.bits.ingress_id := 0.U // set internally
   io.out.bits.egress_id := LFSR(20) % nEgresses.U
-  io.out.bits.payload := (io.tsc << 16) | (io.rob_idx << 8)
+  val out_payload = Wire(new Payload)
+  io.out.bits.payload := out_payload.asUInt
+  out_payload.tsc := io.tsc
+  out_payload.rob_idx := io.rob_idx
+  out_payload.flits_fired := 0.U
+  io.out.bits.fifo_id := 0.U // DontCare
 
   io.n_flits := packet_remaining + 1.U
   io.fire := can_fire && io.out.fire()
 
   when (io.fire && !io.out.bits.tail) {
     flits_left := packet_remaining
-    head_flit := io.out.bits
+    payload := out_payload
+    egress := io.out.bits.egress_id
     flits_fired := 1.U
   }
   when (flits_left =/= 0.U) {
     io.out.valid := !random_delay
     io.out.bits.head := false.B
     io.out.bits.tail := flits_left === 1.U
-    io.out.bits.egress_id := head_flit.egress_id
-    io.out.bits.payload := head_flit.payload | flits_fired
+    io.out.bits.egress_id := egress
+    out_payload := payload
+    out_payload.flits_fired := flits_fired
+
     when (io.out.fire()) {
       flits_fired := flits_fired + 1.U
       flits_left := flits_left - 1.U
@@ -113,7 +129,8 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
   val flits = RegInit(0.U(32.W))
   dontTouch(flits)
 
-  val tsc = RegInit(0.U((payloadBits-16).W))
+
+  val tsc = RegInit(0.U(32.W))
   tsc := tsc + 1.U
 
   val idle_counter = RegInit(0.U(11.W))
@@ -122,15 +139,7 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
     .otherwise { idle_counter := 0.U }
   assert(!idle_counter(10))
 
-
-  class RobEntry extends Bundle {
-    val payload = UInt(payloadBits.W)
-    val egress_id = UInt(log2Ceil(nOutputs).W)
-    val n_flits = UInt(flitIdBits.W)
-    val flits_returned = UInt(flitIdBits.W)
-  }
-
-  val rob_payload = Reg(Vec(robSz, UInt(payloadBits.W)))
+  val rob_payload = Reg(Vec(robSz, new Payload))
   val rob_egress_id = Reg(Vec(robSz, UInt(log2Ceil(nOutputs).W)))
   val rob_ingress_id = Reg(Vec(robSz, UInt(log2Ceil(nInputs).W)))
   val rob_n_flits = Reg(Vec(robSz, UInt(flitIdBits.W)))
@@ -159,7 +168,7 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
     igen.io.tsc := tsc
     i.flit <> igen.io.out
     when (igen.io.fire) {
-      rob_payload        (rob_idx) := igen.io.out.bits.payload
+      rob_payload        (rob_idx) := igen.io.out.bits.payload.asTypeOf(new Payload)
       rob_egress_id      (rob_idx) := igen.io.out.bits.egress_id
       rob_ingress_id     (rob_idx) := idx.U
       rob_n_flits        (rob_idx) := igen.io.n_flits
@@ -172,30 +181,48 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
 
   val enable_print_latency = PlusArg("noctest_enable_print", default=0, width=1)(0)
 
+  val fifo_flows = p(NoCKey).flows.filter(_.fifo)
+
   io.from_noc.zipWithIndex map { case (o,i) =>
     o.flit.ready := LFSR(20) >= (outputStallProbability * (1 << 10)).toInt.U
-    val rob_idx = o.flit.bits.payload(15,8)
+    val out_payload = o.flit.bits.payload.asTypeOf(new Payload)
+    val rob_idx = out_payload.rob_idx
     val packet_valid = RegInit(false.B)
     val packet_rob_idx = Reg(UInt(log2Ceil(robSz).W))
 
     when (o.flit.fire()) {
 
       assert(rob_valids(rob_idx), s"out[$i] unexpected response")
-      assert(rob_payload(rob_idx) === o.flit.bits.payload, s"out[$i] incorrect payload");
-      assert(o.flit.bits.egress_id === i.U && o.flit.bits.egress_id === rob_egress_id(rob_idx), s"out[$i] incorrect destination")
+      assert(rob_payload(rob_idx).asUInt === o.flit.bits.payload.asUInt, s"out[$i] incorrect payload");
+      assert(o.flit.bits.ingress_id === rob_ingress_id(rob_idx), s"out[$i] incorrect source")
+      assert(o.flit.bits.egress_id === i.U && o.flit.bits.egress_id === rob_egress_id(rob_idx),
+        s"out[$i] incorrect destination")
       assert(rob_flits_returned(rob_idx) < rob_n_flits(rob_idx), s"out[$i] too many flits returned")
       assert((!packet_valid && o.flit.bits.head) || rob_idx === packet_rob_idx)
 
       when (o.flit.bits.head && enable_print_latency) {
-        printf(s"%d, $i, %d\n", rob_ingress_id(rob_idx), tsc - (o.flit.bits.payload >> 16))
+        printf(s"%d, $i, %d\n", rob_ingress_id(rob_idx), tsc - out_payload.tsc)
       }
 
       rob_flits_returned(rob_idx) := rob_flits_returned(rob_idx) + 1.U
-      rob_payload(rob_idx) := rob_payload(rob_idx) + 1.U
+      rob_payload(rob_idx).flits_fired := rob_payload(rob_idx).flits_fired + 1.U
       when (o.flit.bits.head) { packet_valid := true.B; packet_rob_idx := rob_idx }
       when (o.flit.bits.tail) { packet_valid := false.B }
     }
     rob_frees = rob_frees | ((o.flit.fire() && o.flit.bits.tail) << rob_idx)
+  }
+
+  for (f <- fifo_flows) {
+    val fifo_tracker = RegInit(0.U(32.W))
+    val out_fire = WireInit(false.B)
+    val out_tsc = WireInit(0.U(32.W))
+
+    val o = io.from_noc(f.egressId)
+    when (o.flit.fire() && o.flit.bits.head && o.flit.bits.ingress_id === f.ingressId.U) {
+      val payload_tsc = o.flit.bits.payload.asTypeOf(new Payload).tsc
+      assert(payload_tsc > fifo_tracker, s"Fifo constraint on flow $f violated")
+      fifo_tracker := payload_tsc
+    }
   }
 
   rob_valids := (rob_valids | rob_allocs) & ~rob_frees

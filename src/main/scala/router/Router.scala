@@ -143,8 +143,8 @@ class Router(
 
     (all_output_units zip vc_allocator.io.out_allocs).foreach {
       case (u,a) => u.io.allocs <> a }
-    (vc_allocator.io.channel_available zip all_output_units).foreach {
-      case (a,u) => a := u.io.channel_available }
+    (vc_allocator.io.channel_status zip all_output_units).foreach {
+      case (a,u) => a := u.io.channel_status }
 
     all_input_units.foreach(in => all_output_units.zipWithIndex.foreach { case (out,outIdx) =>
       in.io.out_credit_available(outIdx) := out.io.credit_available

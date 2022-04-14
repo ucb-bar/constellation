@@ -27,7 +27,8 @@ case class NoCParams(
   vNetBlocking: (Int, Int) => Boolean = (_: Int, _: Int) => true,
   nocName: String = "test",
   skipValidationChecks: Boolean = false,
-  hasCtrl: Boolean = false
+  hasCtrl: Boolean = false,
+  fifoIdBits: Int = 1
 )
 case object NoCKey extends Field[NoCParams](NoCParams())
 
@@ -54,9 +55,12 @@ trait HasNoCParams {
   val nodeIdBits = log2Ceil(nNodes)
   val vNetBits = log2Up(nocParams.userParams.nVirtualNetworks)
   val nEgresses = nocParams.egressParams.size
+  val nIngresses = nocParams.ingressParams.size
   val egressIdBits = log2Up(nEgresses)
+  val ingressIdBits = log2Up(nIngresses)
   val egressSrcIds = nocParams.egressParams.map(_.srcId)
   val routingRelation = nocParams.userParams.routingRelation
+  val fifoIdBits = nocParams.userParams.fifoIdBits
 }
 
 object InternalNoCParams {
@@ -96,6 +100,14 @@ object InternalNoCParams {
       require(f.vNetId < nocParams.nVirtualNetworks)
     })
 
+    for (i <- 0 until nocParams.ingresses.size) {
+      for (e <- 0 until nocParams.egresses.size) {
+        for (v <- 0 until nVirtualNetworks) {
+          require(nocParams.flows.filter(f => f.ingressId == i && f.egressId == e && f.vNetId == v).size <= 1)
+        }
+      }
+    }
+
     val ingressParams = nocParams.ingresses.zipWithIndex.map { case (u,i) => {
       require(u.destId < nNodes)
       IngressChannelParams(
@@ -116,6 +128,45 @@ object InternalNoCParams {
       )
     }}
 
+    // construct a new routing relation such that all FIFO flows have only one physical path
+    // (multiple virtual paths are acceptable)
+    // When multiple physical paths are possible in the base routingRel, pick one randomly
+    // NOTE: this selection policy may cause unroutable paths for some baseRoutingRel
+    val fifoRoutingRel = {
+      val baseRoutingRel = nocParams.routingRelation
+      val fifoFlows = nocParams.flows.filter(_.fifo)
+      val allowedPhysicalPaths = scala.collection.mutable.Map[PacketRoutingInfo, Seq[(Int, Int)]]()
+
+      fifoFlows.map { f =>
+        val pInfo = PacketRoutingInfo(f.ingressId, f.egressId, f.vNetId, egressParams(f.egressId).srcId)
+        val path = scala.collection.mutable.ListBuffer(ChannelRoutingInfo(
+          -1,
+          0,
+          ingressParams(f.ingressId).destId,
+          1
+        ))
+        // First, find a single physical path that terminates
+        while (path.last.dst != pInfo.dst) {
+          path += channelParams.filter(_.srcId == path.last.dst).map { nxtC =>
+            nxtC.channelRoutingInfos.map { cI =>
+              val can_transition = baseRoutingRel(
+                path.last.dst,
+                path.last,
+                cI,
+                pInfo
+              )
+              if (can_transition) Some(cI) else None
+            }.flatten
+          }.flatten.head
+        }
+        allowedPhysicalPaths(pInfo) = path.map { p => (p.src, p.dst) }
+      }
+      new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
+        val allowed = allowedPhysicalPaths(pInfo).contains((nxtC.src, nxtC.dst))
+        val base = baseRoutingRel(nodeId, srcC, nxtC, pInfo)
+        allowed && base
+      })
+    }
 
     // Check sanity of routingRelation, all inputs can route to all outputs
 
@@ -148,12 +199,8 @@ object InternalNoCParams {
 
             // This channel is the destination
             val atDest = head.dst == pInfo.dst
-            // In this call to checkConnectivity, a previously searched ingress point
-            // generated a packet that could route to its destination through head
-            // We don't have to search further along this path.
-            val prevFoundRoutable = tempPossiblePacketMap(head).contains(pInfo)
 
-            if (!atDest && !prevFoundRoutable) {
+            if (!atDest) {
               // Find all possible VCs a packet in head can route to
               val nexts = nextChannelParamMap(head.dst).map { nxtC =>
                 nxtC.channelRoutingInfos.map { cI =>
@@ -270,7 +317,9 @@ object InternalNoCParams {
         if (!traversable) {
           println(s"Constellation WARNING: $nocName virtual channel $vId from ${cP.srcId} to ${cP.destId} appears to be untraversable")
         }
-        vP.copy(possiblePackets=possiblePacketMap(cP.channelRoutingInfos(vId)))
+        vP.copy(
+          possiblePackets=possiblePacketMap(cP.channelRoutingInfos(vId))
+        )
       }
     )}.map(cP => {
       if (!cP.traversable)

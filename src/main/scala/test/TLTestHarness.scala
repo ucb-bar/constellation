@@ -32,8 +32,8 @@ class WithTLNoCTesterParams(p: TLNoCTesterParams) extends Config((site, here, up
 class TLNoCTester(implicit p: Parameters) extends LazyModule {
   val tParams = p(TLNoCTesterKey)
   val txns = tParams.txns
-  val inNodeMapping = ListMap(tParams.inNodeMapping.zipWithIndex.map { case (i,j) => s"_$j" -> i }:_*)
-  val outNodeMapping = ListMap(tParams.outNodeMapping.zipWithIndex.map { case (i,j) => s"_$j" -> i }:_*)
+  val inNodeMapping = ListMap(tParams.inNodeMapping.zipWithIndex.map { case (i,j) => s"[$j]" -> i }:_*)
+  val outNodeMapping = ListMap(tParams.outNodeMapping.zipWithIndex.map { case (i,j) => s"[$j]" -> (i, false) }:_*)
   val nodeMapping = ConstellationTLNetworkNodeMapping(
     inNodeMapping,
     outNodeMapping)
