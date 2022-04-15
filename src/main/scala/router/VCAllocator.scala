@@ -9,13 +9,13 @@ import freechips.rocketchip.rocket.{DecodeLogic}
 
 import constellation.channel._
 import constellation.noc.{HasNoCParams}
-import constellation.routing.{FlowIdentifierBundle}
+import constellation.routing.{FlowRoutingBundle, FlowRoutingInfo}
 
 class VCAllocReqPerInputVC(
   val outParams: Seq[ChannelParams],
   val egressParams: Seq[EgressChannelParams])
   (implicit val p: Parameters) extends Bundle with HasRouterOutputParams with HasNoCParams {
-  val flow = new FlowIdentifierBundle
+  val flow = new FlowRoutingBundle
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
 }
 
@@ -26,7 +26,7 @@ class VCAllocReq(
   val outParams: Seq[ChannelParams],
   val egressParams: Seq[EgressChannelParams])
   (implicit val p: Parameters) extends Bundle with HasRouterOutputParams with HasRouterInputParams with HasNoCParams {
-  val flow = new FlowIdentifierBundle
+  val flow = new FlowRoutingBundle
   val in_id = UInt(log2Ceil(allInParams.size).W)
   val in_virt_channel = UInt(log2Ceil(allInParams.map(_.nVirtualChannels).max).W)
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
@@ -45,7 +45,7 @@ case class VCAllocatorParams(
   egressParams: Seq[EgressChannelParams])
 
 abstract class VCAllocator(val vP: VCAllocatorParams)(implicit val p: Parameters) extends Module
-    with HasRouterParams {
+    with HasRouterParams with HasNoCParams {
 
   val routerParams = vP.routerParams
   val inParams = vP.inParams

@@ -465,16 +465,6 @@ class TestConfig63 extends Config(
   new constellation.channel.WithEgresses(0 until 16) ++
   new constellation.topology.WithMesh2DTopology(4, 4, RoutingRelation.mesh2DEscapeRouter))
 
-// Test FIFO support
-class TestConfig64 extends Config(
-  new constellation.channel.WithFifoEgresses(Seq(0)) ++
-  new constellation.channel.WithUniformNVirtualChannels(5, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(Seq(0)) ++
-  new constellation.channel.WithEgresses(Seq(1)) ++
-  new constellation.topology.WithUnidirectionalLineTopology(2))
-
-
 // test configs for TL network
 class TLTestConfig00 extends Config(
   new WithTLNoCTesterParams(TLNoCTesterParams(Seq(0), Seq(1))) ++

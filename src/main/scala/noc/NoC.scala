@@ -10,7 +10,7 @@ import freechips.rocketchip.util.ElaborationArtefacts
 import freechips.rocketchip.prci._
 import constellation.router._
 import constellation.channel._
-import constellation.routing.{RoutingRelation, PacketRoutingInfo, ChannelRoutingInfo}
+import constellation.routing.{RoutingRelation, ChannelRoutingInfo}
 import constellation.topology.{PhysicalTopology, UnidirectionalLine}
 
 
@@ -175,15 +175,15 @@ class NoC(implicit p: Parameters) extends LazyModule {
 
     val edgeProps = routers.map { r =>
       val outs = r.outParams.map { o =>
-        (Seq(s"${r.nodeId} ${o.destId}") ++ (if (o.possiblePackets.size == 0) Some("unused") else None))
+        (Seq(s"${r.nodeId} ${o.destId}") ++ (if (o.possibleFlows.size == 0) Some("unused") else None))
           .mkString(" ")
       }
       val egresses = r.egressParams.map { e =>
-        (Seq(s"${r.nodeId} e${e.egressId}") ++ (if (e.possiblePackets.size == 0) Some("unused") else None))
+        (Seq(s"${r.nodeId} e${e.egressId}") ++ (if (e.possibleFlows.size == 0) Some("unused") else None))
           .mkString(" ")
       }
       val ingresses = r.ingressParams.map { i =>
-        (Seq(s"i${i.ingressId} ${r.nodeId}") ++ (if (i.possiblePackets.size == 0) Some("unused") else None))
+        (Seq(s"i${i.ingressId} ${r.nodeId}") ++ (if (i.possibleFlows.size == 0) Some("unused") else None))
           .mkString(" ")
       }
       (outs ++ egresses ++ ingresses).mkString("\n")

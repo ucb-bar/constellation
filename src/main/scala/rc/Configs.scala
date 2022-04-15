@@ -57,7 +57,7 @@ class WithNbusNoC(in: Int, f: Int => Int) extends Config((site, here, up) => {
   case ConstellationTLNetworkNodeMappingKey(NBUS) => ConstellationTLNetworkNodeMapping(
     inNodeMapping = ListMap("" -> in), // the inwards should only have 1 connection
     outNodeMapping = ListMap(
-      (0 until site(GlobalTLInterconnectKey).nocParams.topology.nNodes).map { i => s"[$i]" -> (f(i), true) }:_*
+      (0 until site(GlobalTLInterconnectKey).nocParams.topology.nNodes).map { i => s"[$i]" -> f(i) }:_*
     )
   )
 })
@@ -69,9 +69,9 @@ class WithSbusNoCInNodeMapping(matchStr: String, node: Int) extends Config((site
     inNodeMapping = up(ConstellationTLNetworkNodeMappingKey(SBUS)).inNodeMapping + (matchStr -> node)
   )
 })
-class WithSbusNoCOutNodeMapping(matchStr: String, node: Int, fifo: Boolean = false) extends Config((site, here, up) => {
+class WithSbusNoCOutNodeMapping(matchStr: String, node: Int) extends Config((site, here, up) => {
   case ConstellationTLNetworkNodeMappingKey(SBUS) => up(ConstellationTLNetworkNodeMappingKey(SBUS)).copy(
-    outNodeMapping = up(ConstellationTLNetworkNodeMappingKey(SBUS)).outNodeMapping + (matchStr -> (node, fifo))
+    outNodeMapping = up(ConstellationTLNetworkNodeMappingKey(SBUS)).outNodeMapping + (matchStr -> node)
   )
 })
 
@@ -80,9 +80,9 @@ class WithMbusNoCInNodeMapping(matchStr: String, node: Int) extends Config((site
     inNodeMapping = up(ConstellationTLNetworkNodeMappingKey(MBUS)).inNodeMapping + (matchStr -> node)
   )
 })
-class WithMbusNoCOutNodeMapping(matchStr: String, node: Int, fifo: Boolean = false) extends Config((site, here, up) => {
+class WithMbusNoCOutNodeMapping(matchStr: String, node: Int) extends Config((site, here, up) => {
   case ConstellationTLNetworkNodeMappingKey(MBUS) => up(ConstellationTLNetworkNodeMappingKey(MBUS)).copy(
-    outNodeMapping = up(ConstellationTLNetworkNodeMappingKey(MBUS)).outNodeMapping + (matchStr -> (node, fifo))
+    outNodeMapping = up(ConstellationTLNetworkNodeMappingKey(MBUS)).outNodeMapping + (matchStr -> node)
   )
 })
 

@@ -77,7 +77,6 @@ class InputGen(idx: Int, cParams: IngressChannelParams)(implicit val p: Paramete
   out_payload.tsc := io.tsc
   out_payload.rob_idx := io.rob_idx
   out_payload.flits_fired := 0.U
-  io.out.bits.fifo_id := 0.U // DontCare
 
   io.n_flits := packet_remaining + 1.U
   io.fire := can_fire && io.out.fire()
@@ -180,8 +179,6 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
 
   val enable_print_latency = PlusArg("noctest_enable_print", default=0, width=1)(0)
 
-  val fifo_flows = p(NoCKey).flows.filter(_.fifo)
-
   io.from_noc.zipWithIndex map { case (o,i) =>
     o.flit.ready := LFSR(20) >= (outputStallProbability * (1 << 10)).toInt.U
     val out_payload = o.flit.bits.payload.asTypeOf(new Payload)
@@ -210,18 +207,6 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
     rob_frees = rob_frees | ((o.flit.fire() && o.flit.bits.tail) << rob_idx)
   }
 
-  for (f <- fifo_flows) {
-    val fifo_tracker = RegInit(0.U(32.W))
-    val out_fire = WireInit(false.B)
-    val out_tsc = WireInit(0.U(32.W))
-
-    val o = io.from_noc(f.egressId)
-    when (o.flit.fire() && o.flit.bits.head && o.flit.bits.ingress_id === f.ingressId.U) {
-      val payload_tsc = o.flit.bits.payload.asTypeOf(new Payload).tsc
-      assert(payload_tsc > fifo_tracker, s"Fifo constraint on flow $f violated")
-      fifo_tracker := payload_tsc
-    }
-  }
 
   rob_valids := (rob_valids | rob_allocs) & ~rob_frees
   idle := rob_allocs === 0.U && rob_frees === 0.U

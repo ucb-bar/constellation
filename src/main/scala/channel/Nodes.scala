@@ -13,7 +13,7 @@ object ChannelImp extends SimpleNodeImp[ChannelParams, ChannelParams, ChannelEdg
     ChannelEdgeParams(pd, p)
   }
   def bundle(e: ChannelEdgeParams) = new Channel(e.cp)(e.p)
-  def render(e: ChannelEdgeParams) = if (e.cp.possiblePackets.size == 0) {
+  def render(e: ChannelEdgeParams) = if (e.cp.possibleFlows.size == 0) {
     RenderedEdge(colour = "ffffff", label = "X")
   } else {
     RenderedEdge(colour = "#0000ff", label = e.cp.payloadBits.toString)
@@ -43,7 +43,7 @@ object IngressChannelImp extends SimpleNodeImp[IngressChannelParams, IngressChan
     IngressChannelEdgeParams(pd, p)
   }
   def bundle(e: IngressChannelEdgeParams) = new IngressChannel(e.cp)(e.p)
-  def render(e: IngressChannelEdgeParams) = if (e.cp.possiblePackets.size == 0) {
+  def render(e: IngressChannelEdgeParams) = if (e.cp.possibleFlows.size == 0) {
     RenderedEdge(colour = "ffffff", label = "X")
   } else {
     RenderedEdge(colour = "#00ff00", label = e.cp.payloadBits.toString)
@@ -56,7 +56,7 @@ object EgressChannelImp extends SimpleNodeImp[EgressChannelParams, EgressChannel
     EgressChannelEdgeParams(pd, p)
   }
   def bundle(e: EgressChannelEdgeParams) = new EgressChannel(e.cp)(e.p)
-  def render(e: EgressChannelEdgeParams) = if (e.cp.possiblePackets.size == 0) {
+  def render(e: EgressChannelEdgeParams) = if (e.cp.possibleFlows.size == 0) {
     RenderedEdge(colour = "ffffff", label = "X")
   } else {
     RenderedEdge(colour = "#ff0000", label = e.cp.payloadBits.toString)

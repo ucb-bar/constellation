@@ -97,13 +97,13 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
       }
     }
     val flowParams = (0 until in.size).map { iId => (0 until out.size).map { oId => {
-      val outFifo = outNodeMapping(bus).values.toSeq(oId)._2
-      val a = FlowParams(iId * 3    , in.size * 2 + oId * 3    , 4, outFifo)
-      val c = FlowParams(iId * 3 + 1, in.size * 2 + oId * 3 + 1, 2, outFifo)
-      val e = FlowParams(iId * 3 + 2, in.size * 2 + oId * 3 + 2, 0, outFifo)
+      //val outFifo = outNodeMapping(bus).values.toSeq(oId)._2
+      val a = FlowParams(iId * 3    , in.size * 2 + oId * 3    , 4)
+      val c = FlowParams(iId * 3 + 1, in.size * 2 + oId * 3 + 1, 2)
+      val e = FlowParams(iId * 3 + 2, in.size * 2 + oId * 3 + 2, 0)
 
-      val b = FlowParams(in.size * 3 + oId * 2    , iId * 2    , 3, outFifo)
-      val d = FlowParams(in.size * 3 + oId * 2 + 1, iId * 2 + 1, 1, outFifo)
+      val b = FlowParams(in.size * 3 + oId * 2    , iId * 2    , 3)
+      val d = FlowParams(in.size * 3 + oId * 2 + 1, iId * 2 + 1, 1)
       Seq(a, b, c, d, e)
     }}}.flatten.flatten.map(f => f.copy(
       vNetId = f.vNetId + vNetOffset(bus),
@@ -111,13 +111,13 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
       egressId = f.egressId + egressOffset(bus)
     ))
 
-    val ingressParams = (inNodeMapping(bus).values.map(i => Seq(i, i, i)) ++ outNodeMapping(bus).values.map(i => Seq(i._1, i._1)))
+    val ingressParams = (inNodeMapping(bus).values.map(i => Seq(i, i, i)) ++ outNodeMapping(bus).values.map(i => Seq(i, i)))
       .flatten.zipWithIndex.map { case (i, iId) => UserIngressParams(
         destId = i + ingressTerminalOffset,
         vNetId = ingressVNets(iId) + vNetOffset(bus),
         payloadBits = globalNoCWidth
       )}
-    val egressParams = (inNodeMapping(bus).values.map(i => Seq(i, i)) ++ outNodeMapping(bus).values.map(i => Seq(i._1, i._1, i._1)))
+    val egressParams = (inNodeMapping(bus).values.map(i => Seq(i, i)) ++ outNodeMapping(bus).values.map(i => Seq(i, i, i)))
       .flatten.zipWithIndex.map { case (e, eId) => UserEgressParams(
         srcId = e + egressTerminalOffset,
         vNetId = egressVNets(eId) + vNetOffset(bus),

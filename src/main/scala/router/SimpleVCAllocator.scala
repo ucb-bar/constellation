@@ -93,11 +93,10 @@ class SimpleVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) extends V
           io.channel_status(outId)(outVirtId).available
         )
       }
-      io.out_allocs(outId)(outVirtId).alloc := allocator.io.in(idx).map(_.fire()).reduce(_||_)
-      io.out_allocs(outId)(outVirtId).flow := Mux1H(
-        allocator.io.in(idx).map(_.fire()),
-        reqs.map(_.bits.flow)
-      )
+      val fires = allocator.io.in(idx).map(_.fire())
+      val flow = Mux1H(fires, reqs.map(_.bits.flow))
+      io.out_allocs(outId)(outVirtId).alloc := fires.reduce(_||_)
+      io.out_allocs(outId)(outVirtId).flow := flow
     }
   }
 
@@ -105,6 +104,7 @@ class SimpleVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) extends V
     val fires = allocator.io.in.map(_(i).fire())
     val fire_id = OHToUInt(fires)
     val (out_id, out_virt_id) = getOutChannelInfo(fire_id)
+    val flow = req.bits.flow
     assert(PopCount(fires) <= 1.U)
     req.ready := fires.reduce(_||_)
     resp.valid := fires.reduce(_||_)

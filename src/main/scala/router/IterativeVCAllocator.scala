@@ -29,8 +29,6 @@ class IterativeVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) extend
     }
   }
 
-
-
   val allocator = Module(new GrantHoldArbiter(Bool(), nOutChannels, (_: Bool) => true.B,
     policy=ArbiterPolicy.RoundRobin
   ))

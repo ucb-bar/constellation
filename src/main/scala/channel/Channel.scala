@@ -5,7 +5,7 @@ import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.diplomacy.{ClockCrossingType, NoCrossing}
-import constellation.routing.{ChannelRoutingInfo, PacketRoutingInfo}
+import constellation.routing.{ChannelRoutingInfo}
 import constellation.noc.{HasNoCParams}
 
 trait HasChannelParams {

@@ -346,7 +346,6 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
       o.bits.head := first && !is_body
       o.bits.tail := last && (is_body || !has_body)
       o.bits.egress_id := egress
-      o.bits.fifo_id := 0.U
       o.bits.payload := Mux(is_body, body, const) | debug << payloadWidth
 
       when (o.fire() && o.bits.head) { is_body := true.B }
@@ -400,25 +399,25 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
 
         val iId = getIndex(inNodeMapping.keys.toSeq, inN)
         val oId = getIndex(outNodeMapping.keys.toSeq, outN)
-        val outFifo = edgesOut(o).slave.slaves.map(_.fifoId.isDefined).reduce(_||_) || outNodeMapping.values.toSeq(oId)._2
+        val outFifo = edgesOut(o).slave.slaves.map(_.fifoId.isDefined).reduce(_||_)
 
-        val a = connectAIO(iId)(oId).option(FlowParams(iId * 3    , in.size * 2 + oId * 3    , 4, outFifo))
-        val c = connectCIO(iId)(oId).option(FlowParams(iId * 3 + 1, in.size * 2 + oId * 3 + 1, 2, outFifo))
-        val e = connectEIO(iId)(oId).option(FlowParams(iId * 3 + 2, in.size * 2 + oId * 3 + 2, 0, outFifo))
+        val a = connectAIO(iId)(oId).option(FlowParams(iId * 3    , in.size * 2 + oId * 3    , 4))
+        val c = connectCIO(iId)(oId).option(FlowParams(iId * 3 + 1, in.size * 2 + oId * 3 + 1, 2))
+        val e = connectEIO(iId)(oId).option(FlowParams(iId * 3 + 2, in.size * 2 + oId * 3 + 2, 0))
 
-        val b = connectBOI(oId)(iId).option(FlowParams(in.size * 3 + oId * 2    , iId * 2    , 3, outFifo))
-        val d = connectDOI(oId)(iId).option(FlowParams(in.size * 3 + oId * 2 + 1, iId * 2 + 1, 1, outFifo))
+        val b = connectBOI(oId)(iId).option(FlowParams(in.size * 3 + oId * 2    , iId * 2    , 3))
+        val d = connectDOI(oId)(iId).option(FlowParams(in.size * 3 + oId * 2 + 1, iId * 2 + 1, 1))
         (a ++ b ++ c ++ d ++ e)
       }}.flatten.flatten
 
-      val ingressParams = (inNodeMapping.values.map(i => Seq(i, i, i)) ++ outNodeMapping.values.map(i => Seq(i._1, i._1)))
+      val ingressParams = (inNodeMapping.values.map(i => Seq(i, i, i)) ++ outNodeMapping.values.map(i => Seq(i, i)))
         .toSeq
         .flatten.zipWithIndex.map { case (i,iId) => UserIngressParams(
           destId = i + ingressOffset,
           vNetId = ingressVNets(iId),
           payloadBits = actualPayloadWidth
         )}
-      val egressParams = (inNodeMapping.values.map(i => Seq(i, i)) ++ outNodeMapping.values.map(i => Seq(i._1, i._1, i._1)))
+      val egressParams = (inNodeMapping.values.map(i => Seq(i, i)) ++ outNodeMapping.values.map(i => Seq(i, i, i)))
       .toSeq
       .flatten.zipWithIndex.map { case (e,eId) => UserEgressParams(
           srcId = e + egressOffset,
@@ -505,7 +504,7 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
       val inD   = ingresses (in.size*3+idx*2+1)
       val outE  = egresses  (in.size*2+idx*3+2)
 
-      println(s"Constellation TLNoC $nocName: out $i @ ${outNodeMapping.values.toSeq(i)._1}: ${outNames(i)}")
+      println(s"Constellation TLNoC $nocName: out $i @ ${outNodeMapping.values.toSeq(i)}: ${outNames(i)}")
       println(s"Constellation TLNoC $nocName:   ingress (${in.size*3+idx*2} ${in.size*3+idx*2+1}) egress (${in.size*2+idx*3} ${in.size*2+idx*3+1} ${in.size*2+idx*3+2})")
 
       combineFromFlit (outA.flit, out(i).a)

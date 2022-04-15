@@ -31,19 +31,23 @@ class ChannelRoutingBundle extends Bundle {
 }
 
 /** Represents the properties of a packet that are relevant for routing
- *
- * @param egressId packet's destination egress point
- * @param vNet virtual subnetwork identifier
- */
-case class PacketRoutingInfo(
+  * ingressId and egressId uniquely identify a flow, but vnet and dst are used here
+  * to simplify the implementation of routingrelations
+  *
+  * @param ingressId packet's source ingress point
+  * @param egressId packet's destination egress point
+  * @param vNet virtual subnetwork identifier
+  * @param dst packet's destination node ID
+  */
+case class FlowRoutingInfo(
   ingressId: Int, egressId: Int, vNet: Int, dst: Int
 ) {
-  def isFlow(f: FlowIdentifierBundle) = {
+  def isFlow(f: FlowRoutingBundle) = {
     f.ingress_id === ingressId.U && f.egress_id === egressId.U
   }
 }
 
-class FlowIdentifierBundle(implicit val p: Parameters) extends Bundle with HasNoCParams{
+class FlowRoutingBundle(implicit val p: Parameters) extends Bundle with HasNoCParams{
   val ingress_id = UInt(ingressIdBits.W)
   val egress_id = UInt(egressIdBits.W)
 }

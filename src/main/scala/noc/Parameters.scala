@@ -8,7 +8,7 @@ import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp, BundleBridgeSink, InModuleBody}
 import constellation.router._
 import constellation.channel._
-import constellation.routing.{RoutingRelation, PacketRoutingInfo, ChannelRoutingInfo}
+import constellation.routing.{RoutingRelation, FlowRoutingInfo, ChannelRoutingInfo}
 import constellation.topology.{PhysicalTopology, UnidirectionalLine}
 
 
@@ -28,7 +28,6 @@ case class NoCParams(
   nocName: String = "test",
   skipValidationChecks: Boolean = false,
   hasCtrl: Boolean = false,
-  fifoIdBits: Int = 1
 )
 case object NoCKey extends Field[NoCParams](NoCParams())
 
@@ -60,7 +59,6 @@ trait HasNoCParams {
   val ingressIdBits = log2Up(nIngresses)
   val egressSrcIds = nocParams.egressParams.map(_.srcId)
   val routingRelation = nocParams.userParams.routingRelation
-  val fifoIdBits = nocParams.userParams.fifoIdBits
 }
 
 object InternalNoCParams {
@@ -102,9 +100,7 @@ object InternalNoCParams {
 
     for (i <- 0 until nocParams.ingresses.size) {
       for (e <- 0 until nocParams.egresses.size) {
-        for (v <- 0 until nVirtualNetworks) {
-          require(nocParams.flows.filter(f => f.ingressId == i && f.egressId == e && f.vNetId == v).size <= 1)
-        }
+        require(nocParams.flows.filter(f => f.ingressId == i && f.egressId == e).size <= 1)
       }
     }
 
@@ -128,53 +124,14 @@ object InternalNoCParams {
       )
     }}
 
-    // construct a new routing relation such that all FIFO flows have only one physical path
-    // (multiple virtual paths are acceptable)
-    // When multiple physical paths are possible in the base routingRel, pick one randomly
-    // NOTE: this selection policy may cause unroutable paths for some baseRoutingRel
-    val fifoRoutingRel = {
-      val baseRoutingRel = nocParams.routingRelation
-      val fifoFlows = nocParams.flows.filter(_.fifo)
-      val allowedPhysicalPaths = scala.collection.mutable.Map[PacketRoutingInfo, Seq[(Int, Int)]]()
-
-      fifoFlows.map { f =>
-        val pInfo = PacketRoutingInfo(f.ingressId, f.egressId, f.vNetId, egressParams(f.egressId).srcId)
-        val path = scala.collection.mutable.ListBuffer(ChannelRoutingInfo(
-          -1,
-          0,
-          ingressParams(f.ingressId).destId,
-          1
-        ))
-        // First, find a single physical path that terminates
-        while (path.last.dst != pInfo.dst) {
-          path += channelParams.filter(_.srcId == path.last.dst).map { nxtC =>
-            nxtC.channelRoutingInfos.map { cI =>
-              val can_transition = baseRoutingRel(
-                path.last.dst,
-                path.last,
-                cI,
-                pInfo
-              )
-              if (can_transition) Some(cI) else None
-            }.flatten
-          }.flatten.head
-        }
-        allowedPhysicalPaths(pInfo) = path.map { p => (p.src, p.dst) }
-      }
-      new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
-        val allowed = allowedPhysicalPaths(pInfo).contains((nxtC.src, nxtC.dst))
-        val base = baseRoutingRel(nodeId, srcC, nxtC, pInfo)
-        allowed && base
-      })
-    }
 
     // Check sanity of routingRelation, all inputs can route to all outputs
 
-    // Tracks the set of every possible packet that might occupy each virtual channel
-    val possiblePacketMap = scala.collection.mutable.Map[ChannelRoutingInfo, Set[PacketRoutingInfo]]()
+    // Tracks the set of every possible flow that might occupy each virtual channel
+    val possibleFlowMap = scala.collection.mutable.Map[ChannelRoutingInfo, Set[FlowRoutingInfo]]()
       .withDefaultValue(Set())
 
-    /** Uses ROUTINGREL to check that, for any ingress, all possible packets from said ingress are
+    /** Uses ROUTINGREL to check that, for any ingress, all possible flows from said ingress are
       *  able to reach all intended egresses.
       *
       * @param vNetId virtual network id
@@ -182,15 +139,15 @@ object InternalNoCParams {
       */
     def checkConnectivity(vNetId: Int, routingRel: RoutingRelation) = {
       val nextChannelParamMap = (0 until nNodes).map { i => i -> channelParams.filter(_.srcId == i) }.toMap
-      val tempPossiblePacketMap = scala.collection.mutable.Map[ChannelRoutingInfo, Set[PacketRoutingInfo]]()
+      val tempPossibleFlowMap = scala.collection.mutable.Map[ChannelRoutingInfo, Set[FlowRoutingInfo]]()
         .withDefaultValue(Set())
 
       // Loop through accessible ingress/egress pairs
       ingressParams.zipWithIndex.filter(_._1.vNetId == vNetId).map { case (iP,iIdx) =>
         val iId = iP.destId
         //println(s"Constellation: $nocName Checking connectivity from ingress $iIdx")
-        iP.possiblePackets.map { pInfo =>
-          val flowPossiblePackets = scala.collection.mutable.Set[ChannelRoutingInfo]()
+        iP.possibleFlows.map { flow =>
+          val flowPossibleFlows = scala.collection.mutable.Set[ChannelRoutingInfo]()
 
           var stack: Seq[ChannelRoutingInfo] = iP.channelRoutingInfos
           while (stack.size != 0) {
@@ -198,33 +155,33 @@ object InternalNoCParams {
             stack = stack.tail
 
             // This channel is the destination
-            val atDest = head.dst == pInfo.dst
+            val atDest = head.dst == flow.dst
 
             if (!atDest) {
-              // Find all possible VCs a packet in head can route to
+              // Find all possible VCs a flow in head can route to
               val nexts = nextChannelParamMap(head.dst).map { nxtC =>
                 nxtC.channelRoutingInfos.map { cI =>
                   val can_transition = routingRel(
                     head.dst,
                     head,
                     cI,
-                    pInfo
+                    flow
                   )
                   if (can_transition) Some(cI) else None
                 }.flatten
               }.flatten
-              // If the packet can't route to any VCs, this is an error
+              // If the flow can't route to any VCs, this is an error
               require(nexts.size > 0,
-                s"Failed to route from $iId to ${pInfo.dst} at $head for vnet $vNetId")
-              val toAdd = nexts.filter(n => !flowPossiblePackets.contains(n))
-              nexts.foreach(n => flowPossiblePackets += n)
+                s"Failed to route from $iId to ${flow.dst} at $head for vnet $vNetId")
+              val toAdd = nexts.filter(n => !flowPossibleFlows.contains(n))
+              nexts.foreach(n => flowPossibleFlows += n)
               stack = toAdd ++ stack
             }
           }
-          flowPossiblePackets.foreach { k => tempPossiblePacketMap(k) += pInfo }
+          flowPossibleFlows.foreach { k => tempPossibleFlowMap(k) += flow }
         }
       }
-      tempPossiblePacketMap.foreach { case (k,v) => possiblePacketMap(k) ++= v }
+      tempPossibleFlowMap.foreach { case (k,v) => possibleFlowMap(k) ++= v }
     }
     def checkAcyclic(vNetId: Int, routingRel: RoutingRelation): Option[Seq[ChannelRoutingInfo]] = {
       var visited = Set[ChannelRoutingInfo]()
@@ -235,7 +192,7 @@ object InternalNoCParams {
         stack = stack ++ Seq(cI)
 
         val neighbors = channelParams.filter(_.srcId == cI.dst).map(_.channelRoutingInfos).flatten.filter { nI =>
-          possiblePacketMap(cI).filter(_.vNet == vNetId).map { pI =>
+          possibleFlowMap(cI).filter(_.vNet == vNetId).map { pI =>
             routingRel(cI.dst, cI, nI, pI)
           }.fold(false)(_||_)
         }
@@ -277,10 +234,9 @@ object InternalNoCParams {
         // For each subset of blockers for this virtual network, recheck connectivity assuming
         // every virtual channel accessible to each blocker is locked
         for (b <- blockeeSets) {
-          val routingRel = nocParams.routingRelation
-          checkConnectivity(vNetId, new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
-            val base = routingRel(nodeId, srcC, nxtC, pInfo)
-            val blocked = b.map { v => possiblePacketMap(nxtC).map(_.vNet == v) }.flatten.fold(false)(_||_)
+          checkConnectivity(vNetId, new RoutingRelation((nodeId, srcC, nxtC, flow) => {
+            val base = nocParams.routingRelation(nodeId, srcC, nxtC, flow)
+            val blocked = b.map { v => possibleFlowMap(nxtC).map(_.vNet == v) }.flatten.fold(false)(_||_)
             base && !blocked
           }))
         }
@@ -296,11 +252,10 @@ object InternalNoCParams {
       // For each subset of blockers for this virtual network, recheck connectivity assuming
       // every virtual channel accessible to each blocker is locked
       for (b <- blockeeSets) {
-        val routingRel = nocParams.routingRelation
-        val acyclicPath = checkAcyclic(vNetId, new RoutingRelation((nodeId, srcC, nxtC, pInfo) => {
-          val base = routingRel(nodeId, srcC, nxtC, pInfo)
-          val blocked = b.map { v => possiblePacketMap(nxtC).map(_.vNet == v) }.flatten.fold(false)(_||_)
-          val escape = routingRel.isEscape(nxtC, vNetId)
+        val acyclicPath = checkAcyclic(vNetId, new RoutingRelation((nodeId, srcC, nxtC, flow) => {
+          val base = nocParams.routingRelation(nodeId, srcC, nxtC, flow)
+          val blocked = b.map { v => possibleFlowMap(nxtC).map(_.vNet == v) }.flatten.fold(false)(_||_)
+          val escape = nocParams.routingRelation.isEscape(nxtC, vNetId)
           base && !blocked && escape
         }))
         acyclicPath.foreach { path =>
@@ -313,12 +268,12 @@ object InternalNoCParams {
     // Also set possible nodes for each channel
     val finalChannelParams = channelParams.map { cP => cP.copy(
       virtualChannelParams=cP.virtualChannelParams.zipWithIndex.map { case (vP,vId) =>
-        val traversable = possiblePacketMap(cP.channelRoutingInfos(vId)).size != 0
+        val traversable = possibleFlowMap(cP.channelRoutingInfos(vId)).size != 0
         if (!traversable) {
           println(s"Constellation WARNING: $nocName virtual channel $vId from ${cP.srcId} to ${cP.destId} appears to be untraversable")
         }
         vP.copy(
-          possiblePackets=possiblePacketMap(cP.channelRoutingInfos(vId))
+          possibleFlows=possibleFlowMap(cP.channelRoutingInfos(vId))
         )
       }
     )}.map(cP => {

@@ -29,7 +29,6 @@ class IngressUnit(
   route_buffer.io.enq.bits.tail := io.in.bits.tail
   route_buffer.io.enq.bits.flow.ingress_id := cParam.ingressId.U
   route_buffer.io.enq.bits.flow.egress_id := io.in.bits.egress_id
-  route_buffer.io.enq.bits.fifo_id := io.in.bits.fifo_id
   route_buffer.io.enq.bits.payload := io.in.bits.payload
   route_buffer.io.enq.bits.virt_channel_id := DontCare
   io.router_req.bits.src_virt_id := 0.U

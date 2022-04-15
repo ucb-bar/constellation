@@ -70,14 +70,14 @@ class WithEgressPayloadBits(width: Int) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(egresses = up(NoCKey, site).egresses.map(_.copy(payloadBits = width)))
 })
 
-class WithFullyConnectedIngresses(fifo: Boolean = false) extends Config((site, here, up) => {
+class WithFullyConnectedIngresses extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
     flows = up(NoCKey, site).ingresses.zipWithIndex.map { case (ingress, i) => {
       up(NoCKey, site).egresses
         .zipWithIndex
         .filter { case (egress,e) => egress.vNetId == ingress.vNetId }
         .map(_._2)
-        .map(e => FlowParams(i, e, ingress.vNetId, fifo))
+        .map(e => FlowParams(i, e, ingress.vNetId))
     }}.flatten
   )
 })
@@ -91,9 +91,3 @@ class WithEgresses(egresses: Seq[Int]) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(egresses = up(NoCKey, site).egresses ++ egresses.map(i => UserEgressParams(i)))
 })
 
-// All flows to these egresses will be fifo
-class WithFifoEgresses(egresses: Seq[Int]) extends Config((site, here, up) => {
-  case NoCKey => up(NoCKey, site).copy(flows = up(NoCKey).flows.map(f =>
-    f.copy(fifo = egresses.contains(f.egressId))
-  ))
-})

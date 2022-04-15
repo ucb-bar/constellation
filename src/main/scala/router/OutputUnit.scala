@@ -5,7 +5,7 @@ import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 import constellation.channel._
-import constellation.routing.{FlowIdentifierBundle}
+import constellation.routing.{FlowRoutingBundle}
 import constellation.noc.{HasNoCParams}
 
 class OutputCreditAlloc extends Bundle {
@@ -16,12 +16,12 @@ class OutputCreditAlloc extends Bundle {
 class OutputChannelStatus(implicit val p: Parameters) extends Bundle with HasNoCParams {
   val occupied = Bool()
   def available = !occupied
-  val flow = new FlowIdentifierBundle
+  val flow = new FlowRoutingBundle
 }
 
 class OutputChannelAlloc(implicit val p: Parameters) extends Bundle with HasNoCParams {
   val alloc = Bool()
-  val flow = new FlowIdentifierBundle
+  val flow = new FlowRoutingBundle
 }
 
 class AbstractOutputUnitIO(
@@ -59,7 +59,7 @@ class OutputUnit(inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannel
   class OutputState(val bufferSize: Int) extends Bundle {
     val occupied = Bool()
     val c = UInt(log2Up(1+bufferSize).W)
-    val flow = new FlowIdentifierBundle
+    val flow = new FlowRoutingBundle
   }
 
   val states = Reg(MixedVec(virtualChannelParams.map { u => new OutputState(u.bufferSize) }))

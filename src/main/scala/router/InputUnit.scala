@@ -7,7 +7,7 @@ import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
 import constellation.channel._
-import constellation.routing.{FlowIdentifierBundle}
+import constellation.routing.{FlowRoutingBundle}
 import constellation.util.{GrantHoldArbiter, WrapInc, ArbiterPolicy}
 import constellation.noc.{HasNoCParams}
 
@@ -51,7 +51,7 @@ abstract class AbstractInputUnit(
       outParams.zipWithIndex.map { case (oP, oI) =>
         (0 until oP.nVirtualChannels).map { oV =>
           var allow = false
-          virtualChannelParams(srcV).possiblePackets.foreach { pI =>
+          virtualChannelParams(srcV).possibleFlows.foreach { pI =>
             allow = allow || routingRelation(
               nodeId,
               cParam.channelRoutingInfos(srcV),
@@ -83,14 +83,15 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   class InputState extends Bundle {
     val g = UInt(3.W)
     val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
-    val flow = new FlowIdentifierBundle
-    val tail_seen = Bool()
+    val flow = new FlowRoutingBundle
   }
-  val qs = virtualChannelParams.map { vP => Module(new Queue(new Flit(cParam), vP.bufferSize)) }
+  val qs = virtualChannelParams.map { vP => Module(new Queue(new PayloadFlit(cParam), vP.bufferSize)) }
   qs.zipWithIndex.foreach { case (q,i) =>
     val sel = io.in.flit.map(f => f.valid && f.bits.virt_channel_id === i.U)
     q.io.enq.valid := sel.reduce(_||_)
-    q.io.enq.bits := Mux1H(sel, io.in.flit.map(_.bits))
+    q.io.enq.bits.head := Mux1H(sel, io.in.flit.map(_.bits.head))
+    q.io.enq.bits.tail := Mux1H(sel, io.in.flit.map(_.bits.tail))
+    q.io.enq.bits.payload := Mux1H(sel, io.in.flit.map(_.bits.payload))
     assert(!(q.io.enq.valid && !q.io.enq.ready))
     q.io.deq.ready := false.B
   }
@@ -122,7 +123,6 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
         }
       }
       states(id).flow := io.in.flit(i).bits.flow
-      states(id).tail_seen := io.in.flit(i).bits.tail
       if (earlyRC) {
         val rreq = early_route_arbiter.io.in(i+1)
         when (!at_dest) {
@@ -131,11 +131,6 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
           rreq.bits.src_virt_id := io.in.flit(i).bits.virt_channel_id
           states(id).g := Mux(rreq.ready, g_r_stall, g_r)
         }
-      }
-    } .elsewhen (io.in.flit(i).fire()) {
-      val id = io.in.flit(i).bits.virt_channel_id
-      when (io.in.flit(i).bits.tail) {
-        states(id).tail_seen := true.B
       }
     }
   }
@@ -252,7 +247,10 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     val channel_oh = vc_sel.map(_.reduce(_||_))
     val virt_channel = Mux1H(channel_oh, vc_sel.map(v => OHToUInt(v)))
     salloc_out.out_vid := virt_channel
-    salloc_out.flit := Mux1H(salloc_arb.io.chosen_oh(i), qs.map(_.io.deq.bits))
+    salloc_out.flit.payload := Mux1H(salloc_arb.io.chosen_oh(i), qs.map(_.io.deq.bits.payload))
+    salloc_out.flit.head := Mux1H(salloc_arb.io.chosen_oh(i), qs.map(_.io.deq.bits.head))
+    salloc_out.flit.tail := Mux1H(salloc_arb.io.chosen_oh(i), qs.map(_.io.deq.bits.tail))
+    salloc_out.flit.flow := Mux1H(salloc_arb.io.chosen_oh(i), states.map(_.flow))
 
     io.out(i).valid := salloc_out.valid
     io.out(i).bits.flit := salloc_out.flit

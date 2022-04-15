@@ -8,12 +8,12 @@ import freechips.rocketchip.util._
 import freechips.rocketchip.rocket.DecodeLogic
 
 import constellation.channel._
-import constellation.routing.{FlowIdentifierBundle}
+import constellation.routing.{FlowRoutingBundle}
 import constellation.noc.{HasNoCParams}
 
 class RouteComputerReq(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   val src_virt_id = UInt(virtualChannelBits.W)
-  val flow = new FlowIdentifierBundle
+  val flow = new FlowRoutingBundle
 }
 
 class RouteComputerResp(val cParam: BaseChannelParams,
@@ -51,7 +51,7 @@ class RouteComputer(
       (0 until nAllOutputs).map { o =>
         if (o < nOutputs) {
           (0 until outParams(o).nVirtualChannels).map { outVId =>
-            val table = allInParams(i).possiblePackets.toSeq.distinct.map { pI =>
+            val table = allInParams(i).possibleFlows.toSeq.distinct.map { pI =>
               allInParams(i).channelRoutingInfos.map { cI =>
                 val v = routingRelation(
                   nodeId,
