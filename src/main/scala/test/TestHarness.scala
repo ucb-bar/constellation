@@ -3,6 +3,7 @@ package constellation.test
 import chisel3._
 import chisel3.util._
 import chisel3.util.random.LFSR
+import chisel3.experimental.IntParam
 
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.config.{Field, Parameters, Config}
@@ -108,116 +109,33 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
   require(allPayloadBits.size == 1 && allPayloadBits.head >= 64)
   val payloadBits = allPayloadBits.head
 
-  val robSz = p(NoCTesterKey).robSz
-  val totalTxs = p(NoCTesterKey).totalTxs
-  val outputStallProbability = p(NoCTesterKey).outputStallProbability
-  val maxFlits = p(NoCTesterKey).maxFlits
-  val flitIdBits = log2Ceil(maxFlits+1)
-
-  val io = IO(new Bundle {
+  val io = IO(new Bundle { // C++ model should keep this IO, everything else becomes verilog though
     val to_noc = MixedVec(inputParams.map { u => new IngressChannel(u) })
     val from_noc = MixedVec(outputParams.map { u => Flipped(new EgressChannel(u)) })
     val success = Output(Bool())
   })
 
-  val nInputs = inputParams.map(_.nVirtualChannels).sum
-  val nOutputs = outputParams.map(_.nVirtualChannels).sum
+  /**
+   * injectionRate: number of packets to inject per 100 cycles
+   */
+  class BlackBoxIngressUnit(ingressId: Int, injectionRate: Int)
+    extends BlackBox(Map(
+      "NUM_INGRESSES" -> inputParams.length
+      "INGRESS_ID" -> IntParam(ingressId)
+      "INJECTION_RATE" -> IntParam(injectionRate) // TODO (ANIMESH) -- THIS DOESNT WORK
+      "NUM_FLITS" -> p(NoCTesterKey).maxFlits
+      ) {
+    val io = IO(new Bundle {
+      val clock = Input(Clock())
+      val reset = Input(Bool())
 
-  val txs = RegInit(0.U(32.W))
-  val flits = RegInit(0.U(32.W))
-  dontTouch(flits)
+      // see verilog for output pseudocode
 
-
-  val tsc = RegInit(0.U(32.W))
-  tsc := tsc + 1.U
-
-  val idle_counter = RegInit(0.U(11.W))
-  val idle = Wire(Bool())
-  when (idle) { idle_counter := idle_counter + 1.U }
-    .otherwise { idle_counter := 0.U }
-  assert(!idle_counter(10))
-
-  val rob_payload = Reg(Vec(robSz, new Payload))
-  val rob_egress_id = Reg(Vec(robSz, UInt(log2Ceil(nOutputs).W)))
-  val rob_ingress_id = Reg(Vec(robSz, UInt(log2Ceil(nInputs).W)))
-  val rob_n_flits = Reg(Vec(robSz, UInt(flitIdBits.W)))
-  val rob_flits_returned = Reg(Vec(robSz, UInt(flitIdBits.W)))
-  val rob_tscs = Reg(Vec(robSz, UInt(64.W)))
-  val rob_valids = RegInit(0.U(robSz.W))
-  var rob_allocs = 0.U(robSz.W)
-  var rob_frees = 0.U(robSz.W)
-
-
-  val (rob_alloc_ids, rob_alloc_fires) = SelectFirstNUInt(~rob_valids, nInputs)
-  val rob_alloc_avail = rob_alloc_ids.map { i => !rob_valids(i) }
-  val success = txs >= totalTxs.U && rob_valids === 0.U
-  io.success := RegNext(success, false.B)
-  when (success) {
-    printf("%d flits, %d cycles\n", flits, tsc)
+    })
+    addResource("/vsrc/IngressUnit.v")
+    addResource("/csrc/IngressUnit.cpp")
   }
 
-  val tx_fire = Wire(Vec(nInputs, Bool()))
-  io.to_noc.zipWithIndex.map { case (i,idx) =>
-    val igen = Module(new InputGen(idx, inputParams(idx)))
-    val rob_idx = WireInit(rob_alloc_ids(idx))
-    igen.io.rob_idx := rob_idx
-    igen.io.rob_ready := (rob_alloc_avail(idx) && rob_alloc_fires(idx) &&
-      tsc >= 10.U && txs < totalTxs.U)
-    igen.io.tsc := tsc
-    i.flit <> igen.io.out
-    when (igen.io.fire) {
-      rob_payload        (rob_idx) := igen.io.out.bits.payload.asTypeOf(new Payload)
-      rob_egress_id      (rob_idx) := igen.io.out.bits.egress_id
-      rob_ingress_id     (rob_idx) := idx.U
-      rob_n_flits        (rob_idx) := igen.io.n_flits
-      rob_flits_returned (rob_idx) := 0.U
-      rob_tscs           (rob_idx) := tsc
-    }
-    tx_fire(idx) := igen.io.fire
-    rob_allocs = rob_allocs | (igen.io.fire << rob_idx)
-  }
-
-  val enable_print_latency = PlusArg("noctest_enable_print", default=0, width=1)(0)
-
-  io.from_noc.zipWithIndex map { case (o,i) =>
-    o.flit.ready := LFSR(20) >= (outputStallProbability * (1 << 10)).toInt.U
-    val out_payload = o.flit.bits.payload.asTypeOf(new Payload)
-    val rob_idx = out_payload.rob_idx
-    val packet_valid = RegInit(false.B)
-    val packet_rob_idx = Reg(UInt(log2Ceil(robSz).W))
-
-    when (o.flit.fire()) {
-
-      assert(rob_valids(rob_idx), s"out[$i] unexpected response")
-      assert(rob_payload(rob_idx).asUInt === o.flit.bits.payload.asUInt, s"out[$i] incorrect payload");
-      assert(o.flit.bits.ingress_id === rob_ingress_id(rob_idx), s"out[$i] incorrect source")
-      assert(i.U === rob_egress_id(rob_idx), s"out[$i] incorrect destination")
-      assert(rob_flits_returned(rob_idx) < rob_n_flits(rob_idx), s"out[$i] too many flits returned")
-      assert((!packet_valid && o.flit.bits.head) || rob_idx === packet_rob_idx)
-
-      when (o.flit.bits.head && enable_print_latency) {
-        printf(s"%d, $i, %d\n", rob_ingress_id(rob_idx), tsc - out_payload.tsc)
-      }
-
-      rob_flits_returned(rob_idx) := rob_flits_returned(rob_idx) + 1.U
-      rob_payload(rob_idx).flits_fired := rob_payload(rob_idx).flits_fired + 1.U
-      when (o.flit.bits.head) { packet_valid := true.B; packet_rob_idx := rob_idx }
-      when (o.flit.bits.tail) { packet_valid := false.B }
-    }
-    rob_frees = rob_frees | ((o.flit.fire() && o.flit.bits.tail) << rob_idx)
-  }
-
-
-  rob_valids := (rob_valids | rob_allocs) & ~rob_frees
-  idle := rob_allocs === 0.U && rob_frees === 0.U
-  flits := flits + io.from_noc.map(_.flit.fire().asUInt).reduce(_+&_)
-  txs := txs + PopCount(tx_fire)
-
-  for (i <- 0 until robSz) {
-    when (rob_valids(i)) {
-      assert(tsc - rob_tscs(i) < (16 << 10).U, s"ROB Entry $i took too long")
-    }
-  }
 }
 
 

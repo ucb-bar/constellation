@@ -3,3 +3,5 @@ target/
 /.bsp/
 /.idea/
 /test_run_dir/
+/.vscode**
+/.metals**
