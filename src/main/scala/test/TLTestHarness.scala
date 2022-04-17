@@ -11,7 +11,7 @@ import freechips.rocketchip.util._
 
 import constellation.noc.{NoCKey, HasNoCParams, NoC}
 import constellation.channel._
-import constellation.rc.{TLNoC, TLNoCParams, ConstellationTLNetworkNodeMapping}
+import constellation.rc.{TLNoC, TLNoCParams, ConstellationDiplomaticNetworkNodeMapping}
 import constellation.router.{HasRouterCtrlConsts}
 
 import scala.collection.immutable.ListMap
@@ -34,7 +34,7 @@ class TLNoCTester(implicit p: Parameters) extends LazyModule {
   val txns = tParams.txns
   val inNodeMapping = ListMap(tParams.inNodeMapping.zipWithIndex.map { case (i,j) => s"[$j]" -> i }:_*)
   val outNodeMapping = ListMap(tParams.outNodeMapping.zipWithIndex.map { case (i,j) => s"[$j]" -> i }:_*)
-  val nodeMapping = ConstellationTLNetworkNodeMapping(
+  val nodeMapping = ConstellationDiplomaticNetworkNodeMapping(
     inNodeMapping,
     outNodeMapping)
   val nManagers = outNodeMapping.size

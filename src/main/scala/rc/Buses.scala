@@ -14,13 +14,8 @@ import constellation.noc.{NoCParams}
 
 import scala.collection.immutable.{ListMap}
 
-case class ConstellationTLNetworkNodeMapping(
-  inNodeMapping: ListMap[String, Int] = ListMap[String, Int](),
-  outNodeMapping: ListMap[String, Int] = ListMap[String, Int]()
-)
-
-case class ConstellationTLNetworkNodeMappingKey(where: Location[TLBusWrapper]) extends Field[ConstellationTLNetworkNodeMapping](
-  ConstellationTLNetworkNodeMapping()
+case class ConstellationTLNetworkNodeMappingKey(where: Location[TLBusWrapper]) extends Field[ConstellationDiplomaticNetworkNodeMapping](
+  ConstellationDiplomaticNetworkNodeMapping()
 )
 
 case class ConstellationSystemBusParams(

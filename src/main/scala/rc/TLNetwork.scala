@@ -13,13 +13,20 @@ import constellation.noc.{NoC, NoCKey, NoCParams, NoCTerminalIO}
 import constellation.channel._
 import constellation.topology.{TerminalPlaneTopology}
 
+import scala.collection.immutable.ListMap
+
 case class TLNoCParams(
   nocName: String,
-  nodeMappings: ConstellationTLNetworkNodeMapping,
+  nodeMappings: ConstellationDiplomaticNetworkNodeMapping,
   // if set, generates a private noc using the config,
   // else use globalNoC params to connect to global interconnect
   privateNoC: Option[NoCParams],
   globalTerminalChannels: Option[() => BundleBridgeSink[NoCTerminalIO]] = None,
+)
+
+case class ConstellationDiplomaticNetworkNodeMapping(
+  inNodeMapping: ListMap[String, Int] = ListMap[String, Int](),
+  outNodeMapping: ListMap[String, Int] = ListMap[String, Int]()
 )
 
 class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
