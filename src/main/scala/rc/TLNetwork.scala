@@ -218,8 +218,10 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
     val addressC = (in zip edgesIn) map { case (i, e) => e.address(i.c.bits) }
 
     def unique(x: Vector[Boolean]): Bool = (x.filter(x=>x).size <= 1).B
-    val requestAIO = (connectAIO zip addressA) map { case (c, i) => outputPortFns(c).map { o => unique(c) || o(i) } }
-    val requestCIO = (connectCIO zip addressC) map { case (c, i) => outputPortFns(c).map { o => unique(c) || o(i) } }
+    val requestAIO = (connectAIO zip addressA) map { case (c, i) =>
+      outputPortFns(c).zipWithIndex.map { case (o, j) => c(j).B && (unique(c) || o(i)) } }
+    val requestCIO = (connectCIO zip addressC) map { case (c, i) =>
+      outputPortFns(c).zipWithIndex.map { case (o, j) => c(j).B && (unique(c) || o(i)) } }
     val requestBOI = out.map { o => inputIdRanges.map  { i => i.contains(o.b.bits.source) } }
     val requestDOI = out.map { o => inputIdRanges.map  { i => i.contains(o.d.bits.source) } }
     val requestEIO = in.map  { i => outputIdRanges.map { o => o.contains(i.e.bits.sink) } }
@@ -425,8 +427,8 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
           payloadBits = actualPayloadWidth
         )}
       val egressParams = (inNodeMapping.values.map(i => Seq(i, i)) ++ outNodeMapping.values.map(i => Seq(i, i, i)))
-      .toSeq
-      .flatten.zipWithIndex.map { case (e,eId) => UserEgressParams(
+        .toSeq
+        .flatten.zipWithIndex.map { case (e,eId) => UserEgressParams(
           srcId = e + egressOffset,
           vNetId = egressVNets(eId),
           payloadBits = actualPayloadWidth
@@ -478,18 +480,28 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
       println(s"Constellation TLNoC $nocName: in  $i @ ${inNodeMapping.values.toSeq(i)}: ${inNames(i)}")
       println(s"Constellation TLNoC $nocName:   ingress (${idx*3} ${idx*3+1} ${idx*3+2}) egress (${idx*2} ${idx*2+1})")
 
+      val inAEgress = Mux1H(requestAIO(i).zipWithIndex.map { case (r,i) =>
+        r -> (in.size*2 + getIndex(outNodeMapping.keys.toSeq, outNames(i))*3 + 0).U
+      })
+      val inCEgress = Mux1H(requestCIO(i).zipWithIndex.map { case (r,i) =>
+        r -> (in.size*2 + getIndex(outNodeMapping.keys.toSeq, outNames(i))*3 + 1).U
+      })
+      val inEEgress = Mux1H(requestEIO(i).zipWithIndex.map { case (r,i) =>
+        r -> (in.size*2 + getIndex(outNodeMapping.keys.toSeq, outNames(i))*3 + 2).U
+      })
+
       splitToFlit(
-        in(i).a, inA.flit, firstAI(i), lastAI(i), (in.size*2+0).U +& (requestAIIds(i) * 3.U),
+        in(i).a, inA.flit, firstAI(i), lastAI(i), inAEgress,
         edgesIn(i).hasData(in(i).a.bits) || (~in(i).a.bits.mask =/= 0.U),
         Cat(requestAIIds(i), i.U(16.W), tsc)
       )
       splitToFlit(
-        in(i).c, inC.flit, firstCI(i), lastCI(i), (in.size*2+1).U +& (requestCIIds(i) * 3.U),
+        in(i).c, inC.flit, firstCI(i), lastCI(i), inCEgress,
         edgesIn(i).hasData(in(i).c.bits),
         Cat(requestCIIds(i), i.U(16.W), tsc)
       )
       splitToFlit(
-        in(i).e, inE.flit, firstEI(i), lastEI(i), (in.size*2+2).U +& (requestEIIds(i) * 3.U),
+        in(i).e, inE.flit, firstEI(i), lastEI(i), inEEgress,
         edgesIn(i).hasData(in(i).e.bits),
         Cat(requestEIIds(i), i.U(16.W), tsc)
       )
@@ -514,17 +526,24 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
       println(s"Constellation TLNoC $nocName: out $i @ ${outNodeMapping.values.toSeq(i)}: ${outNames(i)}")
       println(s"Constellation TLNoC $nocName:   ingress (${in.size*3+idx*2} ${in.size*3+idx*2+1}) egress (${in.size*2+idx*3} ${in.size*2+idx*3+1} ${in.size*2+idx*3+2})")
 
+      val inBEgress = Mux1H(requestBOI(i).zipWithIndex.map { case (r,i) =>
+        r -> (getIndex(inNodeMapping.keys.toSeq, inNames(i))*2 + 0).U
+      })
+      val inDEgress = Mux1H(requestDOI(i).zipWithIndex.map { case (r,i) =>
+        r -> (getIndex(inNodeMapping.keys.toSeq, inNames(i))*2 + 1).U
+      })
+
       combineFromFlit (outA.flit, out(i).a)
       combineFromFlit (outC.flit, out(i).c)
       combineFromFlit (outE.flit, out(i).e)
 
       splitToFlit(
-        out(i).b, inB.flit, firstBO(i), lastBO(i), 0.U +& (requestBOIds(i) * 2.U),
+        out(i).b, inB.flit, firstBO(i), lastBO(i), inBEgress,
         edgesOut(i).hasData(out(i).b.bits) || (~out(i).b.bits.mask =/= 0.U),
         Cat(requestBOIds(i), i.U(16.W), tsc)
       )
       splitToFlit(
-        out(i).d, inD.flit, firstDO(i), lastDO(i), 1.U +& (requestDOIds(i) * 2.U),
+        out(i).d, inD.flit, firstDO(i), lastDO(i), inDEgress,
         edgesOut(i).hasData(out(i).d.bits),
         Cat(requestDOIds(i), i.U(16.W), tsc)
       )

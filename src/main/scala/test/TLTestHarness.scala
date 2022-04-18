@@ -17,13 +17,13 @@ import constellation.router.{HasRouterCtrlConsts}
 import scala.collection.immutable.ListMap
 
 case class TLNoCTesterParams(
-  inNodeMapping: Seq[Int],
-  outNodeMapping: Seq[Int],
+  inNodeMapping: Seq[Int] = Nil,
+  outNodeMapping: Seq[Int] = Nil,
   ctrlSourceNode: Int = 0,
   txns: Int = 1000
 )
 
-case object TLNoCTesterKey extends Field[TLNoCTesterParams](TLNoCTesterParams(Nil, Nil))
+case object TLNoCTesterKey extends Field[TLNoCTesterParams](TLNoCTesterParams())
 
 class WithTLNoCTesterParams(p: TLNoCTesterParams) extends Config((site, here, up) => {
   case TLNoCTesterKey => p
