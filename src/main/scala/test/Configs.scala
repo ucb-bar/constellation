@@ -435,9 +435,10 @@ class TestConfig59 extends Config(
 class TestConfig60 extends Config(
   new constellation.routing.WithNBlockingVirtualNetworks(4) ++
   new constellation.noc.WithTerminalPlane ++
-  new constellation.channel.WithIngressVNets((i: Int) => i % 4) ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(3)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngressVNets((i: Int) => i % 4) ++
+  new constellation.channel.WithEgressVNets((i: Int) => (i + 1) % 4) ++
   new constellation.channel.WithIngresses(0 until 16) ++
   new constellation.channel.WithEgresses(0 until 16) ++
   new constellation.topology.WithMesh2DTopology(4, 4, RoutingRelation.mesh2DEscapeRouter))
