@@ -18,7 +18,7 @@ class IngressFlit(val cParam: BaseChannelParams)(implicit val p: Parameters) ext
 class EgressFlit(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams with HasNoCParams {
   val head = Bool()
   val tail = Bool()
-  val ingress_id = UInt(egressIdBits.W)
+  val ingress_id = UInt(ingressIdBits.W)
   val payload = UInt(payloadBits.W)
 }
 
