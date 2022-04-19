@@ -25,7 +25,7 @@ class IngressUnit(
   val route_q = Module(new Queue(new RouteComputerResp(cParam, outParams, egressParams), 2,
     flow=combineRCVA))
 
-  assert(!(io.in.valid && !cParam.possibleFlows.map(_.egressId.U === io.in.bits.egress_id).reduce(_||_)))
+  assert(!(io.in.valid && !cParam.possibleFlows.toSeq.map(_.egressId.U === io.in.bits.egress_id).orR))
 
   route_buffer.io.enq.bits.head := io.in.bits.head
   route_buffer.io.enq.bits.tail := io.in.bits.tail
@@ -109,4 +109,18 @@ class IngressUnit(
 
   io.debug.va_stall := io.vcalloc_req(0).valid && !io.vcalloc_req(0).ready
   io.debug.sa_stall := io.salloc_req(0).valid && !io.salloc_req(0).ready
+
+  // TODO: We should not generate input/ingress/output/egress units for untraversable channels
+  if (!cParam.traversable) {
+    io.in.ready := false.B
+    io.router_req.valid := false.B
+    io.router_req.bits := DontCare
+    io.vcalloc_req.foreach(_.valid := false.B)
+    io.vcalloc_req.foreach(_.bits := DontCare)
+    io.salloc_req.foreach(_.valid := false.B)
+    io.salloc_req.foreach(_.bits := DontCare)
+    io.out.foreach(_.valid := false.B)
+    io.out.foreach(_.bits := DontCare)
+  }
+
 }

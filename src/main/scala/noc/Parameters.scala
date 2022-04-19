@@ -143,7 +143,7 @@ object InternalNoCParams {
         .withDefaultValue(Set())
 
       // Loop through accessible ingress/egress pairs
-      ingressParams.zipWithIndex.filter(_._1.vNetId == vNetId).map { case (iP,iIdx) =>
+      ingressParams.filter(_.vNetId == vNetId).map { iP =>
         val iId = iP.destId
         //println(s"Constellation: $nocName Checking connectivity from ingress $iIdx")
         iP.possibleFlows.map { flow =>

@@ -71,6 +71,7 @@ trait BaseChannelParams {
   def payloadBits: Int
   def srcMultiplier: Int
   def destMultiplier: Int
+  def traversable: Boolean = possibleFlows.size > 0
 }
 
 trait TerminalChannelParams extends BaseChannelParams {
@@ -93,7 +94,6 @@ case class ChannelParams(
   val maxBufferSize = virtualChannelParams.map(_.bufferSize).max
 
   val possibleFlows = virtualChannelParams.map(_.possibleFlows).reduce(_++_)
-  val traversable = virtualChannelParams.map(_.traversable).reduce(_||_)
 
   val channelRoutingInfos = (0 until nVirtualChannels).map(i => ChannelRoutingInfo(srcId, i, destId, nVirtualChannels))
 }
