@@ -251,6 +251,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     salloc_out.flit.head := Mux1H(salloc_arb.io.chosen_oh(i), qs.map(_.io.deq.bits.head))
     salloc_out.flit.tail := Mux1H(salloc_arb.io.chosen_oh(i), qs.map(_.io.deq.bits.tail))
     salloc_out.flit.flow := Mux1H(salloc_arb.io.chosen_oh(i), states.map(_.flow))
+    salloc_out.flit.virt_channel_id := DontCare // this gets set in the switch
 
     io.out(i).valid := salloc_out.valid
     io.out(i).bits.flit := salloc_out.flit
