@@ -332,28 +332,31 @@ class TestConfig46 extends Config(
   new constellation.topology.WithMesh2DTopology(5, 5, RoutingRelation.mesh2DNorthLast))
 
 class TestConfig47 extends Config(
-  new constellation.channel.WithIngressVNets((i: Int) => i % 4) ++
   new constellation.routing.WithNBlockingVirtualNetworks(4) ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(3)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngressVNets((i: Int) => i % 4) ++
+  new constellation.channel.WithEgressVNets ((i: Int) => (i + 2) % 4) ++
   new constellation.channel.WithIngresses(0 until 9) ++
   new constellation.channel.WithEgresses(0 until 9) ++
   new constellation.topology.WithMesh2DTopology(3, 3, RoutingRelation.mesh2DEscapeRouter))
 
 class TestConfig48 extends Config(
-  new constellation.channel.WithIngressVNets((i: Int) => i % 4) ++
   new constellation.routing.WithNBlockingVirtualNetworks(4) ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(3)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngressVNets((i: Int) => i % 4) ++
+  new constellation.channel.WithEgressVNets ((i: Int) => (i + 2) % 4) ++
   new constellation.channel.WithIngresses(0 until 9) ++
   new constellation.channel.WithEgresses(0 until 9) ++
   new constellation.topology.WithMesh2DTopology(3, 3, RoutingRelation.mesh2DAlternatingDimensionOrdered))
 
 class TestConfig49 extends Config(
-  new constellation.channel.WithIngressVNets((i: Int) => i % 4) ++
   new constellation.routing.WithNNonblockingVirtualNetworks(4) ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(3)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngressVNets((i: Int) => i % 4) ++
+  new constellation.channel.WithEgressVNets ((i: Int) => (i + 2) % 4) ++
   new constellation.channel.WithIngresses(0 until 9) ++
   new constellation.channel.WithEgresses(0 until 9) ++
   new constellation.topology.WithMesh2DTopology(3, 3, RoutingRelation.mesh2DEscapeRouter))

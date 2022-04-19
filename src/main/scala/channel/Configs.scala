@@ -62,6 +62,12 @@ class WithIngressVNets(f: Int => Int) extends Config((site, here, up) => {
   })
 })
 
+class WithEgressVNets(f: Int => Int) extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(egresses = up(NoCKey, site).egresses.zipWithIndex.map { case (u,i) =>
+    u.copy(vNetId = f(i))
+  })
+})
+
 class WithIngressPayloadBits(width: Int) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(ingresses = up(NoCKey, site).ingresses.map(_.copy(payloadBits = width)))
 })
