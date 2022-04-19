@@ -46,7 +46,8 @@ class Payload extends Bundle {
   val flits_fired = UInt(16.W)
 }
 
-class InputGen(idx: Int, cParams: IngressChannelParams)(implicit val p: Parameters) extends Module with HasNoCParams {
+class InputGen(idx: Int, cParams: IngressChannelParams)
+  (implicit val p: Parameters) extends Module with HasNoCParams {
   val maxFlits = p(NoCTesterKey).maxFlits
   val inputStallProbability = p(NoCTesterKey).inputStallProbability
   val flitIdBits = log2Ceil(maxFlits+1)
@@ -71,7 +72,7 @@ class InputGen(idx: Int, cParams: IngressChannelParams)(implicit val p: Paramete
   io.out.valid := !random_delay && flits_left === 0.U && io.rob_ready
   io.out.bits.head := true.B
   io.out.bits.tail := packet_remaining === 0.U
-  io.out.bits.egress_id := LFSR(20) % nEgresses.U
+  io.out.bits.egress_id := VecInit(cParams.possibleFlows.toSeq.map(_.egressId.U))(LFSR(20) % cParams.possibleFlows.size.U)
   val out_payload = Wire(new Payload)
   io.out.bits.payload := out_payload.asUInt
   out_payload.tsc := io.tsc

@@ -25,6 +25,8 @@ class IngressUnit(
   val route_q = Module(new Queue(new RouteComputerResp(cParam, outParams, egressParams), 2,
     flow=combineRCVA))
 
+  assert(!(io.in.valid && !cParam.possibleFlows.map(_.egressId.U === io.in.bits.egress_id).reduce(_||_)))
+
   route_buffer.io.enq.bits.head := io.in.bits.head
   route_buffer.io.enq.bits.tail := io.in.bits.tail
   route_buffer.io.enq.bits.flow.ingress_id := cParam.ingressId.U
