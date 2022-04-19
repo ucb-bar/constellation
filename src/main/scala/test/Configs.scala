@@ -500,3 +500,25 @@ class TLTestConfig04 extends Config(
   new constellation.noc.WithTerminalPlane ++
   new constellation.channel.WithUniformNVirtualChannels(5, UserVirtualChannelParams(3)) ++
   new constellation.topology.WithMesh2DTopology(4, 3, RoutingRelation.mesh2DEscapeRouter))
+
+// test configs for AXI4 network
+class AXI4TestConfig00 extends Config(
+  new WithAXI4NoCTesterParams(AXI4NoCTesterParams(Seq(0), Seq(1))) ++
+  new constellation.routing.WithNNonblockingVirtualNetworks(5) ++
+  new constellation.channel.WithUniformNVirtualChannels(5, UserVirtualChannelParams(5)) ++
+  new constellation.topology.WithBidirectionalLineTopology(2))
+class AXI4TestConfig01 extends Config(
+  new WithAXI4NoCTesterParams(AXI4NoCTesterParams(Seq(0, 2), Seq(1))) ++
+  new constellation.routing.WithNNonblockingVirtualNetworks(5) ++
+  new constellation.channel.WithUniformNVirtualChannels(5, UserVirtualChannelParams(5)) ++
+  new constellation.topology.WithBidirectionalLineTopology(3))
+class AXI4TestConfig02 extends Config(
+  new WithAXI4NoCTesterParams(AXI4NoCTesterParams(Seq(0, 1, 2, 3, 5, 6, 7, 8), Seq(4))) ++
+  new constellation.routing.WithNNonblockingVirtualNetworks(5) ++
+  new constellation.channel.WithUniformNVirtualChannels(10, UserVirtualChannelParams(3)) ++
+  new constellation.topology.WithMesh2DTopology(3, 3, RoutingRelation.mesh2DEscapeRouter))
+class AXI4TestConfig03 extends Config(
+  new WithAXI4NoCTesterParams(AXI4NoCTesterParams(Seq(1, 3, 5, 7), Seq(0, 2, 4, 6, 8))) ++
+  new constellation.routing.WithNNonblockingVirtualNetworks(5) ++
+  new constellation.channel.WithUniformNVirtualChannels(10, UserVirtualChannelParams(3)) ++
+  new constellation.topology.WithMesh2DTopology(3, 3, RoutingRelation.mesh2DEscapeRouter))

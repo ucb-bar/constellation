@@ -16,6 +16,11 @@ class TLNoCChiselTester(implicit val p: Parameters) extends Module {
   when (th.io.success) { stop() }
 }
 
+class AXI4NoCChiselTester(implicit val p: Parameters) extends Module {
+  val th = Module(new AXI4TestHarness)
+  when (th.io.success) { stop() }
+}
+
 abstract class BaseNoCTest(gen: Parameters => Module, configs: Seq[Config]) extends AnyFlatSpec with ChiselScalatestTester {
   behavior of "NoC"
 
@@ -30,7 +35,7 @@ abstract class BaseNoCTest(gen: Parameters => Module, configs: Seq[Config]) exte
 
 abstract class NoCTest(configs: Seq[Config]) extends BaseNoCTest(p => new NoCChiselTester()(p), configs)
 abstract class TLNoCTest(configs: Seq[Config]) extends BaseNoCTest(p => new TLNoCChiselTester()(p), configs)
-
+abstract class AXI4NoCTest(configs: Seq[Config]) extends BaseNoCTest(p => new AXI4NoCChiselTester()(p), configs)
 
 
 // these tests allow you to run an infividual config
@@ -104,3 +109,8 @@ class NoCTestTL01 extends TLNoCTest(Seq(new TLTestConfig01))
 class NoCTestTL02 extends TLNoCTest(Seq(new TLTestConfig02))
 class NoCTestTL03 extends TLNoCTest(Seq(new TLTestConfig03))
 class NoCTestTL04 extends TLNoCTest(Seq(new TLTestConfig04))
+
+class NoCTestAXI400 extends AXI4NoCTest(Seq(new AXI4TestConfig00))
+class NoCTestAXI401 extends AXI4NoCTest(Seq(new AXI4TestConfig01))
+class NoCTestAXI402 extends AXI4NoCTest(Seq(new AXI4TestConfig02))
+class NoCTestAXI403 extends AXI4NoCTest(Seq(new AXI4TestConfig03))
