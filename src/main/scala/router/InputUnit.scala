@@ -169,7 +169,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
       if (combineRCVA) {
         when (io.router_resp.valid && io.router_resp.bits.src_virt_id === idx.U) {
           i.valid := true.B
-          i.bits := io.router_resp.bits.vc_sel
+          i.bits.vc_sel := io.router_resp.bits.vc_sel
         }
       }
     } else {
