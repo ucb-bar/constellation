@@ -443,7 +443,7 @@ class TestConfig60 extends Config(
   new constellation.channel.WithEgresses(0 until 16) ++
   new constellation.topology.WithMesh2DTopology(4, 4, RoutingRelation.mesh2DEscapeRouter))
 class TestConfig61 extends Config(
-  new constellation.test.WithInputStallProbability(0.7) ++
+  new constellation.test.WithInputStallProbability(0.8) ++
   new constellation.router.WithSafeCoupleSAVA ++
   new constellation.noc.WithTerminalPlane ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
