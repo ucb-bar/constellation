@@ -484,32 +484,29 @@ class TestConfig65 extends Config(
   new constellation.channel.WithEgresses(0 until 16) ++
   new constellation.router.WithUniformPayloadBits(16) ++
   new constellation.topology.WithMesh2DTopology(4, 4, RoutingRelation.mesh2DEscapeRouter))
-// class TestConfig66 extends Config(
-//   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-//   new constellation.channel.WithFullyConnectedIngresses ++
-//   new constellation.channel.WithIngressPayloadBits(72) ++
-//   new constellation.channel.WithEgressPayloadBits(72) ++
-//   new constellation.channel.WithIngresses(Seq(0)) ++
-//   new constellation.channel.WithEgresses(Seq(4)) ++
-//   new constellation.router.WithPayloadBits( 8, Seq(4)) ++
-//   new constellation.router.WithPayloadBits(24, Seq(3)) ++
-//   new constellation.router.WithPayloadBits(12, Seq(2)) ++
-//   new constellation.router.WithPayloadBits(24, Seq(1)) ++
-//   new constellation.router.WithPayloadBits( 8, Seq(0)) ++
-//   new constellation.topology.WithUnidirectionalLineTopology(5))
-// class TestConfig67 extends Config(
-//   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(3)) ++
-//   new constellation.channel.WithFullyConnectedIngresses ++
-//   new constellation.channel.WithIngressPayloadBits(72) ++
-//   new constellation.channel.WithEgressPayloadBits(72) ++
-//   new constellation.channel.WithIngresses(Seq(0, 1, 2, 3, 4)) ++
-//   new constellation.channel.WithEgresses(Seq(0, 1, 2, 3, 4)) ++
-//   new constellation.router.WithPayloadBits(36, Seq(4)) ++
-//   new constellation.router.WithPayloadBits(12, Seq(3)) ++
-//   new constellation.router.WithPayloadBits(24, Seq(2)) ++
-//   new constellation.router.WithPayloadBits(12, Seq(1)) ++
-//   new constellation.router.WithPayloadBits(36, Seq(0)) ++
-//   new constellation.topology.WithUnidirectionalTorus1DTopology(5))
+class TestConfig66 extends Config(
+  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
+  new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngressPayloadBits(72) ++
+  new constellation.channel.WithEgressPayloadBits(72) ++
+  new constellation.channel.WithIngresses(Seq(0)) ++
+  new constellation.channel.WithEgresses(Seq(4)) ++
+  new constellation.router.WithPayloadBits( 8, Seq(4)) ++
+  new constellation.router.WithPayloadBits(24, Seq(3)) ++
+  new constellation.router.WithPayloadBits(12, Seq(2)) ++
+  new constellation.router.WithPayloadBits(24, Seq(1)) ++
+  new constellation.router.WithPayloadBits( 8, Seq(0)) ++
+  new constellation.topology.WithUnidirectionalLineTopology(5))
+class TestConfig67 extends Config(
+  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(4)) ++
+  new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngresses((0 until 16)) ++
+  new constellation.channel.WithEgresses((0 until 16)) ++
+  new constellation.router.WithPayloadBits(8,  (3 until 16 by 4)) ++
+  new constellation.router.WithPayloadBits(16, (2 until 16 by 4)) ++
+  new constellation.router.WithPayloadBits(32, (1 until 16 by 4)) ++
+  new constellation.router.WithPayloadBits(64, (0 until 16 by 4)) ++
+  new constellation.topology.WithMesh2DTopology(4, 4, RoutingRelation.mesh2DEscapeRouter))
 
 
 // test configs for TL network

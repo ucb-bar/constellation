@@ -65,6 +65,7 @@ case class VirtualChannelParams(
   uniqueId: Int,
 ) {
   val traversable = possibleFlows.size > 0
+  require(bufferSize > 0, s"Illegal $this")
 }
 
 

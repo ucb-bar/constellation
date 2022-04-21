@@ -4,6 +4,7 @@ import chisel3._
 import chisel3.util._
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.config.{Parameters}
+import freechips.rocketchip.util._
 
 object WidthWidget {
   def split[T <: BaseFlit](in: IrrevocableIO[T], out: IrrevocableIO[T]) = {
@@ -113,121 +114,117 @@ object EgressWidthWidget {
   }
 }
 
-// class ChannelWidthWidget(destBits: Int, srcBits: Int)(implicit p: Parameters) extends LazyModule {
-//   val node = new ChannelAdapterNode(
-//     masterFn = { s =>
-//       require(s.payloadBits == srcBits)
-//       if (srcBits > destBits) {
-//         val ratio = srcBits / destBits
-//         s.copy(
-//           payloadBits=destBits,
-//           virtualChannelParams=s.virtualChannelParams.map(v => v.copy(bufferSize=v.bufferSize * ratio))
-//         )
-//       } else {
-//         s.copy(payloadBits=destBits)
-//       }
-//     },
-//     slaveFn = { s =>
-//       require(s.payloadBits == destBits)
-//       if (srcBits > destBits) {
-//         s.copy(payloadBits=srcBits)
-//       } else {
-//         val ratio = srcBits / destBits
-//         s.copy(
-//           payloadBits=srcBits,
-//           virtualChannelParams=s.virtualChannelParams.map(v => v.copy(bufferSize=v.bufferSize * ratio))
-//         )
-//       }
-//     }
-//   )
-//   lazy val module = new LazyModuleImp(this) {
-//     (node.in zip node.out) foreach { case ((in, edgeIn), (out, edgeOut)) =>
-//       in.vc_free := out.vc_free
-//       if (srcBits == destBits) {
-//         in.credit_return := out.credit_return
-//         out.flit <> in.flit
-//       } else if (srcBits > destBits) {
-//         require(srcBits % destBits == 0)
+class ChannelWidthWidget(srcBits: Int)(implicit p: Parameters) extends LazyModule {
+  val node = new ChannelAdapterNode(
+    slaveFn = { s =>
+      val destBits = s.payloadBits
+      if (srcBits > destBits) {
+        val ratio = srcBits / destBits
+        val virtualChannelParams = s.virtualChannelParams.map { vP =>
+          require(vP.bufferSize >= ratio)
+          vP.copy(bufferSize = vP.bufferSize / ratio)
+        }
+        s.copy(payloadBits=srcBits, virtualChannelParams=virtualChannelParams)
+      } else {
+        val ratio = destBits / srcBits
+        val virtualChannelParams = s.virtualChannelParams.map { vP =>
+          vP.copy(bufferSize = vP.bufferSize * ratio)
+        }
+        s.copy(payloadBits=srcBits, virtualChannelParams=virtualChannelParams)
+      }
+    }
+  )
+  lazy val module = new LazyModuleImp(this) {
+    (node.in zip node.out) foreach { case ((in, edgeIn), (out, edgeOut)) =>
+      val destBits = out.cParam.payloadBits
+      in.vc_free := out.vc_free
+      if (srcBits == destBits) {
+        in.credit_return := out.credit_return
+        out.flit <> in.flit
+      } else if (srcBits > destBits) {
+        require(srcBits % destBits == 0)
 
-//         (in.flit zip out.flit) foreach { case (iF, oF) =>
-//           val in_q = Module(new Queue(new Flit(in.cParam),
-//             in.cParam.virtualChannelParams.map(_.bufferSize).sum, pipe=true, flow=true))
-//           in_q.io.enq.valid := iF.valid
-//           in_q.io.enq.bits := iF.bits
-//           assert(!(in_q.io.enq.valid && !in_q.io.enq.ready))
+        (in.flit zip out.flit) foreach { case (iF, oF) =>
+          val in_q = Module(new Queue(new Flit(in.cParam),
+            in.cParam.virtualChannelParams.map(_.bufferSize).sum, pipe=true, flow=true))
+          in_q.io.enq.valid := iF.valid
+          in_q.io.enq.bits := iF.bits
+          assert(!(in_q.io.enq.valid && !in_q.io.enq.ready))
 
-//           val in_flit = Wire(Irrevocable(new Flit(in.cParam)))
-//           in_flit.valid := in_q.io.deq.valid
-//           in_flit.bits := in_q.io.deq.bits
-//           in_q.io.deq.ready := in_flit.ready
+          val in_flit = Wire(Irrevocable(new Flit(in.cParam)))
+          in_flit.valid := in_q.io.deq.valid
+          in_flit.bits := in_q.io.deq.bits
+          in_q.io.deq.ready := in_flit.ready
 
-//           val out_flit = Wire(Irrevocable(new Flit(out.cParam)))
-//           oF.valid := out_flit.valid
-//           oF.bits := out_flit.bits
-//           out_flit.ready := true.B
-//           WidthWidget(in_flit, out_flit)
-//         }
+          val out_flit = Wire(Irrevocable(new Flit(out.cParam)))
+          oF.valid := out_flit.valid
+          oF.bits := out_flit.bits
+          out_flit.ready := true.B
+          WidthWidget(in_flit, out_flit)
+        }
 
-//         val ratio = srcBits / destBits
-//         val counts = RegInit(VecInit(Seq.fill(in.nVirtualChannels) { 0.U(log2Ceil(ratio).W) }))
-//         val in_credit_return = Wire(Vec(in.nVirtualChannels, Bool()))
-//         in.credit_return := in_credit_return.asUInt
-//         for (i <- 0 until in.nVirtualChannels) {
-//           in_credit_return(i) := false.B
-//           when (out.credit_return(i)) {
-//             val last = counts(i) === (ratio-1).U
-//             counts(i) := Mux(last, 0.U, counts(i) + 1.U)
-//             when (last) {
-//               in_credit_return(i) := true.B
-//             }
-//           }
-//         }
-//       } else {
-//         require(destBits % srcBits == 0)
+        val ratio = srcBits / destBits
+        val counts = RegInit(VecInit(Seq.fill(in.nVirtualChannels) { 0.U(log2Ceil(ratio).W) }))
+        val in_credit_return = Wire(Vec(in.nVirtualChannels, Bool()))
+        in.credit_return := in_credit_return.asUInt
+        for (i <- 0 until in.nVirtualChannels) {
+          in_credit_return(i) := false.B
+          when (out.credit_return(i)) {
+            val last = counts(i) === (ratio-1).U
+            counts(i) := Mux(last, 0.U, counts(i) + 1.U)
+            when (last) {
+              in_credit_return(i) := true.B
+            }
+          }
+        }
+      } else {
+        require(destBits % srcBits == 0)
 
-//         (in.flit zip out.flit) foreach { case (iF, oF) =>
-//           val in_flit = Wire(Irrevocable(new Flit(in.cParam)))
-//           in_flit.valid := iF.valid
-//           in_flit.bits := iF.bits
-//           assert(in_flit.ready)
+        val in_flits = Wire(Vec(in.nVirtualChannels, Irrevocable(new Flit(in.cParam))))
+        val out_flits = Wire(Vec(in.nVirtualChannels, Irrevocable(new Flit(out.cParam))))
+        for (i <- 0 until in.nVirtualChannels) {
+          val sel = in.flit.map(f => f.valid && f.bits.virt_channel_id === i.U)
+          in_flits(i).valid := sel.orR
+          in_flits(i).bits := Mux1H(sel, in.flit.map(_.bits))
 
-//           val out_flit = Wire(Irrevocable(new Flit(out.cParam)))
-//           oF.valid := out_flit.valid
-//           oF.bits := out_flit.bits
-//           out_flit.ready := true.B
-//           WidthWidget(in_flit, out_flit)
-//         }
+          out_flits(i).ready := sel.orR
+          WidthWidget(in_flits(i), out_flits(i))
+        }
+        for (i <- 0 until in.flit.size) {
+          val sel = UIntToOH(in.flit(i).bits.virt_channel_id)
+          out.flit(i).valid := Mux1H(sel, out_flits.map(_.valid))
+          out.flit(i).bits := Mux1H(sel, out_flits.map(_.bits))
+        }
 
+        val ratio = destBits / srcBits
+        val credits = RegInit(VecInit((0 until in.nVirtualChannels).map { i =>
+          0.U(log2Ceil(ratio*in.cParam.virtualChannelParams(i).bufferSize).W)
+        }))
+        val in_credit_return = Wire(Vec(in.nVirtualChannels, Bool()))
+        in.credit_return := in_credit_return.asUInt
+        for (i <- 0 until in.nVirtualChannels) {
+          when (out.credit_return(i)) {
+            in_credit_return(i) := true.B
+            credits(i) := credits(i) + (ratio - 1).U
+          } .otherwise {
+            val empty = credits(i) === 0.U
+            in_credit_return(i) := !empty
+            credits(i) := Mux(empty, 0.U, credits(i) - 1.U)
+          }
+        }
+      }
+    }
+  }
+}
 
-//         val ratio = destBits / srcBits
-//         val credits = RegInit(VecInit((0 until in.nVirtualChannels).map { i =>
-//           0.U(log2Ceil(ratio*in.cParam.virtualChannelParams(i).bufferSize).W)
-//         }))
-//         val in_credit_return = Wire(Vec(in.nVirtualChannels, Bool()))
-//         in.credit_return := in_credit_return.asUInt
-//         for (i <- 0 until in.nVirtualChannels) {
-//           when (out.credit_return(i)) {
-//             in_credit_return(i) := true.B
-//             credits(i) := credits(i) + (ratio - 1).U
-//           } .otherwise {
-//             val empty = credits(i) === 0.U
-//             in_credit_return(i) := !empty
-//             credits(i) := Mux(empty, 0.U, credits(i) - 1.U)
-//           }
-//         }
-//       }
-//     }
-//   }
-// }
-
-// object ChannelWidthWidget {
-//   def apply(destBits: Int, srcBits: Int)(implicit p: Parameters) = {
-//     if (destBits == srcBits) {
-//       val node = ChannelEphemeralNode()
-//       node
-//     } else {
-//       val channel_width_widget = LazyModule(new ChannelWidthWidget(destBits, srcBits))
-//       channel_width_widget.node
-//     }
-//   }
-// }
+object ChannelWidthWidget {
+  def apply(destBits: Int, srcBits: Int)(implicit p: Parameters) = {
+    if (destBits == srcBits) {
+      val node = ChannelEphemeralNode()
+      node
+    } else {
+      val channel_width_widget = LazyModule(new ChannelWidthWidget(srcBits))
+      channel_width_widget.node
+    }
+  }
+}

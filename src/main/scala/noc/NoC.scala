@@ -90,7 +90,7 @@ class NoC(implicit p: Parameters) extends LazyModule {
         router_sink_domains(j) {
           implicit val p: Parameters = iP
           (dst
-            //:= ChannelWidthWidget(routerJ.get.payloadBits, routerI.get.payloadBits)
+            := ChannelWidthWidget(routerJ.get.payloadBits, routerI.get.payloadBits)
             := channelParam.channelGen(p)(src)
           )
         }

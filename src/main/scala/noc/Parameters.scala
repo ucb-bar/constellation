@@ -78,8 +78,7 @@ object InternalNoCParams {
     val channelParams = Seq.tabulate(nNodes, nNodes) { case (i,j) =>
       if (nocParams.topology.topo(i, j)) {
         val cP = nocParams.channelParamGen(i, j)
-        val payloadBits = nocParams.routerParams(i).payloadBits
-        require(nocParams.routerParams(i).payloadBits == nocParams.routerParams(j).payloadBits)
+        val payloadBits = nocParams.routerParams(j).payloadBits
         Some(ChannelParams(
           srcId = i,
           destId = j,
