@@ -33,6 +33,7 @@ case class ChannelAdapterNode(
   slaveFn:  ChannelParams => ChannelParams = { d => d })(
   implicit valName: ValName) extends AdapterNode(ChannelImp)(masterFn, slaveFn)
 case class ChannelIdentityNode()(implicit valName: ValName) extends IdentityNode(ChannelImp)()
+case class ChannelEphemeralNode()(implicit valName: ValName) extends EphemeralNode(ChannelImp)()
 
 case class IngressChannelEdgeParams(cp: IngressChannelParams, p: Parameters)
 case class EgressChannelEdgeParams(cp: EgressChannelParams, p: Parameters)
@@ -85,3 +86,6 @@ case class EgressChannelAdapterNode(
 
 case class IngressChannelIdentityNode()(implicit valName: ValName) extends IdentityNode(IngressChannelImp)()
 case class EgressChannelIdentityNode()(implicit valName: ValName) extends IdentityNode(EgressChannelImp)()
+
+case class IngressChannelEphemeralNode()(implicit valName: ValName) extends EphemeralNode(IngressChannelImp)()
+case class EgressChannelEphemeralNode()(implicit valName: ValName) extends EphemeralNode(EgressChannelImp)()

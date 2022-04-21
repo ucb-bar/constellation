@@ -343,7 +343,7 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
     val actualPayloadWidth = payloadWidth + (if (debugPrintLatencies) 64 else 0)
 
     def splitToFlit(
-      i: DecoupledIO[Data], o: DecoupledIO[IngressFlit],
+      i: DecoupledIO[Data], o: IrrevocableIO[IngressFlit],
       first: Bool, last: Bool, egress: UInt, has_body: Bool, debug: UInt
     ) = {
       val is_body = RegInit(false.B)
@@ -360,7 +360,7 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
       when (o.fire() && o.bits.head) { is_body := true.B }
       when (o.fire() && o.bits.tail) { is_body := false.B }
     }
-    def combineFromFlit(i: DecoupledIO[EgressFlit], o: DecoupledIO[Data]) = {
+    def combineFromFlit(i: IrrevocableIO[EgressFlit], o: DecoupledIO[Data]) = {
       val is_const = RegInit(true.B)
       val const = Reg(UInt(constWidth(o.bits).W))
 

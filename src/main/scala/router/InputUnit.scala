@@ -85,7 +85,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
     val flow = new FlowRoutingBundle
   }
-  val qs = virtualChannelParams.map { vP => Module(new Queue(new PayloadFlit(cParam), vP.bufferSize)) }
+  val qs = virtualChannelParams.map { vP => Module(new Queue(new BaseFlit(cParam), vP.bufferSize)) }
   qs.zipWithIndex.foreach { case (q,i) =>
     val sel = io.in.flit.map(f => f.valid && f.bits.virt_channel_id === i.U)
     q.io.enq.valid := sel.reduce(_||_)

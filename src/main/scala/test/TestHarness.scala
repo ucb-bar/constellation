@@ -52,7 +52,7 @@ class InputGen(idx: Int, cParams: IngressChannelParams)
   val inputStallProbability = p(NoCTesterKey).inputStallProbability
   val flitIdBits = log2Ceil(maxFlits+1)
   val io = IO(new Bundle {
-    val out = Decoupled(new IngressFlit(cParams))
+    val out = Irrevocable(new IngressFlit(cParams))
     val rob_ready = Input(Bool())
     val rob_idx = Input(UInt())
     val tsc = Input(UInt(32.W))
@@ -165,7 +165,7 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
     igen.io.rob_ready := (rob_alloc_avail(idx) && rob_alloc_fires(idx) &&
       tsc >= 10.U && txs < totalTxs.U)
     igen.io.tsc := tsc
-    i.flit <> igen.io.out
+    i.flit <> Queue(igen.io.out, 1, pipe=true, flow=true)
     when (igen.io.fire) {
       rob_payload        (rob_idx) := igen.io.out.bits.payload.asTypeOf(new Payload)
       rob_egress_id      (rob_idx) := igen.io.out.bits.egress_id

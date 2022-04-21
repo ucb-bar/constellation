@@ -357,7 +357,7 @@ class AXI4NoC(params: AXI4NoCParams)(implicit p: Parameters) extends LazyModule 
     noc.io.router_clocks.foreach(_.reset := reset)
 
     def toFlit(
-      i: IrrevocableIO[Data], o: DecoupledIO[IngressFlit],
+      i: IrrevocableIO[Data], o: IrrevocableIO[IngressFlit],
       last: Bool, egress: UInt, extra: UInt) = {
       val first = RegInit(true.B)
 
@@ -371,7 +371,7 @@ class AXI4NoC(params: AXI4NoCParams)(implicit p: Parameters) extends LazyModule 
       when (i.fire()) { first := last }
     }
 
-    def fromFlit(i: DecoupledIO[EgressFlit], o: IrrevocableIO[Data]) = {
+    def fromFlit(i: IrrevocableIO[EgressFlit], o: IrrevocableIO[Data]) = {
       i.ready := o.ready
       o.valid := i.valid
       o.bits := i.bits.payload.asTypeOf(o.bits)

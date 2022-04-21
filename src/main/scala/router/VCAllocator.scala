@@ -14,7 +14,9 @@ import constellation.routing.{FlowRoutingBundle, FlowRoutingInfo}
 class VCAllocReqPerInputVC(
   val outParams: Seq[ChannelParams],
   val egressParams: Seq[EgressChannelParams])
-  (implicit val p: Parameters) extends Bundle with HasRouterOutputParams with HasNoCParams {
+  (implicit val p: Parameters) extends Bundle
+    with HasRouterOutputParams
+    with HasNoCParams {
   val flow = new FlowRoutingBundle
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
 }
@@ -25,14 +27,19 @@ class VCAllocReq(
   val ingressParams: Seq[IngressChannelParams],
   val outParams: Seq[ChannelParams],
   val egressParams: Seq[EgressChannelParams])
-  (implicit val p: Parameters) extends Bundle with HasRouterOutputParams with HasRouterInputParams with HasNoCParams {
+  (implicit val p: Parameters) extends Bundle
+    with HasRouterOutputParams
+    with HasRouterInputParams
+    with HasNoCParams {
   val flow = new FlowRoutingBundle
   val in_id = UInt(log2Ceil(allInParams.size).W)
   val in_virt_channel = UInt(log2Ceil(allInParams.map(_.nVirtualChannels).max).W)
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
 }
 
-class VCAllocResp(val cParam: BaseChannelParams, val outParams: Seq[ChannelParams], val egressParams: Seq[EgressChannelParams])(implicit val p: Parameters) extends Bundle with HasChannelParams with HasRouterOutputParams {
+class VCAllocResp(val cParam: BaseChannelParams, val outParams: Seq[ChannelParams], val egressParams: Seq[EgressChannelParams])(implicit val p: Parameters) extends Bundle
+    with HasChannelParams
+    with HasRouterOutputParams {
   val in_virt_channel = UInt(virtualChannelBits.W)
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
 }
@@ -45,7 +52,10 @@ case class VCAllocatorParams(
   egressParams: Seq[EgressChannelParams])
 
 abstract class VCAllocator(val vP: VCAllocatorParams)(implicit val p: Parameters) extends Module
-    with HasRouterParams with HasNoCParams {
+    with HasRouterParams
+    with HasRouterInputParams
+    with HasRouterOutputParams
+    with HasNoCParams {
 
   val routerParams = vP.routerParams
   val inParams = vP.inParams

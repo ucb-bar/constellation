@@ -51,10 +51,11 @@ trait HasRouterInputParams {
   def nAllInputs = allInParams.size
 }
 
-trait HasRouterParams extends HasRouterOutputParams with HasRouterInputParams
+trait HasRouterParams
 {
   def routerParams: RouterParams
   def nodeId = routerParams.nodeId
+  def payloadBits = routerParams.user.payloadBits
 }
 
 class DebugBundle(val nIn: Int) extends Bundle {
@@ -64,28 +65,40 @@ class DebugBundle(val nIn: Int) extends Bundle {
 
 class Router(
   val routerParams: RouterParams,
-  val inParams: Seq[ChannelParams],
-  val outParams: Seq[ChannelParams],
-  val ingressParams: Seq[IngressChannelParams],
-  val egressParams: Seq[EgressChannelParams]
-)(implicit p: Parameters) extends LazyModule with HasRouterParams with HasNoCParams {
-  allOutParams.foreach(u => require(u.srcId == nodeId && u.payloadBits == routerParams.user.payloadBits))
-  allInParams.foreach(u => require(u.destId == nodeId && u.payloadBits == routerParams.user.payloadBits))
+  val preDiplomaticInParams: Seq[ChannelParams],
+  val preDiplomaticOutParams: Seq[ChannelParams],
+  val preDiplomaticIngressParams: Seq[IngressChannelParams],
+  val preDiplomaticEgressParams: Seq[EgressChannelParams]
+)(implicit p: Parameters) extends LazyModule with HasNoCParams with HasRouterParams {
+  val allPreDiplomaticInParams = preDiplomaticInParams ++ preDiplomaticIngressParams
+  val allPreDiplomaticOutParams = preDiplomaticOutParams ++ preDiplomaticEgressParams
+  allPreDiplomaticOutParams.foreach(u => require(u.srcId == nodeId && u.payloadBits == routerParams.user.payloadBits))
+  allPreDiplomaticInParams.foreach(u => require(u.destId == nodeId && u.payloadBits == routerParams.user.payloadBits))
 
-  val destNodes = inParams.map(u => ChannelDestNode(u))
-  val sourceNodes = outParams.map(u => ChannelSourceNode(u))
-  val ingressNodes = ingressParams.map(u => IngressChannelDestNode(u))
-  val egressNodes = egressParams.map(u => EgressChannelSourceNode(u))
+  val destNodes = preDiplomaticInParams.map(u => ChannelDestNode(u))
+  val sourceNodes = preDiplomaticOutParams.map(u => ChannelSourceNode(u))
+  val ingressNodes = preDiplomaticIngressParams.map(u => IngressChannelDestNode(u))
+  val egressNodes = preDiplomaticEgressParams.map(u => EgressChannelSourceNode(u))
 
-  val debugNode = BundleBridgeSource(() => new DebugBundle(nAllInputs))
+  val debugNode = BundleBridgeSource(() => new DebugBundle(allPreDiplomaticInParams.size))
   val ctrlNode = if (hasCtrl) Some(BundleBridgeSource(() => new RouterCtrlBundle)) else None
 
-  lazy val module = new LazyModuleImp(this) {
-    val io_in = destNodes.map(_.in(0)._1)
-    val io_out = sourceNodes.map(_.out(0)._1)
-    val io_ingress = ingressNodes.map(_.in(0)._1)
-    val io_egress = egressNodes.map(_.out(0)._1)
+  def inParams = module.inParams
+  def outParams = module.outParams
+  def ingressParams = module.ingressParams
+  def egressParams = module.egressParams
+
+  lazy val module = new LazyModuleImp(this) with HasRouterInputParams with HasRouterOutputParams {
+    val (io_in, edgesIn) = destNodes.map(_.in(0)).unzip
+    val (io_out, edgesOut) = sourceNodes.map(_.out(0)).unzip
+    val (io_ingress, edgesIngress) = ingressNodes.map(_.in(0)).unzip
+    val (io_egress, edgesEgress) = egressNodes.map(_.out(0)).unzip
     val io_debug = debugNode.out(0)._1
+
+    val inParams = edgesIn.map(_.cp)
+    val outParams = edgesOut.map(_.cp)
+    val ingressParams = edgesIngress.map(_.cp)
+    val egressParams = edgesEgress.map(_.cp)
 
     require(nAllInputs >= 1)
     require(nAllOutputs >= 1)

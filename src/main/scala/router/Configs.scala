@@ -52,8 +52,14 @@ class WithSimpleVCAllocator extends Config((site, here, up) => {
   )
 })
 
-class WithUniformPayloadBits(w: Int) extends Config((site, here, up) => {
+class WithPayloadBits(w: Int, routers: Seq[Int]) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(routerParams = (i: Int) =>
-    up(NoCKey, site).routerParams(i).copy(payloadBits=w)
+    if (routers.contains(i) || routers.size == 0) {
+      up(NoCKey, site).routerParams(i).copy(payloadBits=w)
+    } else {
+      up(NoCKey, site).routerParams(i)
+    }
   )
 })
+
+class WithUniformPayloadBits(w: Int) extends WithPayloadBits(w, Nil)

@@ -39,13 +39,19 @@ case class UserChannelParams(
 case class UserIngressParams(
   destId: Int,
   vNetId: Int = 0,
-  payloadBits: Int = 64
+  payloadBits: Int = 64,
 )
 
+/** Represents an egress from the network
+ *
+ *  @param srcId node identifier for the network node this egress connects to
+ *  @param vNetId virtual network id
+ *  @param payloadBits width of the wire coming out of the egress
+ */
 case class UserEgressParams(
   srcId: Int,
   vNetId: Int = 0,
-  payloadBits: Int = 64
+  payloadBits: Int = 64,
 )
 
 

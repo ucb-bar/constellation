@@ -7,31 +7,21 @@ import freechips.rocketchip.config.{Field, Parameters}
 import constellation.routing.{FlowRoutingBundle}
 import constellation.noc.{HasNoCParams}
 
-class IngressFlit(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams with HasNoCParams {
+class BaseFlit(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   val head = Bool()
   val tail = Bool()
+  val payload = UInt(payloadBits.W)
+}
+
+class IngressFlit(cParam: BaseChannelParams)(implicit p: Parameters) extends BaseFlit(cParam)(p) with HasNoCParams {
   val egress_id = UInt(egressIdBits.W)
-  val payload = UInt(payloadBits.W)
 }
 
-
-class EgressFlit(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams with HasNoCParams {
-  val head = Bool()
-  val tail = Bool()
+class EgressFlit(cParam: BaseChannelParams)(implicit p: Parameters) extends BaseFlit(cParam)(p) with HasNoCParams {
   val ingress_id = UInt(ingressIdBits.W)
-  val payload = UInt(payloadBits.W)
 }
 
-class Flit(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams with HasNoCParams {
-  val head = Bool()
-  val tail = Bool()
+class Flit(cParam: BaseChannelParams)(implicit p: Parameters) extends BaseFlit(cParam)(p) with HasNoCParams {
   val flow = new FlowRoutingBundle
-  val payload = UInt(payloadBits.W)
   val virt_channel_id = UInt(virtualChannelBits.W)
-}
-
-class PayloadFlit(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams with HasNoCParams {
-  val head = Bool()
-  val tail = Bool()
-  val payload = UInt(payloadBits.W)
 }
