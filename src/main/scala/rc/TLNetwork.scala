@@ -21,6 +21,7 @@ case class TLNoCParams(
   // if set, generates a private noc using the config,
   // else use globalNoC params to connect to global interconnect
   privateNoC: Option[NoCParams],
+  explicitPayloadWidth: Option[Int] = None, // if unset, chooses minimum with based on TL bundle width
   globalTerminalChannels: Option[() => BundleBridgeSink[NoCTerminalIO]] = None,
 )
 
@@ -34,6 +35,7 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
   val inNodeMapping = params.nodeMappings.inNodeMapping
   val outNodeMapping = params.nodeMappings.outNodeMapping
   val privateNoC = params.privateNoC
+  val explicitPayloadWidth = params.explicitPayloadWidth
   val globalSink: Option[BundleBridgeSink[NoCTerminalIO]] = if (privateNoC.isEmpty) {
     Some(params.globalTerminalChannels.get())
   } else {
@@ -424,19 +426,19 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
         .flatten.zipWithIndex.map { case (i,iId) => UserIngressParams(
           destId = i + ingressOffset,
           vNetId = ingressVNets(iId),
-          payloadBits = actualPayloadWidth
+          payloadBits = explicitPayloadWidth.map(e => e * ((actualPayloadWidth + e - 1) / e)).getOrElse(actualPayloadWidth)
         )}
       val egressParams = (inNodeMapping.values.map(i => Seq(i, i)) ++ outNodeMapping.values.map(i => Seq(i, i, i)))
         .toSeq
         .flatten.zipWithIndex.map { case (e,eId) => UserEgressParams(
           srcId = e + egressOffset,
           vNetId = egressVNets(eId),
-          payloadBits = actualPayloadWidth
+          payloadBits = explicitPayloadWidth.map(e => e * ((actualPayloadWidth + e - 1) / e)).getOrElse(actualPayloadWidth)
         )}
 
       Module(LazyModule(new NoC()(p.alterPartial({
         case NoCKey => nocParams.copy(
-          routerParams = (i: Int) => nocParams.routerParams(i).copy(payloadBits = actualPayloadWidth),
+          routerParams = (i: Int) => nocParams.routerParams(i).copy(payloadBits = explicitPayloadWidth.getOrElse(actualPayloadWidth)),
           ingresses = ingressParams,
           egresses = egressParams,
           flows = flowParams,
@@ -454,8 +456,8 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
     val ingresses: Seq[IngressChannel] = noc.map(_.io.ingress).getOrElse(globalSink.get.in(0)._1.ingress)
     val egresses: Seq[EgressChannel] = noc.map(_.io.egress).getOrElse(globalSink.get.in(0)._1.egress)
 
-    for (t <- ingresses) { require(t.payloadBits >= actualPayloadWidth) }
-    for (t <-  egresses) { require(t.payloadBits >= actualPayloadWidth) }
+    for (t <- ingresses) { require(t.payloadBits >= actualPayloadWidth, s"${t.payloadBits} <= $actualPayloadWidth") }
+    for (t <-  egresses) { require(t.payloadBits >= actualPayloadWidth, s"${t.payloadBits} <= $actualPayloadWidth") }
 
     val tsc = RegInit(0.U(32.W))
     tsc := tsc + 1.U
@@ -465,7 +467,7 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
         printf(s"TLNoC, $channel, %d, %d, %d\n",
           tsc - payload(payloadWidth+32-1,payloadWidth),
           payload(payloadWidth+48-1,payloadWidth+32),
-          payload >> (payloadWidth + 48))
+          payload(actualPayloadWidth-1, payloadWidth + 48))
       }
     }
 

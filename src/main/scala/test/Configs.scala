@@ -541,6 +541,15 @@ class TLTestConfig04 extends Config(
   new constellation.channel.WithUniformNVirtualChannels(5, UserVirtualChannelParams(3)) ++
   new constellation.topology.WithMesh2DTopology(4, 3, RoutingRelation.mesh2DEscapeRouter))
 
+class TLTestConfig05 extends Config(
+  new WithTLNoCTesterParams(TLNoCTesterParams(Seq(4, 0, 2, 5, 6, 9, 11), Seq(7, 1, 3, 8, 10),
+    explicitPayloadWidth=Some(32))) ++
+  new constellation.routing.WithNBlockingVirtualNetworks(5) ++
+  new constellation.noc.WithTerminalPlane ++
+  new constellation.channel.WithUniformNVirtualChannels(5, UserVirtualChannelParams(3)) ++
+  new constellation.topology.WithMesh2DTopology(4, 3, RoutingRelation.mesh2DEscapeRouter))
+
+
 // test configs for AXI4 network
 class AXI4TestConfig00 extends Config(
   new WithAXI4NoCTesterParams(AXI4NoCTesterParams(Seq(0), Seq(1))) ++

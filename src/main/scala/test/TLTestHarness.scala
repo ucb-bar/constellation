@@ -20,6 +20,7 @@ case class TLNoCTesterParams(
   inNodeMapping: Seq[Int] = Nil,
   outNodeMapping: Seq[Int] = Nil,
   ctrlSourceNode: Int = 0,
+  explicitPayloadWidth: Option[Int] = None,
   txns: Int = 1000
 )
 
@@ -39,7 +40,7 @@ class TLNoCTester(implicit p: Parameters) extends LazyModule {
     outNodeMapping)
   val nManagers = outNodeMapping.size
   val nClients = inNodeMapping.size
-  val noc = LazyModule(new TLNoC(TLNoCParams("test", nodeMapping, Some(p(NoCKey)))))
+  val noc = LazyModule(new TLNoC(TLNoCParams("test", nodeMapping, Some(p(NoCKey)), tParams.explicitPayloadWidth)))
 
   val fuzzers = (0 until nClients) map { n =>
     val fuzz = LazyModule(new TLFuzzer(txns))

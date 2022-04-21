@@ -133,3 +133,6 @@ class WithMbusGlobalNoC extends Config((site, here, up) => {
   }
 })
 
+class WithGlobalNoCWidth(w: Int) extends Config((site, here, up) => {
+  case GlobalTLInterconnectKey => up(GlobalTLInterconnectKey).copy(payloadWidth=w)
+})
