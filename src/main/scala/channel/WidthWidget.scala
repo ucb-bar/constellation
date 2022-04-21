@@ -67,10 +67,9 @@ object WidthWidget {
   }
 }
 
-class IngressWidthWidget(destBits: Int, srcBits: Int)(implicit p: Parameters) extends LazyModule {
+class IngressWidthWidget(srcBits: Int)(implicit p: Parameters) extends LazyModule {
   val node = new IngressChannelAdapterNode(
-    masterFn = { s => require(s.payloadBits == srcBits); s.copy(payloadBits=destBits) },
-    slaveFn = { s => require(s.payloadBits == destBits); s.copy(payloadBits=srcBits) }
+    slaveFn = { s => s.copy(payloadBits=srcBits) }
   )
   lazy val module = new LazyModuleImp(this) {
     (node.in zip node.out) foreach { case ((in, edgeIn), (out, edgeOut)) =>
@@ -85,16 +84,15 @@ object IngressWidthWidget {
       val node = IngressChannelEphemeralNode()
       node
     } else {
-      val ingress_width_widget = LazyModule(new IngressWidthWidget(destBits, srcBits))
+      val ingress_width_widget = LazyModule(new IngressWidthWidget(srcBits))
       ingress_width_widget.node
     }
   }
 }
 
-class EgressWidthWidget(destBits: Int, srcBits: Int)(implicit p: Parameters) extends LazyModule {
+class EgressWidthWidget(srcBits: Int)(implicit p: Parameters) extends LazyModule {
   val node = new EgressChannelAdapterNode(
-    masterFn = { s => require(s.payloadBits == srcBits); s.copy(payloadBits=destBits) },
-    slaveFn = { s => require(s.payloadBits == destBits); s.copy(payloadBits=srcBits) }
+    slaveFn = { s => s.copy(payloadBits=srcBits) }
   )
   lazy val module = new LazyModuleImp(this) {
     (node.in zip node.out) foreach { case ((in, edgeIn), (out, edgeOut)) =>
@@ -109,7 +107,7 @@ object EgressWidthWidget {
       val node = EgressChannelEphemeralNode()
       node
     } else {
-      val egress_width_widget = LazyModule(new EgressWidthWidget(destBits, srcBits))
+      val egress_width_widget = LazyModule(new EgressWidthWidget(srcBits))
       egress_width_widget.node
     }
   }

@@ -67,14 +67,14 @@ class NoC(implicit p: Parameters) extends LazyModule {
       Some(LazyModule(new Router(
         routerParams = allRouterParams(i),
         preDiplomaticInParams = inParams,
-        preDiplomaticOutParams = outParams,
         preDiplomaticIngressParams = ingressParams,
-        preDiplomaticEgressParams = egressParams,
+        outDests = outParams.map(_.destId),
+        egressIds = egressParams.map(_.egressId)
       )(iP)))
     }
   }}.flatten
 
-  val ingressNodes = allIngressParams.map { u => IngressChannelSourceNode(u) }
+  val ingressNodes = allIngressParams.map { u => IngressChannelSourceNode(u.destId) }
   val egressNodes = allEgressParams.map { u => EgressChannelDestNode(u) }
 
   // Generate channels between routers diplomatically
@@ -82,7 +82,7 @@ class NoC(implicit p: Parameters) extends LazyModule {
     val routerI = routers.find(_.nodeId == i)
     val routerJ = routers.find(_.nodeId == j)
     if (routerI.isDefined && routerJ.isDefined) {
-      val sourceNodes = routerI.get.sourceNodes.find(_.sourceParams.destId == j)
+      val sourceNodes = routerI.get.sourceNodes.find(_.destId == j)
       val destNodes = routerJ.get.destNodes.filter(_.destParams.srcId == i)
       require (sourceNodes.size == destNodes.size)
       (sourceNodes zip destNodes).foreach { case (src, dst) =>
@@ -102,7 +102,7 @@ class NoC(implicit p: Parameters) extends LazyModule {
   routers.foreach { dst => router_sink_domains(dst.nodeId) {
     implicit val p: Parameters = iP
     dst.ingressNodes.foreach(n => {
-      val ingressId = n.destParams.asInstanceOf[IngressChannelParams].ingressId
+      val ingressId = n.destParams.ingressId
       require(dst.payloadBits <= allIngressParams(ingressId).payloadBits)
       (n
         := IngressWidthWidget(dst.payloadBits, allIngressParams(ingressId).payloadBits)
@@ -110,7 +110,7 @@ class NoC(implicit p: Parameters) extends LazyModule {
       )
     })
     dst.egressNodes.foreach(n => {
-      val egressId = n.sourceParams.asInstanceOf[EgressChannelParams].egressId
+      val egressId = n.egressId
       require(dst.payloadBits <= allEgressParams(egressId).payloadBits)
       (egressNodes(egressId)
         := EgressWidthWidget(allEgressParams(egressId).payloadBits, dst.payloadBits)

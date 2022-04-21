@@ -65,20 +65,17 @@ class DebugBundle(val nIn: Int) extends Bundle {
 
 class Router(
   val routerParams: RouterParams,
-  val preDiplomaticInParams: Seq[ChannelParams],
-  val preDiplomaticOutParams: Seq[ChannelParams],
-  val preDiplomaticIngressParams: Seq[IngressChannelParams],
-  val preDiplomaticEgressParams: Seq[EgressChannelParams]
+  preDiplomaticInParams: Seq[ChannelParams],
+  preDiplomaticIngressParams: Seq[IngressChannelParams],
+  outDests: Seq[Int],
+  egressIds: Seq[Int]
 )(implicit p: Parameters) extends LazyModule with HasNoCParams with HasRouterParams {
   val allPreDiplomaticInParams = preDiplomaticInParams ++ preDiplomaticIngressParams
-  val allPreDiplomaticOutParams = preDiplomaticOutParams ++ preDiplomaticEgressParams
-  allPreDiplomaticOutParams.foreach(u => require(u.srcId == nodeId && u.payloadBits == routerParams.user.payloadBits))
-  allPreDiplomaticInParams.foreach(u => require(u.destId == nodeId && u.payloadBits == routerParams.user.payloadBits))
 
   val destNodes = preDiplomaticInParams.map(u => ChannelDestNode(u))
-  val sourceNodes = preDiplomaticOutParams.map(u => ChannelSourceNode(u))
+  val sourceNodes = outDests.map(u => ChannelSourceNode(u))
   val ingressNodes = preDiplomaticIngressParams.map(u => IngressChannelDestNode(u))
-  val egressNodes = preDiplomaticEgressParams.map(u => EgressChannelSourceNode(u))
+  val egressNodes = egressIds.map(u => EgressChannelSourceNode(u))
 
   val debugNode = BundleBridgeSource(() => new DebugBundle(allPreDiplomaticInParams.size))
   val ctrlNode = if (hasCtrl) Some(BundleBridgeSource(() => new RouterCtrlBundle)) else None
@@ -99,6 +96,10 @@ class Router(
     val outParams = edgesOut.map(_.cp)
     val ingressParams = edgesIngress.map(_.cp)
     val egressParams = edgesEgress.map(_.cp)
+
+    allOutParams.foreach(u => require(u.srcId == nodeId && u.payloadBits == routerParams.user.payloadBits))
+    allInParams.foreach(u => require(u.destId == nodeId && u.payloadBits == routerParams.user.payloadBits))
+
 
     require(nAllInputs >= 1)
     require(nAllOutputs >= 1)
