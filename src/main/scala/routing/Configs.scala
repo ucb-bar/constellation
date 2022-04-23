@@ -2,6 +2,7 @@ package constellation.routing
 
 import freechips.rocketchip.config.{Field, Parameters, Config}
 import constellation.noc.{NoCKey}
+import constellation.topology.{TerminalPlane}
 
 /** Creates N non-blocking virtual networks. Non-blocking virtual networks can share the physical
  *  resources of the NoC. However, if one virtual network is blocked, the others are not.
@@ -10,8 +11,7 @@ import constellation.noc.{NoCKey}
  */
 class WithNNonblockingVirtualNetworks(n: Int) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
-    routingRelation = RoutingRelation.nonblockingVirtualSubnetworks(
-      up(NoCKey, site).routingRelation, n),
+    routingRelation = new NonblockingVirtualSubnetworksRouting(up(NoCKey, site).routingRelation, n),
     nVirtualNetworks = n
   )
 })
@@ -24,8 +24,7 @@ class WithNNonblockingVirtualNetworks(n: Int) extends Config((site, here, up) =>
  */
 class WithNBlockingVirtualNetworks(n: Int, nDedicatedChannels: Int = 1) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
-    routingRelation = RoutingRelation.blockingVirtualSubnetworks(
-      up(NoCKey, site).routingRelation, n, nDedicatedChannels),
+    routingRelation = new BlockingVirtualSubnetworksRouting(up(NoCKey, site).routingRelation, n, nDedicatedChannels),
     nVirtualNetworks = n,
     vNetBlocking = (blocker: Int, blockee: Int) => blocker < blockee
   )
@@ -41,9 +40,19 @@ class WithNBlockingVirtualNetworks(n: Int, nDedicatedChannels: Int = 1) extends 
  */
 class WithNNonblockingVirtualNetworksWithSharing(n: Int, nSharedChannels: Int = 1) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(
-    routingRelation = RoutingRelation.sharedNonblockingVirtualSubnetworks(
+    routingRelation = new SharedNonblockingVirtualSubnetworksRouting(
       up(NoCKey, site).routingRelation, n, nSharedChannels),
     nVirtualNetworks = n
   )
 })
 
+class WithRoutingRelation(r: RoutingRelation) extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(routingRelation = r)
+})
+
+class WithTerminalPlaneRouting extends Config((site, here, up) => {
+  case NoCKey => {
+    val base = up(NoCKey).topology.asInstanceOf[TerminalPlane].base
+    up(NoCKey).copy(routingRelation = new TerminalPlaneRouting(up(NoCKey).routingRelation, base.nNodes))
+  }
+})

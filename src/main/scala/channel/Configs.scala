@@ -2,7 +2,7 @@ package constellation.channel
 
 import freechips.rocketchip.config.{Field, Parameters, Config}
 import constellation.noc.{NoCKey}
-import constellation.topology.BidirectionalTree
+import constellation.topology.{BidirectionalTree, TerminalPlane}
 
 import scala.math.{floor, log10, pow, max}
 
@@ -96,4 +96,16 @@ class WithFatTreeChannels(mult: Int) extends Config((site, here, up) => {
       p.copy(srcMultiplier = multiplier,
              destMultiplier = multiplier)
   })
+})
+
+class WithTerminalPlaneIngressEgress extends Config((site, here, up) => {
+  case NoCKey => {
+    val topo = up(NoCKey).topology.asInstanceOf[TerminalPlane]
+    require(up(NoCKey).ingresses.map(_.destId).max < topo.base.nNodes)
+    require(up(NoCKey).egresses .map(_.srcId ).max < topo.base.nNodes)
+    up(NoCKey).copy(
+      ingresses = up(NoCKey).ingresses.map(i => i.copy(destId = i.destId + topo.base.nNodes)),
+      egresses  = up(NoCKey). egresses.map(i => i.copy( srcId =  i.srcId + topo.base.nNodes * 2))
+    )
+  }
 })

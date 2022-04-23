@@ -11,7 +11,7 @@ import freechips.rocketchip.util._
 
 import constellation.noc.{NoC, NoCKey, NoCParams, NoCTerminalIO}
 import constellation.channel._
-import constellation.topology.{TerminalPlaneTopology}
+import constellation.topology.{TerminalPlane}
 
 import scala.collection.immutable.ListMap
 
@@ -401,7 +401,7 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
       // If desired, create a private noc
       require(nocParams.nVirtualNetworks == 5)
       val (ingressOffset, egressOffset) = nocParams.topology match {
-        case t: TerminalPlaneTopology => (t.base.nNodes, t.base.nNodes * 2)
+        case t: TerminalPlane => (t.base.nNodes, t.base.nNodes * 2)
         case _ => (0, 0)
       }
       val flowParams = (0 until in.size).map { i => (0 until out.size).map { o =>

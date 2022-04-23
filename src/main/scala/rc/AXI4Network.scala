@@ -11,7 +11,7 @@ import freechips.rocketchip.amba.axi4._
 
 import constellation.noc.{NoC, NoCKey, NoCParams, NoCTerminalIO}
 import constellation.channel._
-import constellation.topology.{TerminalPlaneTopology}
+import constellation.topology.{TerminalPlane}
 
 case class AXI4NoCParams(
   nocName: String,
@@ -305,7 +305,7 @@ class AXI4NoC(params: AXI4NoCParams)(implicit p: Parameters) extends LazyModule 
     val outNames = genUniqueName(edgesOut.map(_.slave.slaves.map(_.name)))
 
     val (ingressOffset, egressOffset) = nocParams.topology match {
-      case t: TerminalPlaneTopology => (t.base.nNodes, t.base.nNodes * 2)
+      case t: TerminalPlane => (t.base.nNodes, t.base.nNodes * 2)
       case _ => (0, 0)
     }
 
