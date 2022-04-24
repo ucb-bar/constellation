@@ -62,7 +62,6 @@ case class VirtualChannelParams(
   vc: Int,
   bufferSize: Int,
   possibleFlows: Set[FlowRoutingInfo],
-  uniqueId: Int,
 ) {
   val traversable = possibleFlows.size > 0
   require(bufferSize > 0, s"Illegal $this")
@@ -111,7 +110,6 @@ object ChannelParams {
     destId: Int,
     payloadBits: Int,
     user: UserChannelParams,
-    uniqueId: Int
   ): ChannelParams = {
     ChannelParams(
       srcId = srcId,
@@ -121,7 +119,7 @@ object ChannelParams {
       destMultiplier = user.destMultiplier,
       channelGen = user.channelGen,
       virtualChannelParams = user.virtualChannelParams.zipWithIndex.map { case (vP, vc) =>
-        VirtualChannelParams(srcId, destId, vc, vP.bufferSize, Set[FlowRoutingInfo](), uniqueId)
+        VirtualChannelParams(srcId, destId, vc, vP.bufferSize, Set[FlowRoutingInfo]())
       }
     )
   }
@@ -129,7 +127,6 @@ object ChannelParams {
 
 case class IngressChannelParams(
   ingressId: Int,
-  uniqueId: Int,
   destId: Int,
   possibleFlows: Set[FlowRoutingInfo],
   vNetId: Int,
@@ -142,7 +139,6 @@ case class IngressChannelParams(
 object IngressChannelParams {
   def apply(
     ingressId: Int,
-    uniqueId: Int,
     flows: Seq[FlowParams],
     user: UserIngressParams,
     egresses: Seq[UserEgressParams]
@@ -151,7 +147,6 @@ object IngressChannelParams {
     ourFlows.foreach(f => require(f.vNetId == user.vNetId && f.vNetId == egresses(f.egressId).vNetId))
     IngressChannelParams(
       ingressId = ingressId,
-      uniqueId = uniqueId,
       destId = user.destId,
       possibleFlows = ourFlows.map(f =>
         FlowRoutingInfo(f.ingressId, f.egressId, user.vNetId, egresses(f.egressId).srcId)
@@ -166,7 +161,6 @@ object IngressChannelParams {
 
 case class EgressChannelParams(
   egressId: Int,
-  uniqueId: Int,
   possibleFlows: Set[FlowRoutingInfo],
   srcId: Int,
   payloadBits: Int
@@ -178,7 +172,6 @@ case class EgressChannelParams(
 object EgressChannelParams {
   def apply(
     egressId: Int,
-    uniqueId: Int,
     flows: Seq[FlowParams],
     user: UserEgressParams): EgressChannelParams = {
     val ourFlows = flows.filter(_.egressId == egressId)
@@ -188,7 +181,6 @@ object EgressChannelParams {
       require(vNetIds.head == user.vNetId)
     EgressChannelParams(
       egressId = egressId,
-      uniqueId = uniqueId,
       possibleFlows = ourFlows.map(f =>
         FlowRoutingInfo(f.ingressId, egressId, vNetIds.head, user.srcId)
       ).toSet,

@@ -68,13 +68,6 @@ object InternalNoCParams {
     val nocName = nocParams.nocName
     val skipValidationChecks = nocParams.skipValidationChecks
 
-    var uniqueChannelId = 0
-    def getUniqueChannelId(): Int = {
-      val r = uniqueChannelId
-      uniqueChannelId = uniqueChannelId + 1
-      r
-    }
-
     val channelParams = Seq.tabulate(nNodes, nNodes) { case (i,j) =>
       if (nocParams.topology.topo(i, j)) {
         val cP = nocParams.channelParamGen(i, j)
@@ -84,7 +77,6 @@ object InternalNoCParams {
           destId = j,
           payloadBits = payloadBits,
           user = cP,
-          uniqueId = getUniqueChannelId()
         ))
       } else {
         None
@@ -109,7 +101,6 @@ object InternalNoCParams {
         user = u,
         ingressId = i,
         flows = nocParams.flows,
-        uniqueId = getUniqueChannelId(),
         egresses = nocParams.egresses
       )
     }}
@@ -118,7 +109,6 @@ object InternalNoCParams {
       EgressChannelParams(
         user = u,
         egressId = e,
-        uniqueId = getUniqueChannelId(),
         flows = nocParams.flows
       )
     }}
