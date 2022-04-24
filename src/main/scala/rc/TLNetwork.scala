@@ -378,7 +378,7 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
 
     def getIndex(nodeMapping: Seq[String], l: String) = {
       val matches = nodeMapping.map(k => l.contains(k))
-      require(matches.filter(i => i).size == 1, s"Unable to find valid mapping for $l")
+      require(matches.filter(i => i).size == 1, s"$nocName unable to find valid mapping for $l\n$nodeMapping")
       matches.indexWhere(i => i)
     }
 

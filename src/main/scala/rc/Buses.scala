@@ -94,10 +94,12 @@ class ConstellationMemoryBus(mbus_params: MemoryBusParams, noc_params: TLNoCPara
 
 case class ConstellationPeripheryBusParams(
   params: PeripheryBusParams,
-  privateNoC: Option[NoCParams]
+  privateNoC: Option[NoCParams],
+  explicitPayloadWidth: Option[Int] = None
 ) extends TLBusWrapperInstantiationLike {
   def instantiate(context: HasTileLinkLocations, loc: Location[TLBusWrapper])(implicit p: Parameters): ConstellationPeripheryBus = {
-    val base_noc_params = TLNoCParams(loc.name, p(ConstellationTLNetworkNodeMappingKey(loc)), privateNoC)
+    val base_noc_params = TLNoCParams(loc.name, p(ConstellationTLNetworkNodeMappingKey(loc)), privateNoC,
+      explicitPayloadWidth=explicitPayloadWidth)
     val noc_params = context match {
       case c: CanHaveGlobalTLInterconnect =>
         base_noc_params.copy(globalTerminalChannels = Some(() => c.getSubnetTerminalChannels(MBUS)))

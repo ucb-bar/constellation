@@ -50,9 +50,11 @@ class WithMbusNoC extends Config((site, here, up) => {
 })
 
 // Use a noc based control bus. By default instantiates a private noc within the bus
-class WithNbusNoC(in: Int, f: Int => Int) extends Config((site, here, up) => {
+class WithNbusNoC(in: Int, f: Int => Int, explicitWidth: Option[Int] = None) extends Config((site, here, up) => {
   case TLNetworkTopologyLocated(InSubsystem) => up(TLNetworkTopologyLocated(InSubsystem)) ++ Seq(
-    NoCControlBusTopologyParams(nbus=ConstellationPeripheryBusParams(site(PeripheryBusKey), Some(up(NoCKey))))
+    NoCControlBusTopologyParams(nbus=ConstellationPeripheryBusParams(
+      site(PeripheryBusKey), Some(up(NoCKey)), explicitWidth
+    ))
   )
   case ConstellationTLNetworkNodeMappingKey(NBUS) => ConstellationDiplomaticNetworkNodeMapping(
     inNodeMapping = ListMap("" -> in), // the inwards should only have 1 connection
