@@ -21,7 +21,7 @@ case class UserRouterParams(
   // Adds combinational path from SA to VA
   coupleSAVA: Boolean = false,
   earlyRC: Boolean = false,
-  vcAllocator: VCAllocatorParams => Parameters => VCAllocator = (vP) => (p) => new IterativeVCAllocator(vP)(p)
+  vcAllocator: VCAllocatorParams => Parameters => VCAllocator = (vP) => (p) => new RotatingSingleVCAllocator(vP)(p)
 )
 
 case class RouterParams(

@@ -40,17 +40,15 @@ class WithEarlyRC extends Config((site, here, up) => {
 })
 
 
-class WithIterativeVCAllocator extends Config((site, here, up) => {
+class WithVCAllocator(vc: VCAllocatorParams => Parameters => VCAllocator) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(routerParams = (i: Int) =>
-    up(NoCKey, site).routerParams(i).copy(vcAllocator = (vP) => (p) => new IterativeVCAllocator(vP)(p))
+    up(NoCKey, site).routerParams(i).copy(vcAllocator = vc)
   )
 })
 
-class WithSimpleVCAllocator extends Config((site, here, up) => {
-  case NoCKey => up(NoCKey, site).copy(routerParams = (i: Int) =>
-    up(NoCKey, site).routerParams(i).copy(vcAllocator = (vP) => (p) => new SimpleVCAllocator(vP)(p))
-  )
-})
+class WithPIMMultiVCAllocator extends WithVCAllocator(vP => p => new PIMMultiVCAllocator(vP)(p))
+class WithISLIPMultiVCAllocator extends WithVCAllocator(vP => p => new ISLIPMultiVCAllocator(vP)(p))
+class WithRotatingSingleVCAllocator extends WithVCAllocator(vP => p => new RotatingSingleVCAllocator(vP)(p))
 
 class WithPayloadBits(w: Int, routers: Seq[Int]) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(routerParams = (i: Int) =>

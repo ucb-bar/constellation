@@ -22,8 +22,8 @@ class AbstractInputUnitIO(
   val router_req = Decoupled(new RouteComputerReq(cParam))
   val router_resp = Flipped(Valid(new RouteComputerResp(cParam, outParams, egressParams)))
 
-  val vcalloc_req = Vec(nVirtualChannels, Decoupled(new VCAllocReqPerInputVC(outParams, egressParams)))
-  val vcalloc_resp = Flipped(Valid(new VCAllocResp(cParam, outParams, egressParams)))
+  val vcalloc_req = Vec(nVirtualChannels, Decoupled(new VCAllocReq(outParams, egressParams)))
+  val vcalloc_resp = Flipped(Vec(nVirtualChannels, Valid(new VCAllocResp(cParam, outParams, egressParams))))
 
   val out_credit_available = Input(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) }))
 
@@ -180,14 +180,11 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
 
   io.debug.va_stall := PopCount(io.vcalloc_req.map { i => i.valid && !i.ready })
 
-  when (io.vcalloc_resp.fire()) {
-    val id = io.vcalloc_resp.bits.in_virt_channel
-    for (i <- 0 until nVirtualChannels) {
-      when (i.U === id) {
-        states(i).vc_sel := io.vcalloc_resp.bits.vc_sel
-      }
+  for (i <- 0 until nVirtualChannels) {
+    when (io.vcalloc_resp(i).fire()) {
+      states(i).vc_sel := io.vcalloc_resp(i).bits.vc_sel
+      states(i).g := g_a
     }
-    states(id).g := g_a
   }
   val salloc_arb = Module(new GrantHoldArbiter(
     new SwitchAllocReq(outParams, egressParams),

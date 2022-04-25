@@ -9,38 +9,21 @@ import freechips.rocketchip.rocket.{DecodeLogic}
 
 import constellation.channel._
 import constellation.noc.{HasNoCParams}
-import constellation.routing.{FlowRoutingBundle, FlowRoutingInfo}
-
-class VCAllocReqPerInputVC(
-  val outParams: Seq[ChannelParams],
-  val egressParams: Seq[EgressChannelParams])
-  (implicit val p: Parameters) extends Bundle
-    with HasRouterOutputParams
-    with HasNoCParams {
-  val flow = new FlowRoutingBundle
-  val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
-}
-
+import constellation.routing.{FlowRoutingBundle, FlowRoutingInfo, ChannelRoutingInfo}
 
 class VCAllocReq(
-  val inParams: Seq[ChannelParams],
-  val ingressParams: Seq[IngressChannelParams],
   val outParams: Seq[ChannelParams],
   val egressParams: Seq[EgressChannelParams])
   (implicit val p: Parameters) extends Bundle
     with HasRouterOutputParams
-    with HasRouterInputParams
     with HasNoCParams {
   val flow = new FlowRoutingBundle
-  val in_id = UInt(log2Ceil(allInParams.size).W)
-  val in_virt_channel = UInt(log2Ceil(allInParams.map(_.nVirtualChannels).max).W)
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
 }
 
 class VCAllocResp(val cParam: BaseChannelParams, val outParams: Seq[ChannelParams], val egressParams: Seq[EgressChannelParams])(implicit val p: Parameters) extends Bundle
     with HasChannelParams
     with HasRouterOutputParams {
-  val in_virt_channel = UInt(virtualChannelBits.W)
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
 }
 
@@ -65,10 +48,11 @@ abstract class VCAllocator(val vP: VCAllocatorParams)(implicit val p: Parameters
 
   val io = IO(new Bundle {
     val req = MixedVec(allInParams.map { u =>
-      Flipped(Vec(u.nVirtualChannels, Decoupled(new VCAllocReqPerInputVC(outParams, egressParams))))
+      Flipped(Vec(u.nVirtualChannels, Decoupled(new VCAllocReq(outParams, egressParams))))
     })
     val resp = MixedVec(allInParams.map { u =>
-      Valid(new VCAllocResp(u, outParams, egressParams)) })
+      Vec(u.nVirtualChannels, Valid(new VCAllocResp(u, outParams, egressParams)))
+    })
 
     val channel_status = MixedVec(allOutParams.map { u =>
       Vec(u.nVirtualChannels, Input(new OutputChannelStatus)) })
@@ -77,35 +61,8 @@ abstract class VCAllocator(val vP: VCAllocatorParams)(implicit val p: Parameters
   })
   val nOutChannels = allOutParams.map(_.nVirtualChannels).sum
 
-  // Remaps the channels/virt channels such that lower-indexed virt channels are
-  // first. Kludgy solution
-  def getIdx(outChannel: Int, outVirtChannel: Int): Int = {
-    require(outChannel < nAllOutputs &&
-      outVirtChannel < allOutParams(outChannel).nVirtualChannels)
-    if (outChannel < nOutputs) {
-      (0 until outVirtChannel).map(v =>
-        outParams.count(_.nVirtualChannels > v)
-      ).sum + outParams.take(outChannel).count(_.nVirtualChannels > outVirtChannel)
-    } else {
-      require(outVirtChannel == 0)
-      outParams.map(_.nVirtualChannels).sum + outChannel - nOutputs
-    }
-  }
-  def getOutChannelInfo(idx: Int): (Int, Int) = {
-    for (outId <- 0 until nAllOutputs)
-      for (outVirtId <- 0 until allOutParams(outId).nVirtualChannels)
-        if (getIdx(outId, outVirtId) == idx) return (outId, outVirtId)
-    require(false)
-    return (-1, -1)
-  }
-  def getOutChannelInfo(idx: UInt): (UInt, UInt) = {
-    val outId = MuxLookup(idx, 0.U(1.W), (0 until nOutChannels).map(i =>
-      i.U -> getOutChannelInfo(i)._1.U
-    ))
-    val outVirtId = MuxLookup(idx, 0.U(1.W), (0 until nOutChannels).map(i =>
-      i.U -> getOutChannelInfo(i)._2.U
-    ))
-    (outId, outVirtId)
-  }
+  def inputAllocPolicy(req: VCAllocReq, fire: Bool): MixedVec[Vec[Bool]]
+  def outputAllocPolicy(out: ChannelRoutingInfo,
+    flows: Seq[Seq[FlowRoutingBundle]], reqs: Seq[Seq[Bool]], fire: Bool): MixedVec[Vec[Bool]]
 
 }

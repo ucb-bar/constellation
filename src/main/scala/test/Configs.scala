@@ -307,7 +307,7 @@ class TestConfig37 extends Config(
   new constellation.routing.WithRoutingRelation(new Mesh2DEscapeRouting(3, 3)) ++
   new constellation.topology.WithTopology(new Mesh2D(3, 3)))
 class TestConfig38 extends Config(
-  new constellation.router.WithSimpleVCAllocator ++
+  new constellation.router.WithISLIPMultiVCAllocator ++
   new constellation.channel.WithUniformNVirtualChannels(2, UserVirtualChannelParams(2)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithIngresses(0 until 9) ++

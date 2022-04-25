@@ -81,8 +81,8 @@ class IngressUnit(
   route_q.io.deq.ready := (route_buffer.io.deq.fire() && tail)
 
 
-  vcalloc_q.io.enq.valid := io.vcalloc_resp.valid
-  vcalloc_q.io.enq.bits := io.vcalloc_resp.bits
+  vcalloc_q.io.enq.valid := io.vcalloc_resp(0).valid
+  vcalloc_q.io.enq.bits := io.vcalloc_resp(0).bits
   assert(!(vcalloc_q.io.enq.valid && !vcalloc_q.io.enq.ready))
 
   io.salloc_req(0).bits.vc_sel := vcalloc_q.io.deq.bits.vc_sel
