@@ -41,8 +41,9 @@ abstract class SingleVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) 
   // Input arbitration
   io.req.foreach(_.foreach(_.ready := false.B))
   val in_alloc = Wire(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) }))
+
   in_alloc := Mux(in_arb.io.out.valid,
-    inputAllocPolicy(in_arb.io.out.bits, io.req.map(_.map(_.fire).orR).orR),
+    inputAllocPolicy(in_arb.io.out.bits, in_sel, io.req.map(_.map(_.fire).orR).orR),
     0.U.asTypeOf(in_alloc))
 
   // send allocation to inputunits

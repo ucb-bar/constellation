@@ -61,7 +61,7 @@ abstract class VCAllocator(val vP: VCAllocatorParams)(implicit val p: Parameters
   })
   val nOutChannels = allOutParams.map(_.nVirtualChannels).sum
 
-  def inputAllocPolicy(req: VCAllocReq, fire: Bool): MixedVec[Vec[Bool]]
+  def inputAllocPolicy(req: VCAllocReq, srcSel: MixedVec[Vec[Bool]], fire: Bool): MixedVec[Vec[Bool]]
   def outputAllocPolicy(out: ChannelRoutingInfo,
     flows: Seq[Seq[FlowRoutingBundle]], reqs: Seq[Seq[Bool]], fire: Bool): MixedVec[Vec[Bool]]
 

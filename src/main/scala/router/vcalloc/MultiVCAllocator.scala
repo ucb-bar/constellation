@@ -17,8 +17,12 @@ abstract class MultiVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) e
   io.req.foreach(_.foreach(_.ready := false.B))
   val in_allocs = allInParams.zipWithIndex.map { case (iP,i) =>
     (0 until iP.nVirtualChannels).map { j =>
+      val sel = Wire(MixedVec(allInParams.map { u => Vec(u.nVirtualChannels, Bool()) }))
+      sel.foreach(_.foreach(_ := false.B))
+      sel(i)(j) := true.B
       val a = Wire(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) }))
-      a := Mux(io.req(i)(j).valid, inputAllocPolicy(io.req(i)(j).bits, io.req(i)(j).fire()),
+      a := Mux(io.req(i)(j).valid,
+        inputAllocPolicy(io.req(i)(j).bits, sel, io.req(i)(j).fire()),
         0.U.asTypeOf(a))
       a
     }

@@ -24,12 +24,6 @@ case class ChannelRoutingInfo(
   val isEgress = dst == -1
 }
 
-class ChannelRoutingBundle extends Bundle {
-  val src = UInt()
-  val vc = UInt()
-  val dst = UInt()
-}
-
 /** Represents the properties of a packet that are relevant for routing
   * ingressId and egressId uniquely identify a flow, but vnet and dst are used here
   * to simplify the implementation of routingrelations

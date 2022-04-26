@@ -30,7 +30,7 @@ trait ISLIP { this: VCAllocator =>
     }
   }
 
-  def inputAllocPolicy(req: VCAllocReq, fire: Bool) = {
+  def inputAllocPolicy(req: VCAllocReq, sel: MixedVec[Vec[Bool]], fire: Bool) = {
     islip(req.vc_sel.asUInt, fire).asTypeOf(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool())}))
   }
   def outputAllocPolicy(out: ChannelRoutingInfo,

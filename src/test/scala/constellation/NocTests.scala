@@ -107,6 +107,8 @@ class NoCTest64 extends NoCTest(Seq(new TestConfig64))
 class NoCTest65 extends NoCTest(Seq(new TestConfig65))
 class NoCTest66 extends NoCTest(Seq(new TestConfig66))
 class NoCTest67 extends NoCTest(Seq(new TestConfig67))
+class NoCTest68 extends NoCTest(Seq(new TestConfig68))
+class NoCTest69 extends NoCTest(Seq(new TestConfig69))
 
 class NoCTestTL00 extends TLNoCTest(Seq(new TLTestConfig00))
 class NoCTestTL01 extends TLNoCTest(Seq(new TLTestConfig01))

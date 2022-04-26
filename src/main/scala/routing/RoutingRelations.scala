@@ -1,6 +1,6 @@
 package constellation.routing
 
-import scala.math.pow
+import scala.math.{min, max, pow}
 import scala.collection.mutable.HashMap
 import freechips.rocketchip.config.{Parameters}
 
@@ -25,7 +25,8 @@ abstract class RoutingRelation {
   }
 
   def isEscape(c: ChannelRoutingInfo, vNetId: Int): Boolean = true
-
+  def getNPrios(src: ChannelRoutingInfo): Int = 1
+  def getPrio(src: ChannelRoutingInfo, a: ChannelRoutingInfo, flow: FlowRoutingInfo): Int = 0
 }
 
 /** Given a deadlock-prone routing relation and a routing relation representing the network's escape
@@ -59,6 +60,24 @@ class EscapeChannelRouting(
   override def isEscape(c: ChannelRoutingInfo, v: Int) = {
     c.isIngress || c.isEgress || c.vc < nEscapeChannels
   }
+  override def getNPrios(c: ChannelRoutingInfo): Int = {
+    escapeRouter.getNPrios(c) + normalRouter.getNPrios(c)
+  }
+  override def getPrio(src: ChannelRoutingInfo, a: ChannelRoutingInfo, flow: FlowRoutingInfo): Int = {
+    val aEscape = isEscape(a, flow.vNet)
+    val nSrc = if (src.isIngress) {
+      src
+    } else if (isEscape(src, flow.vNet)) {
+      src.copy(vc=src.vc, n_vc=nEscapeChannels)
+    } else {
+      src.copy(vc=src.vc-nEscapeChannels, n_vc=src.n_vc-nEscapeChannels)
+    }
+    if (aEscape) {
+      escapeRouter.getPrio(nSrc, a.copy(n_vc=nEscapeChannels), flow) + normalRouter.getNPrios(src)
+    } else {
+      normalRouter.getPrio(nSrc, a.copy(vc=a.vc-nEscapeChannels, n_vc=a.n_vc-nEscapeChannels), flow)
+    }
+  }
 }
 
 /**
@@ -66,6 +85,16 @@ class EscapeChannelRouting(
   */
 class AllLegalRouting extends RoutingRelation {
   def rel(nodeId: Int, srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = true
+}
+
+class UnidirectionalLineRouting extends RoutingRelation {
+  def rel(nodeId: Int, srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+    nxtC.dst <= flow.dst
+  }
+  override def getNPrios(src: ChannelRoutingInfo) = 4
+  override def getPrio(src: ChannelRoutingInfo, a: ChannelRoutingInfo, flow: FlowRoutingInfo): Int = {
+    max(src.dst - a.dst + getNPrios(src), 0)
+  }
 }
 
 /** An example of the parameter `f` for the RoutingRelation class that routes traffic along a
