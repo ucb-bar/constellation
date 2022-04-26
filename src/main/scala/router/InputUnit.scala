@@ -22,8 +22,8 @@ class AbstractInputUnitIO(
   val router_req = Decoupled(new RouteComputerReq(cParam))
   val router_resp = Flipped(Valid(new RouteComputerResp(cParam, outParams, egressParams)))
 
-  val vcalloc_req = Vec(nVirtualChannels, Decoupled(new VCAllocReq(outParams, egressParams)))
-  val vcalloc_resp = Flipped(Vec(nVirtualChannels, Valid(new VCAllocResp(cParam, outParams, egressParams))))
+  val vcalloc_req = Decoupled(new VCAllocReq(cParam, outParams, egressParams))
+  val vcalloc_resp = Flipped(Valid(new VCAllocResp(cParam, outParams, egressParams)))
 
   val out_credit_available = Input(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) }))
 
@@ -160,9 +160,16 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     }
   }
 
-  (io.vcalloc_req zip states).zipWithIndex.map { case ((i,s),idx) =>
+  val vcalloc_arb = Module(new RRArbiter(
+    new VCAllocReq(cParam, outParams, egressParams),
+    nVirtualChannels
+  ))
+  io.vcalloc_req <> vcalloc_arb.io.out
+
+  (vcalloc_arb.io.in zip states).zipWithIndex.map { case ((i,s),idx) =>
     if (virtualChannelParams(idx).traversable) {
       i.valid := s.g === g_v
+      i.bits.in_vc := idx.U
       i.bits.vc_sel := s.vc_sel
       i.bits.flow := s.flow
       when (i.fire()) { s.g := g_v_stall }
@@ -178,12 +185,15 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     }
   }
 
-  io.debug.va_stall := PopCount(io.vcalloc_req.map { i => i.valid && !i.ready })
+  io.debug.va_stall := PopCount(vcalloc_arb.io.in.map { i => i.valid && !i.ready })
 
-  for (i <- 0 until nVirtualChannels) {
-    when (io.vcalloc_resp(i).fire()) {
-      states(i).vc_sel := io.vcalloc_resp(i).bits.vc_sel
-      states(i).g := g_a
+  when (io.vcalloc_resp.fire()) {
+    for (i <- 0 until nVirtualChannels) {
+      when (io.vcalloc_resp.bits.in_vc === i.U) {
+        states(i).vc_sel := io.vcalloc_resp.bits.vc_sel
+        states(i).g := g_a
+        assert(states(i).g.isOneOf(g_v, g_v_stall))
+      }
     }
   }
   val salloc_arb = Module(new GrantHoldArbiter(

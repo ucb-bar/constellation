@@ -30,18 +30,11 @@ trait ISLIP { this: VCAllocator =>
     }
   }
 
-  def inputAllocPolicy(req: VCAllocReq, sel: MixedVec[Vec[Bool]], fire: Bool) = {
-    islip(req.vc_sel.asUInt, fire).asTypeOf(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool())}))
+  def inputAllocPolicy(flow: FlowRoutingBundle, vc_sel: MixedVec[Vec[Bool]], inId: UInt, inVId: UInt, fire: Bool) = {
+    islip(vc_sel.asUInt, fire).asTypeOf(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool())}))
   }
-  def outputAllocPolicy(out: ChannelRoutingInfo,
-    flows: Seq[Seq[FlowRoutingBundle]], reqs: Seq[Seq[Bool]], fire: Bool): MixedVec[Vec[Bool]] = {
-    val in = Wire(MixedVec(allInParams.map { u => Vec(u.nVirtualChannels, Bool()) }))
-    for (i <- 0 until allInParams.size) {
-      (0 until allInParams(i).nVirtualChannels).map { j =>
-        in(i)(j) := reqs(i)(j)
-      }
-    }
-    islip(in.asUInt, fire).asTypeOf(new MixedVec(allInParams.map { u => Vec(u.nVirtualChannels, Bool()) }))
+  def outputAllocPolicy(channel: ChannelRoutingInfo, flows: Seq[FlowRoutingBundle], reqs: Seq[Bool], fire: Bool) = {
+    islip(VecInit(reqs).asUInt, fire).asTypeOf(Vec(allInParams.size, Bool()))
   }
 }
 

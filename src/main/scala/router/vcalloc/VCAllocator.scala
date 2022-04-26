@@ -12,18 +12,21 @@ import constellation.noc.{HasNoCParams}
 import constellation.routing.{FlowRoutingBundle, FlowRoutingInfo, ChannelRoutingInfo}
 
 class VCAllocReq(
+  val inParam: BaseChannelParams,
   val outParams: Seq[ChannelParams],
   val egressParams: Seq[EgressChannelParams])
   (implicit val p: Parameters) extends Bundle
     with HasRouterOutputParams
     with HasNoCParams {
   val flow = new FlowRoutingBundle
+  val in_vc = UInt(log2Ceil(inParam.nVirtualChannels).W)
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
 }
 
 class VCAllocResp(val cParam: BaseChannelParams, val outParams: Seq[ChannelParams], val egressParams: Seq[EgressChannelParams])(implicit val p: Parameters) extends Bundle
     with HasChannelParams
     with HasRouterOutputParams {
+  val in_vc = UInt(log2Ceil(cParam.nVirtualChannels).W)
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
 }
 
@@ -48,10 +51,10 @@ abstract class VCAllocator(val vP: VCAllocatorParams)(implicit val p: Parameters
 
   val io = IO(new Bundle {
     val req = MixedVec(allInParams.map { u =>
-      Flipped(Vec(u.nVirtualChannels, Decoupled(new VCAllocReq(outParams, egressParams))))
+      Flipped(Decoupled(new VCAllocReq(u, outParams, egressParams)))
     })
     val resp = MixedVec(allInParams.map { u =>
-      Vec(u.nVirtualChannels, Valid(new VCAllocResp(u, outParams, egressParams)))
+      Valid(new VCAllocResp(u, outParams, egressParams))
     })
 
     val channel_status = MixedVec(allOutParams.map { u =>
@@ -61,8 +64,11 @@ abstract class VCAllocator(val vP: VCAllocatorParams)(implicit val p: Parameters
   })
   val nOutChannels = allOutParams.map(_.nVirtualChannels).sum
 
-  def inputAllocPolicy(req: VCAllocReq, srcSel: MixedVec[Vec[Bool]], fire: Bool): MixedVec[Vec[Bool]]
-  def outputAllocPolicy(out: ChannelRoutingInfo,
-    flows: Seq[Seq[FlowRoutingBundle]], reqs: Seq[Seq[Bool]], fire: Bool): MixedVec[Vec[Bool]]
+  def inputAllocPolicy(
+    flow: FlowRoutingBundle, vc_sel: MixedVec[Vec[Bool]],
+    inId: UInt, inVId: UInt, fire: Bool): MixedVec[Vec[Bool]]
+  def outputAllocPolicy(
+    out: ChannelRoutingInfo,
+    flows: Seq[FlowRoutingBundle], reqs: Seq[Bool], fire: Bool): Vec[Bool]
 
 }

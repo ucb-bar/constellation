@@ -15,56 +15,49 @@ import constellation.routing.{ChannelRoutingInfo, FlowRoutingBundle}
 abstract class SingleVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) extends VCAllocator(vP)(p) {
   // get single input
   val in_arb = Module(new RRArbiter(
-    new VCAllocReq(outParams, egressParams),
-    allInParams.map(_.nVirtualChannels).sum
+    MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) }),
+    allInParams.size,
   ))
   in_arb.io.out.ready := true.B
 
-  var t = 0
-  val in_sel = Wire(MixedVec(allInParams.map { u => Vec(u.nVirtualChannels, Bool()) }))
+  val in_oh = UIntToOH(in_arb.io.chosen)
   for (i <- 0 until allInParams.size) {
-    (0 until allInParams(i).nVirtualChannels).map { j =>
-      in_arb.io.in(t).valid := io.req(i)(j).valid && in_arb.io.in(t).bits.vc_sel.asUInt =/= 0.U
-      in_arb.io.in(t).bits := io.req(i)(j).bits
-      for (m <- 0 until allOutParams.size) {
-        (0 until allOutParams(m).nVirtualChannels).map { n =>
-          when (!io.channel_status(m)(n).available) {
-            in_arb.io.in(t).bits.vc_sel(m)(n) := false.B
-          }
-        }
+    (0 until allOutParams.size).map { m =>
+      (0 until allOutParams(m).nVirtualChannels).map { n =>
+        in_arb.io.in(i).bits(m)(n) := io.req(i).bits.vc_sel(m)(n) && !io.channel_status(m)(n).occupied
       }
-      in_sel(i)(j) := in_arb.io.chosen === t.U
-      t += 1
     }
+
+    in_arb.io.in(i).valid := io.req(i).valid && in_arb.io.in(i).bits.map(_.orR).orR
   }
 
   // Input arbitration
-  io.req.foreach(_.foreach(_.ready := false.B))
+  io.req.foreach(_.ready := false.B)
   val in_alloc = Wire(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) }))
-
+  val in_flow = Mux1H(in_oh, io.req.map(_.bits.flow))
+  val in_vc = Mux1H(in_oh, io.req.map(_.bits.in_vc))
   in_alloc := Mux(in_arb.io.out.valid,
-    inputAllocPolicy(in_arb.io.out.bits, in_sel, io.req.map(_.map(_.fire).orR).orR),
+    inputAllocPolicy(in_flow, in_arb.io.out.bits, in_arb.io.chosen, in_vc, io.req.map(_.fire).orR),
     0.U.asTypeOf(in_alloc))
 
   // send allocation to inputunits
   for (i <- 0 until allInParams.size) {
-    (0 until allInParams(i).nVirtualChannels).map { j =>
-      io.resp(i)(j).valid := in_sel(i)(j) && in_arb.io.out.valid
-      io.req(i)(j).ready := io.resp(i)(j).valid
-      for (m <- 0 until allOutParams.size) {
-        (0 until allOutParams(m).nVirtualChannels).map { n =>
-          io.resp(i)(j).bits.vc_sel(m)(n) := in_alloc(m)(n)
-        }
+    io.resp(i).valid := in_arb.io.chosen === i.U && in_arb.io.out.valid
+    io.resp(i).bits.in_vc := Mux1H(in_oh, io.req.map(_.bits.in_vc))
+    io.req(i).ready := io.resp(i).valid
+    for (m <- 0 until allOutParams.size) {
+      (0 until allOutParams(m).nVirtualChannels).map { n =>
+        io.resp(i).bits.vc_sel(m)(n) := in_alloc(m)(n)
       }
-      assert(PopCount(io.resp(i)(j).bits.vc_sel.asUInt) <= 1.U)
     }
+    assert(PopCount(io.resp(i).bits.vc_sel.asUInt) <= 1.U)
   }
 
   // send allocation to output units
   for (i <- 0 until allOutParams.size) {
     (0 until allOutParams(i).nVirtualChannels).map { j =>
       io.out_allocs(i)(j).alloc := in_alloc(i)(j)
-      io.out_allocs(i)(j).flow := in_arb.io.out.bits.flow
+      io.out_allocs(i)(j).flow := in_flow
     }
   }
 }

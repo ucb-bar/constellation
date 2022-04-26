@@ -28,17 +28,11 @@ trait PIM { this: VCAllocator =>
     }
   }
 
-  def inputAllocPolicy(req: VCAllocReq, sel: MixedVec[Vec[Bool]], fire: Bool) = {
-    randOH(req.vc_sel.asUInt).asTypeOf(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool())}))
+  def inputAllocPolicy(flow: FlowRoutingBundle, vc_sel: MixedVec[Vec[Bool]], inId: UInt, inVId: UInt, fire: Bool) = {
+    randOH(vc_sel.asUInt).asTypeOf(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool())}))
   }
-  def outputAllocPolicy(channel: ChannelRoutingInfo, flows: Seq[Seq[FlowRoutingBundle]], reqs: Seq[Seq[Bool]], fire: Bool) = {
-    val in = Wire(MixedVec(allInParams.map { u => Vec(u.nVirtualChannels, Bool()) }))
-    for (i <- 0 until allInParams.size) {
-      (0 until allInParams(i).nVirtualChannels).map { j =>
-        in(i)(j) := reqs(i)(j)
-      }
-    }
-    randOH(in.asUInt).asTypeOf(new MixedVec(allInParams.map { u => Vec(u.nVirtualChannels, Bool()) }))
+  def outputAllocPolicy(channel: ChannelRoutingInfo, flows: Seq[FlowRoutingBundle], reqs: Seq[Bool], fire: Bool) = {
+    randOH(VecInit(reqs).asUInt).asTypeOf(Vec(allInParams.size, Bool()))
   }
 }
 

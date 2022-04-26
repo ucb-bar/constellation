@@ -15,7 +15,9 @@ import constellation.routing._
 trait Prioritizing { this: VCAllocator =>
   def prioritizing(
     in: UInt,
-    in_sel: MixedVec[Vec[Bool]],
+    inId: UInt,
+    inVId: UInt,
+//    in_sel: MixedVec[Vec[Bool]],
     dests: Seq[ChannelRoutingInfo],
     flow: FlowRoutingBundle,
     fire: Bool): UInt = {
@@ -48,14 +50,14 @@ trait Prioritizing { this: VCAllocator =>
       }}.flatten.flatten.flatten.flatten
 
       val in_split = in.asTypeOf(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool())}))
-
+      val addr = (((inVId << (log2Ceil(allInParams.size))) | inId) << flow.getWidth) | flow.asUInt
       val in_prio = (0 until allOutParams.size).map { i => (0 until allOutParams(i).nVirtualChannels).map { j =>
-        val addr = Cat(in_sel.asUInt, flow.asUInt)
         val lookup = prio_map.filter(t => t.outId == i && t.outVId == j).map { e =>
-          val sel = BigInt(1) << (allInParams.take(e.inId).map(_.nVirtualChannels).sum + e.inVId + ingressIdBits + egressIdBits)
+          val inVId = e.inVId << (log2Ceil(allInParams.size) + ingressIdBits + egressIdBits)
+          val inId = e.inId << (ingressIdBits + egressIdBits)
           val ingress = e.flow.ingressId << egressIdBits
           val egress = e.flow.egressId
-          (BitPat((sel | ingress | egress).U), BitPat((1 << e.prio).U))
+          (BitPat((inVId | inId | ingress | egress).U), BitPat((1 << e.prio).U))
         }
         Mux(in_split(i)(j), DecodeLogic(addr, BitPat.dontCare(nPrios), lookup), 0.U(nPrios.W))
       }}
@@ -88,19 +90,19 @@ trait Prioritizing { this: VCAllocator =>
     }
   }
 
-  def inputAllocPolicy(req: VCAllocReq, sel: MixedVec[Vec[Bool]], fire: Bool) = {
+  def inputAllocPolicy(flow: FlowRoutingBundle, vc_sel: MixedVec[Vec[Bool]], inId: UInt, inVId: UInt, fire: Bool) = {
     prioritizing(
-      req.vc_sel.asUInt,
-      sel,
+      vc_sel.asUInt,
+      inId,
+      inVId,
       allOutParams.map(_.channelRoutingInfos).flatten,
-      req.flow,
+      flow,
       fire).asTypeOf(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool())}))
   }
-  def outputAllocPolicy(out: ChannelRoutingInfo,
-    flows: Seq[Seq[FlowRoutingBundle]], reqs: Seq[Seq[Bool]], fire: Bool): MixedVec[Vec[Bool]] = {
-    val in = Wire(MixedVec(allInParams.map { u => Vec(u.nVirtualChannels, Bool()) }))
+
+  def outputAllocPolicy(channel: ChannelRoutingInfo, flows: Seq[FlowRoutingBundle], reqs: Seq[Bool], fire: Bool): Vec[Bool] = {
     require(false, "Not supported")
-    in
+    VecInit(reqs)
   }
 }
 
