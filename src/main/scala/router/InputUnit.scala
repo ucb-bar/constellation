@@ -160,32 +160,35 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     }
   }
 
-  val vcalloc_arb = Module(new RRArbiter(
-    new VCAllocReq(cParam, outParams, egressParams),
-    nVirtualChannels
-  ))
-  io.vcalloc_req <> vcalloc_arb.io.out
+  val mask = RegInit(0.U(nVirtualChannels.W))
+  val vcalloc_reqs = Wire(Vec(nVirtualChannels, new VCAllocReq(cParam, outParams, egressParams)))
+  val vcalloc_vals = Wire(Vec(nVirtualChannels, Bool()))
+  val vcalloc_filter = PriorityEncoderOH(Cat(vcalloc_vals.asUInt, vcalloc_vals.asUInt & ~mask))
+  val vcalloc_sel = vcalloc_filter(nVirtualChannels-1,0) | (vcalloc_filter >> nVirtualChannels)
+  mask := Mux1H(vcalloc_sel, (0 until nVirtualChannels).map { w => ~(0.U((w+1).W)) })
+  io.vcalloc_req.valid := vcalloc_vals.orR
+  io.vcalloc_req.bits := Mux1H(vcalloc_sel, vcalloc_reqs)
 
-  (vcalloc_arb.io.in zip states).zipWithIndex.map { case ((i,s),idx) =>
+  states.zipWithIndex.map { case (s,idx) =>
     if (virtualChannelParams(idx).traversable) {
-      i.valid := s.g === g_v
-      i.bits.in_vc := idx.U
-      i.bits.vc_sel := s.vc_sel
-      i.bits.flow := s.flow
-      when (i.fire()) { s.g := g_v_stall }
+      vcalloc_vals(idx) := s.g === g_v
+      vcalloc_reqs(idx).in_vc := idx.U
+      vcalloc_reqs(idx).vc_sel := s.vc_sel
+      vcalloc_reqs(idx).flow := s.flow
+      when (vcalloc_vals(idx) && vcalloc_sel(idx) && io.vcalloc_req.ready) { s.g := g_v_stall }
       if (combineRCVA) {
         when (io.router_resp.valid && io.router_resp.bits.src_virt_id === idx.U) {
-          i.valid := true.B
-          i.bits.vc_sel := io.router_resp.bits.vc_sel
+          vcalloc_vals(idx) := true.B
+          vcalloc_reqs(idx).vc_sel := io.router_resp.bits.vc_sel
         }
       }
     } else {
-      i.valid := false.B
-      i.bits := DontCare
+      vcalloc_vals(idx) := false.B
+      vcalloc_reqs(idx) := DontCare
     }
   }
 
-  io.debug.va_stall := PopCount(vcalloc_arb.io.in.map { i => i.valid && !i.ready })
+  io.debug.va_stall := PopCount(vcalloc_vals) - io.vcalloc_req.ready
 
   when (io.vcalloc_resp.fire()) {
     for (i <- 0 until nVirtualChannels) {
