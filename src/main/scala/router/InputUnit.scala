@@ -197,7 +197,9 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
       when (io.vcalloc_resp.bits.in_vc === i.U) {
         states(i).vc_sel := io.vcalloc_resp.bits.vc_sel
         states(i).g := g_a
-        assert(states(i).g.isOneOf(g_v, g_v_stall))
+        if (!combineRCVA) {
+          assert(states(i).g.isOneOf(g_v, g_v_stall))
+        }
       }
     }
   }
