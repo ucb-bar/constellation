@@ -165,7 +165,9 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   val vcalloc_vals = Wire(Vec(nVirtualChannels, Bool()))
   val vcalloc_filter = PriorityEncoderOH(Cat(vcalloc_vals.asUInt, vcalloc_vals.asUInt & ~mask))
   val vcalloc_sel = vcalloc_filter(nVirtualChannels-1,0) | (vcalloc_filter >> nVirtualChannels)
-  mask := Mux1H(vcalloc_sel, (0 until nVirtualChannels).map { w => ~(0.U((w+1).W)) })
+  when (vcalloc_vals.orR) {
+    mask := Mux1H(vcalloc_sel, (0 until nVirtualChannels).map { w => ~(0.U((w+1).W)) })
+  }
   io.vcalloc_req.valid := vcalloc_vals.orR
   io.vcalloc_req.bits := Mux1H(vcalloc_sel, vcalloc_reqs)
 

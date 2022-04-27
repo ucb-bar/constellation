@@ -142,6 +142,7 @@ class TestConfig15 extends Config(
   new constellation.routing.WithRoutingRelation(new UnidirectionalTorus1DDatelineRouting(10)) ++
   new constellation.topology.WithTopology(new UnidirectionalTorus1D(10)))
 class TestConfig16 extends Config(
+  new WithInputStallProbability(0.8) ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithIngresses(0 until 10) ++
