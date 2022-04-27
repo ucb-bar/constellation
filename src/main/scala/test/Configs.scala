@@ -173,6 +173,7 @@ class TestConfig19 extends Config(
   new constellation.topology.WithTopology(new BidirectionalTorus1D(10)))
 
 class TestConfig20 extends Config(
+  new WithInputStallProbability(0.8) ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithIngresses((0 until 10)) ++
