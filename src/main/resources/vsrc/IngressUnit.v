@@ -1,7 +1,6 @@
 
 
 import "DPI-C" function void instrumentationunit_init(
-    input longint unsigned   num_flits,
     input longint unsigned   num_ingresses,
     input longint unsigned   num_egresses
 );
@@ -19,7 +18,7 @@ import "DPI-C" function void ingressunit_tick
     output longint unsigned     flit_out_payload
 );
 
-module IngressUnit #(
+module BlackBoxIngressUnit #(
     NUM_INGRESSES = 1,
     NUM_EGRESSES = 1,
     INGRESS_ID = 0,
@@ -61,11 +60,11 @@ module IngressUnit #(
 
     initial begin
         if (INGRESS_ID == 0) begin
-            instrumentationunit_init(NUM_FLITS, NUM_INGRESSES, NUM_EGRESSES);
+            instrumentationunit_init(NUM_INGRESSES, NUM_EGRESSES);
         end
     end
 
-    always @(posedge clk) begin
+    always @(posedge clock) begin
         if (reset) begin
             _flit_out_valid_reg <= 1'b0;
         end else begin

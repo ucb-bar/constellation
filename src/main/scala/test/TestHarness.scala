@@ -76,8 +76,8 @@ class Payload extends Bundle {
       val flit_egress_id = Output(UInt(log2Ceil(nE).W))
       val flit_payload = Output(UInt(pB.W))
     })
-    addResource("vsrc/IngressUnit.v")
-    addResource("csrc/InstrumentationUnit.cpp")
+    addResource("/vsrc/IngressUnit.v")
+    addResource("/csrc/InstrumentationUnit.cpp")
   }
 
   /**
@@ -105,8 +105,8 @@ class Payload extends Bundle {
         val egressunit_ready = Output(Bool())
         val success = Output(Bool())
       })
-      addResource("vsrc/EgressUnit.v")
-      addResource("csrc/InstrumentationUnit.cpp")
+      addResource("/vsrc/EgressUnit.v")
+      addResource("/csrc/InstrumentationUnit.cpp")
     }
 
 class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[EgressChannelParams])(implicit val p: Parameters) extends Module with HasNoCParams {

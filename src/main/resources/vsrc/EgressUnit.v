@@ -12,7 +12,7 @@ import "DPI-C" function void egressunit_tick
     output bit             success
 );
 
-module EgressUnit #(
+module BlackBoxEgressUnit #(
     EGRESS_ID = 0,
 
     INGRESS_BITS = 64,
@@ -38,7 +38,7 @@ module EgressUnit #(
     reg _egressunit_ready_reg;
     reg _success_reg;
 
-    always @(posedge clk) begin
+    always @(posedge clock) begin
         if (reset) begin
             _egressunit_ready_reg <= 1'b0;
             _success_reg <= 1'b0;
