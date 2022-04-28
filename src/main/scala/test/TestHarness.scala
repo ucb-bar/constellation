@@ -2,6 +2,7 @@ package constellation.test
 
 import chisel3._
 import chisel3.util._
+import chisel3.util.HasBlackBoxResource
 import chisel3.util.random.LFSR
 import chisel3.experimental.IntParam
 
@@ -47,64 +48,6 @@ class Payload extends Bundle {
   val flits_fired = UInt(16.W)
 }
 
-class InputGen(idx: Int, cParams: IngressChannelParams)(implicit val p: Parameters) extends Module with HasNoCParams {
-  val maxFlits = p(NoCTesterKey).maxFlits
-  val inputStallProbability = p(NoCTesterKey).inputStallProbability
-  val flitIdBits = log2Ceil(maxFlits+1)
-  val io = IO(new Bundle { // ANIMESH: use this as IO for the BlackBox
-    val out = Decoupled(new IngressFlit(cParams)) // Ex: access flitparams like out.bits.head
-    // verilog names should match this naming convention -> replace dots with underscores (Ex: io.out.bits -> out_bits in verilog)
-    // val rob_ready = Input(Bool())
-    // val rob_idx = Input(UInt())
-    val tsc = Input(UInt(32.W)) // ANIMESH: timestamp counter
-    // val fire = Output(Bool())
-    // val n_flits = Output(UInt(flitIdBits.W))
-  })
-
-  val flits_left = RegInit(0.U(flitIdBits.W))
-  val flits_fired = RegInit(0.U(flitIdBits.W))
-  val egress = Reg(UInt(log2Ceil(nEgresses).W))
-  val payload = Reg(new Payload)
-
-  val can_fire = (flits_left === 0.U) && io.rob_ready
-
-  val packet_remaining = if (p(NoCTesterKey).constPacketSize) maxFlits.U else (LFSR(20) % maxFlits.U)
-  val random_delay = LFSR(20) < (inputStallProbability * (1 << 20)).toInt.U
-  io.out.valid := !random_delay && flits_left === 0.U && io.rob_ready
-  io.out.bits.head := true.B
-  io.out.bits.tail := packet_remaining === 0.U
-  io.out.bits.egress_id := LFSR(20) % nEgresses.U
-  val out_payload = Wire(new Payload)
-  io.out.bits.payload := out_payload.asUInt
-  out_payload.tsc := io.tsc
-  out_payload.rob_idx := io.rob_idx
-  out_payload.flits_fired := 0.U
-
-  io.n_flits := packet_remaining + 1.U
-  io.fire := can_fire && io.out.fire()
-
-  when (io.fire && !io.out.bits.tail) {
-    flits_left := packet_remaining
-    payload := out_payload
-    egress := io.out.bits.egress_id
-    flits_fired := 1.U
-  }
-  when (flits_left =/= 0.U) {
-    io.out.valid := !random_delay
-    io.out.bits.head := false.B
-    io.out.bits.tail := flits_left === 1.U
-    io.out.bits.egress_id := egress
-    out_payload := payload
-    out_payload.flits_fired := flits_fired
-
-    when (io.out.fire()) {
-      flits_fired := flits_fired + 1.U
-      flits_left := flits_left - 1.U
-    }
-  }
-
-}
-
   /**
    * ccb: (cycle counter bits) width of cycle count reg
    * nI: number of ingresses
@@ -118,8 +61,8 @@ class InputGen(idx: Int, cParams: IngressChannelParams)(implicit val p: Paramete
       "INGRESS_ID" -> IntParam(ingressId),
       "CYCLE_COUNT_BITS" -> ccb,
       "EGRESS_BITS" -> IntParam(log2Ceil(nE)), // from Flit.scala
-      "PAYLOAD_BITS" -> IntParam(payloadBits) // from Flit.scala
-    ) with HasNocParams {
+      "PAYLOAD_BITS" -> IntParam(pB) // from Flit.scala
+    )) with HasBlackBoxResource {
 
     val io = IO(new Bundle {
       val clock = Input(Clock())
@@ -130,8 +73,8 @@ class InputGen(idx: Int, cParams: IngressChannelParams)(implicit val p: Paramete
       val flit_out_valid = Output(Bool())
       val flit_head = Output(Bool())
       val flit_tail = Output(Bool())
-      val flit_egress_id = Output(UInt(egressIdBits.W))
-      val flit_payload = Output(UInt(payloadBits.W))
+      val flit_egress_id = Output(UInt(log2Ceil(nE).W))
+      val flit_payload = Output(UInt(pB.W))
     })
     addResource("vsrc/IngressUnit.v")
     addResource("csrc/InstrumentationUnit.cpp")
@@ -142,13 +85,13 @@ class InputGen(idx: Int, cParams: IngressChannelParams)(implicit val p: Paramete
    * ccb: cycle count width
    * pB: payload width
    */
-  class BlackBoxEgressUnit(egressId: Int, iB: Int, pB: Int)(implicit val p: Parameters)
+  class BlackBoxEgressUnit(egressId: Int, ccb: Int, iB: Int, pB: Int)(implicit val p: Parameters)
     extends BlackBox(Map(
       "EGRESS_ID" -> IntParam(egressId),
       "INGRESS_BITS" -> IntParam(iB),
       "CYCLE_COUNT_BITS" -> IntParam(ccb),
       "PAYLOAD_BITS" -> IntParam(pB)
-    )) with HasNocParams {
+    )) with HasBlackBoxResource {
       val io = IO(new Bundle {
         val clock = Input(Clock())
         val reset = Input(Bool())
@@ -181,32 +124,32 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
   val cycleCounter = RegInit(0.U(cycCntBits.W))
 
   io.to_noc.zipWithIndex.map{ case(ingressChannel: IngressChannel, idx) =>
-    val ingressUnit = Module(new BlackBoxIngressUnit(idx, ccb, inputParams.length, outputParams.length, payloadBits)) // TODO (ANIMESH) WHY DO WE HAVE TO WRAP THIS IN MODULE
-    ingressUnit.clock := clock
-    ingressUnit.reset := reset
-    ingressUnit.cycle_count := cycleCounter
-    ingressUnit.noc_ready := ingressChannel.flit.ready // TODO (ANIMESH) not sure where to get this
+    val ingressUnit = Module(new BlackBoxIngressUnit(idx, cycCntBits, inputParams.length, outputParams.length, payloadBits)) // TODO (ANIMESH) WHY DO WE HAVE TO WRAP THIS IN MODULE
+    ingressUnit.io.clock := clock
+    ingressUnit.io.reset := reset
+    ingressUnit.io.cycle_count := cycleCounter
+    ingressUnit.io.noc_ready := ingressChannel.flit.ready // TODO (ANIMESH) not sure where to get this
 
-    ingressChannel.flit.valid := ingressUnit.flit_out_valid
-    ingressChannel.flit.bits.head := ingressUnit.flit_out_head
-    ingressChannel.flit.bits.tail := ingressUnit.flit_out_tail
-    ingressChannel.flit.bits.egress_id := ingressUnit.flit_out_egress_id
-    ingressChannel.flit.bits.payload := ingressUnit.flit_out_payload
+    ingressChannel.flit.valid := ingressUnit.io.flit_out_valid
+    ingressChannel.flit.bits.head := ingressUnit.io.flit_head
+    ingressChannel.flit.bits.tail := ingressUnit.io.flit_tail
+    ingressChannel.flit.bits.egress_id := ingressUnit.io.flit_egress_id
+    ingressChannel.flit.bits.payload := ingressUnit.io.flit_payload
   }
 
   io.from_noc.zipWithIndex.map{ case(egressChannel: EgressChannel, idx) =>
-    val egressUnit = Module(new BlackBoxEgressUnit(idx, log2Ceil(inputParams.length), payloadBits))
-    egressUnit.clock := clock
-    egressUnit.reset := reset
-    egressUnit.cycle_count := cycleCounter
-    egressUnit.noc_valid := egressChannel.flit.valid
-    egressUnit.flit_in_head := egressChannel.flit.bits.head
-    egressUnit.flit_in_tail := egressChannel.flit.bits.tail
-    egressUnit.flit_in_ingress_id := egressChannel.flit.bits.ingress_id
-    egressUnit.flit_in_payload := egressChannel.flit.bits.payload
+    val egressUnit = Module(new BlackBoxEgressUnit(idx, cycCntBits, log2Ceil(inputParams.length), payloadBits))
+    egressUnit.io.clock := clock
+    egressUnit.io.reset := reset
+    egressUnit.io.cycle_count := cycleCounter
+    egressUnit.io.noc_valid := egressChannel.flit.valid
+    egressUnit.io.flit_in_head := egressChannel.flit.bits.head
+    egressUnit.io.flit_in_tail := egressChannel.flit.bits.tail
+    egressUnit.io.flit_in_ingress_id := egressChannel.flit.bits.ingress_id
+    egressUnit.io.flit_in_payload := egressChannel.flit.bits.payload
 
-    egressChannel.flit.ready := egressUnit.egressunit_ready
-    io.success := egressUnit.success
+    egressChannel.flit.ready := egressUnit.io.egressunit_ready
+    io.success := egressUnit.io.success
   }
 
 }
