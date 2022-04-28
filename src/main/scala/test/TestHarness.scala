@@ -60,7 +60,7 @@ class Payload extends Bundle {
       "NUM_EGRESSES"  -> IntParam(nE),
       "INGRESS_ID" -> IntParam(ingressId),
       "CYCLE_COUNT_BITS" -> ccb,
-      "EGRESS_BITS" -> IntParam(log2Ceil(nE)), // from Flit.scala
+      "EGRESS_BITS" -> IntParam(log2Ceil(nE) + 1), // from Flit.scala
       "PAYLOAD_BITS" -> IntParam(pB) // from Flit.scala
     )) with HasBlackBoxResource {
 
@@ -73,7 +73,7 @@ class Payload extends Bundle {
       val flit_out_valid = Output(Bool())
       val flit_head = Output(Bool())
       val flit_tail = Output(Bool())
-      val flit_egress_id = Output(UInt(log2Ceil(nE).W))
+      val flit_egress_id = Output(UInt((log2Ceil(nE) + 1).W))
       val flit_payload = Output(UInt(pB.W))
     })
     addResource("/vsrc/IngressUnit.v")
@@ -138,7 +138,7 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
   }
 
   io.from_noc.zipWithIndex.map{ case(egressChannel: EgressChannel, idx) =>
-    val egressUnit = Module(new BlackBoxEgressUnit(idx, cycCntBits, log2Ceil(inputParams.length), payloadBits))
+    val egressUnit = Module(new BlackBoxEgressUnit(idx, cycCntBits, log2Ceil(inputParams.length) + 1, payloadBits))
     egressUnit.io.clock := clock
     egressUnit.io.reset := reset
     egressUnit.io.cycle_count := cycleCounter

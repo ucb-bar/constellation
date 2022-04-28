@@ -1,10 +1,11 @@
 #include <cstdio>
 #include <iostream>
 #include <vector>
-#include <unordered_set>
+#include <set>
 #include <cmath>
 #include <cstring>
 #include <random>
+#include <chrono>
 
 // https://github.com/ucb-bar/testchipip/blob/03535f56a6318236ab6abf5342d78eecf453984d/src/main/resources/testchipip/csrc/SimSerial.cc
 #include <vpi_user.h>
@@ -19,14 +20,13 @@ using namespace std;
 /* Global Variables */
 int WARMUP_CYCLES = 2000;
 int MEASUREMENT_CYCLES = 3000;
-unsigned long long NUM_FLITS
 unsigned long long SIM_START = (unsigned long long) -1; // set to first cycle where NoC begins accepting traffic
 
 /* plusarg name for the filepath corresponding to the traffic matrix. */
-char* TRAFFIC_MATRIX_PLUSARG = "+TRAFFIC_MATRIX="
+const char* TRAFFIC_MATRIX_PLUSARG = "+TRAFFIC_MATRIX=";
 
 /* TRAFFIC_MATRIX[i][e] specifies the flow rate from ingress i to egress e. */
-int** TRAFFIC_MATRIX
+int** TRAFFIC_MATRIX;
 
 /* Number of packets received between each src->dst pair during the measurement phase.
  * Used to compute the throughput at the end of the simulation. */
@@ -34,21 +34,32 @@ long** PACKETS_RECVD_M;
 
 unsigned long long NUM_FLITS;
 unsigned long long NUM_INGRESSES;
+unsigned long long NUM_EGRESSES;
 
 /* C representation of a flit. */
-struct flit {
+typedef struct flit {
   bool head;
   bool tail;
   unsigned int ingress_id; // src
   unsigned int egress_id; // dst
   unsigned long long payload; // cycle_time flit was created
+  unsigned int body_id; // flit index in packet. Used only in C++ model to compare flits
+} flit;
+
+struct flit_comparator {
+  /* Returns true if lflit < rflit, used by FLITS_IN_FLIGHT set. */
+  bool operator() (const flit& lflit, const flit& rflit) {
+    long long lflit_sum = (long long) (lflit.ingress_id + lflit.egress_id + lflit.payload + lflit.body_id);
+    long long rflit_sum = (long long) (rflit.ingress_id + rflit.egress_id + rflit.payload + rflit.body_id);
+    return lflit_sum < rflit_sum;
+  }
 };
 
 /* Source Queues for input into NoC */
 vector<vector<struct flit>>* SRC_QUEUES;
 
 /* All packets currently in-flight in the NoC. */
-unordered_set<flit>* FLITS_IN_FLIGHT;
+set<struct flit, flit_comparator>* FLITS_IN_FLIGHT;
 
 /* Called at the beginning of simulation to initialize global state. */
 extern "C" void instrumentationunit_init(
@@ -59,10 +70,11 @@ extern "C" void instrumentationunit_init(
   // Initialize global state
   NUM_FLITS = 4; // TODO (ANIMESH): PARAMETERIZE THIS
   NUM_INGRESSES = num_ingresses;
+  NUM_EGRESSES = num_egresses;
   SRC_QUEUES = new vector<vector<flit>>(NUM_INGRESSES, vector<flit>());
-  FLITS_IN_FLIGHT = new unordered_set<flit>();
-  TRAFFIC_MATRIX = new *int[num_ingresses + 1];
-  PACKETS_RECVD_M = new *long[num_ingresses + 1];
+  FLITS_IN_FLIGHT = new set<struct flit, flit_comparator>();
+  TRAFFIC_MATRIX = new int*[num_ingresses + 1];
+  PACKETS_RECVD_M = new long*[num_ingresses + 1];
   for (int i = 0; i < num_ingresses; i++) {
     TRAFFIC_MATRIX[i] = new int[num_egresses + 1];
     PACKETS_RECVD_M[i] = new long[num_egresses + 1];
@@ -77,7 +89,7 @@ extern "C" void instrumentationunit_init(
   char* filepath = NULL;
   for (int i = 0; i < info.argc; i++) {
     char* input_arg = info.argv[i];
-    if (strncmp(input_arg, TRAFFIC_MATRIX_PLUSARG) != NULL) {
+    if (strncmp(input_arg, TRAFFIC_MATRIX_PLUSARG, strlen(TRAFFIC_MATRIX_PLUSARG)) == 0) {
       filepath = input_arg + strlen(TRAFFIC_MATRIX_PLUSARG);
     }
   }
@@ -85,36 +97,36 @@ extern "C" void instrumentationunit_init(
     printf("C++ Sim: Unable to find traffic matrix filepath plusarg\n");
     abort();
   }
-  FILE* traffic_matrix_file = fopen(filepath, "r")
+  FILE* traffic_matrix_file = fopen(filepath, "r");
   int num_iterations = 0;
   while (feof(traffic_matrix_file) != 0) {
     int ingress; int egress; int flow_rate;
-    fscanf(file, " "); // skip leading whitespace
+    fscanf(traffic_matrix_file, " "); // skip leading whitespace
     int num_matches = fscanf(traffic_matrix_file, "%d %d %d", &ingress, &egress, &flow_rate);
     if (num_matches != 3) {
-      printf("C++ Sim: failed to read traffic matrix file (incorrect format)\n")
+      printf("C++ Sim: failed to read traffic matrix file (incorrect format)\n");
       abort();
     }
     if (ingress >= NUM_INGRESSES || egress >= NUM_EGRESSES) {
-      printf("C++ Sim: read invalid ingress or egress:\n\tIngress: %d with max %d\n\tEgress: %d with max %d", ingress, NUM_INGRESSES, egress, NUM_EGRESSES);
+      printf("C++ Sim: read invalid ingress or egress:\n\tIngress: %d with max %d\n\tEgress: %d with max %d\n", ingress, NUM_INGRESSES, egress, NUM_EGRESSES);
       abort();
     }
     TRAFFIC_MATRIX[ingress][egress] = flow_rate;
     num_iterations++;
   }
   if (num_iterations != NUM_EGRESSES * NUM_INGRESSES) {
-    printf("C++ Sim: not enough entries in traffic file. Expected %d but got %d", NUM_EGRESSES * NUM_INGRESSES, num_iterations);
+    printf("C++ Sim: not enough entries in traffic file. Expected %d but got %d\n", NUM_EGRESSES * NUM_INGRESSES, num_iterations);
     abort();
   }
   fclose(traffic_matrix_file);
   for (int i = 0; i < NUM_INGRESSES; i++) {
-    int ingress_routing = TRAFFIC_MATRIX[i];
+    int* ingress_routing = TRAFFIC_MATRIX[i];
     int sum = 0;
     for (int e = 0; e < NUM_INGRESSES; e++) {
       sum += ingress_routing[e];
     }
     if (sum != 100) {
-      printf("C++ Sim: Invalid traffic matrix (each row must sum to 100)\n")
+      printf("C++ Sim: Invalid traffic matrix (each row must sum to 100)\n");
       abort();
     }
   }
@@ -130,18 +142,25 @@ long long gen_packet(
   unsigned long long ingress_id,
   unsigned long long cycle_count
 ) {
-  int generate_sample = uniform_int_distribution(1, NUM_FLITS);
-  if (generate_sample != 1) return -1; // TODO: prevents packets from being injected too often
+  unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+  std::default_random_engine generator (seed);
 
-  int random_sample = uniform_int_distribution(1, 100);
-  int ingress_traffic_pattern = TRAFFIC_MATRIX[ingress_id];
+  uniform_int_distribution<int> generate_packet(1, NUM_FLITS);
+  int generated_sample = generate_packet(generator);
+
+  if (generated_sample != 1) return -1; // TODO: prevents packets from being injected too often
+
+  uniform_int_distribution<int> egress_selector(1, NUM_FLITS);
+  int selected_ingress_sample = egress_selector(generator);
+
+  int* ingress_traffic_pattern = TRAFFIC_MATRIX[ingress_id];
 
   int sum_so_far = 0;
   for (int e = 0; e < NUM_INGRESSES; e++) {
     int rate_for_e = ingress_traffic_pattern[e];
     if (rate_for_e == 0) continue;
     sum_so_far += rate_for_e;
-    if (sum_so_far >= random_sample) {
+    if (sum_so_far >= selected_ingress_sample) {
       return e;
     }
   }
@@ -172,9 +191,10 @@ extern "C" void ingressunit_tick(
       new_flit->tail = i == (NUM_FLITS - 1);
       new_flit->ingress_id = ingress_id;
       new_flit->egress_id = dest;
+      new_flit->body_id = i;
       if (IS_MEASUREMENT(cycle_count)) {
         new_flit->payload = cycle_count;
-        FLITS_IN_FLIGHT.append(new_flit);
+        (*FLITS_IN_FLIGHT).insert(*new_flit);
       } else {
         new_flit->payload = (unsigned long long) -1;
       }
@@ -198,7 +218,7 @@ extern "C" void ingressunit_tick(
     struct flit head_flit = (*SRC_QUEUES)[ingress_id].at(0);
     if (head_flit.payload != (unsigned long long) -1) {
       // payload set to -1 during warmup/drain phases, don't track those flits
-      FLIGHTS_IN_FLIGHT.insert((*SRC_QUEUES)[ingress_id].at(0));
+      (*FLITS_IN_FLIGHT).insert((*SRC_QUEUES)[ingress_id].at(0));
     }
     (*SRC_QUEUES)[ingress_id].erase((*SRC_QUEUES)[ingress_id].begin());
   }
@@ -206,7 +226,25 @@ extern "C" void ingressunit_tick(
   return;
 }
 
-bool METRICS_PRINTED = FALSE;
+bool METRICS_PRINTED = false;
+
+double compute_throughput() {
+  // expected traffic from ingress i to egress e is TRAFFIC_MATRIX[i][e] * MEASUREMENT_CYCLES / 100
+  // actual traffic is PACKETS_RECVD_M
+  double min_throughput = 1.0;
+  for (int i = 0; i < NUM_INGRESSES; i++) {
+    for (int e = 0; e < NUM_EGRESSES; e++) {
+      long expected_traffic = TRAFFIC_MATRIX[i][e] * MEASUREMENT_CYCLES / 100;
+      long actual_traffic = PACKETS_RECVD_M[i][e];
+      long channel_throughput = actual_traffic / expected_traffic;
+      if (channel_throughput > 1) {
+        printf("C++ Sim: throughput for (ingress %d, egress %d) greater than 1: %f\n", i, e, channel_throughput);
+      }
+      min_throughput = (channel_throughput < min_throughput) ? channel_throughput : min_throughput;
+    }
+  }
+  return min_throughput;
+}
 
 extern "C" void egressunit_tick(
   unsigned long long egress_id,
@@ -227,20 +265,20 @@ extern "C" void egressunit_tick(
 
   struct flit received_flit;
   received_flit.head = flit_in_head;
-  received_flit.tail = filt_in_tail;
+  received_flit.tail = flit_in_tail;
   received_flit.ingress_id = flit_in_ingress_id;
   received_flit.egress_id = egress_id;
   received_flit.payload = flit_in_payload;
 
   if (received_flit.payload != (unsigned long long) -1) {
-    FLITS_IN_FLIGHT.erase(received_flit);
+    (*FLITS_IN_FLIGHT).erase(received_flit);
   }
 
   if (received_flit.tail != 0 && IS_MEASUREMENT(received_flit.payload)) {
-    PACKETS_RECVD_M[index(received_flit.ingress_id, received_flit.egress_id)]++;
+    PACKETS_RECVD_M[received_flit.ingress_id][received_flit.egress_id]++;
   }
 
-  if (FLITS_IN_FLIGHT.size() != 0) return;
+  if ((*FLITS_IN_FLIGHT).size() != 0) return;
   *success = 1;
 
   /* Compute and print out metrics. (TODO) */
@@ -250,22 +288,4 @@ extern "C" void egressunit_tick(
   }
 
   return;
-}
-
-double compute_throughput() {
-  // expected traffic from ingress i to egress e is TRAFFIC_MATRIX[i][e] * MEASUREMENT_CYCLES / 100
-  // actual traffic is PACKETS_RECVD_M
-  double min_throughput = 1.0;
-  for (int i = 0; i < num_ingresses; i++) {
-    for (int e = 0; e < num_egresses; e++) {
-      long expected_traffic = TRAFFIC_MATRIX[i][e] * MEASUREMENT_CYCLES / 100;
-      long actual_traffic = PACKETS_RECVD_M[i][e];
-      long channel_throughput = actual_traffic / expected_traffic
-      if (channel_throughput > 1) {
-        printf("C++ Sim: throughput for (ingress %d, egress %d) greater than 1: %f\n", i, e, channel_throughput);
-      }
-      min_throughput = (channel_throughput < min_throughput) ? channel_throughput : min_throughput;
-    }
-  }
-  return min_throughput;
 }
