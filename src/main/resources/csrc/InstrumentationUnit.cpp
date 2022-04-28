@@ -19,6 +19,7 @@ using namespace std;
 /* Global Variables */
 int WARMUP_CYCLES = 2000;
 int MEASUREMENT_CYCLES = 3000;
+unsigned long long NUM_FLITS
 unsigned long long SIM_START = (unsigned long long) -1; // set to first cycle where NoC begins accepting traffic
 
 /* plusarg name for the filepath corresponding to the traffic matrix. */
@@ -38,8 +39,8 @@ unsigned long long NUM_INGRESSES;
 struct flit {
   bool head;
   bool tail;
-  int ingress_id; // src
-  int egress_id; // dst
+  unsigned int ingress_id; // src
+  unsigned int egress_id; // dst
   unsigned long long payload; // cycle_time flit was created
 };
 
@@ -51,13 +52,12 @@ unordered_set<flit>* FLITS_IN_FLIGHT;
 
 /* Called at the beginning of simulation to initialize global state. */
 extern "C" void instrumentationunit_init(
-  unsigned long long num_flits,
   unsigned long long num_ingresses,
   unsigned long long num_egresses
 )
 {
   // Initialize global state
-  NUM_FLITS = num_flits;
+  NUM_FLITS = 4; // TODO (ANIMESH): PARAMETERIZE THIS
   NUM_INGRESSES = num_ingresses;
   SRC_QUEUES = new vector<vector<flit>>(NUM_INGRESSES, vector<flit>());
   FLITS_IN_FLIGHT = new unordered_set<flit>();
@@ -86,6 +86,7 @@ extern "C" void instrumentationunit_init(
     abort();
   }
   FILE* traffic_matrix_file = fopen(filepath, "r")
+  int num_iterations = 0;
   while (feof(traffic_matrix_file) != 0) {
     int ingress; int egress; int flow_rate;
     fscanf(file, " "); // skip leading whitespace
@@ -94,7 +95,16 @@ extern "C" void instrumentationunit_init(
       printf("C++ Sim: failed to read traffic matrix file (incorrect format)\n")
       abort();
     }
+    if (ingress >= NUM_INGRESSES || egress >= NUM_EGRESSES) {
+      printf("C++ Sim: read invalid ingress or egress:\n\tIngress: %d with max %d\n\tEgress: %d with max %d", ingress, NUM_INGRESSES, egress, NUM_EGRESSES);
+      abort();
+    }
     TRAFFIC_MATRIX[ingress][egress] = flow_rate;
+    num_iterations++;
+  }
+  if (num_iterations != NUM_EGRESSES * NUM_INGRESSES) {
+    printf("C++ Sim: not enough entries in traffic file. Expected %d but got %d", NUM_EGRESSES * NUM_INGRESSES, num_iterations);
+    abort();
   }
   fclose(traffic_matrix_file);
   for (int i = 0; i < NUM_INGRESSES; i++) {
@@ -164,6 +174,7 @@ extern "C" void ingressunit_tick(
       new_flit->egress_id = dest;
       if (IS_MEASUREMENT(cycle_count)) {
         new_flit->payload = cycle_count;
+        FLITS_IN_FLIGHT.append(new_flit);
       } else {
         new_flit->payload = (unsigned long long) -1;
       }
@@ -194,6 +205,8 @@ extern "C" void ingressunit_tick(
 
   return;
 }
+
+bool METRICS_PRINTED = FALSE;
 
 extern "C" void egressunit_tick(
   unsigned long long egress_id,
@@ -231,8 +244,12 @@ extern "C" void egressunit_tick(
   *success = 1;
 
   /* Compute and print out metrics. (TODO) */
-  printf("C++ Sim: THROUGHPUT IS %f\n", compute_throughput());
+  if (!METRICS_PRINTED) {
+    printf("C++ Sim: THROUGHPUT IS %f\n", compute_throughput());
+    METRICS_PRINTED = true;
+  }
 
+  return;
 }
 
 double compute_throughput() {

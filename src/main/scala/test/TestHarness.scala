@@ -51,13 +51,14 @@ class InputGen(idx: Int, cParams: IngressChannelParams)(implicit val p: Paramete
   val maxFlits = p(NoCTesterKey).maxFlits
   val inputStallProbability = p(NoCTesterKey).inputStallProbability
   val flitIdBits = log2Ceil(maxFlits+1)
-  val io = IO(new Bundle {
-    val out = Decoupled(new IngressFlit(cParams))
-    val rob_ready = Input(Bool())
-    val rob_idx = Input(UInt())
-    val tsc = Input(UInt(32.W))
-    val fire = Output(Bool())
-    val n_flits = Output(UInt(flitIdBits.W))
+  val io = IO(new Bundle { // ANIMESH: use this as IO for the BlackBox
+    val out = Decoupled(new IngressFlit(cParams)) // Ex: access flitparams like out.bits.head
+    // verilog names should match this naming convention -> replace dots with underscores (Ex: io.out.bits -> out_bits in verilog)
+    // val rob_ready = Input(Bool())
+    // val rob_idx = Input(UInt())
+    val tsc = Input(UInt(32.W)) // ANIMESH: timestamp counter
+    // val fire = Output(Bool())
+    // val n_flits = Output(UInt(flitIdBits.W))
   })
 
   val flits_left = RegInit(0.U(flitIdBits.W))
@@ -104,9 +105,70 @@ class InputGen(idx: Int, cParams: IngressChannelParams)(implicit val p: Paramete
 
 }
 
+  /**
+   * ccb: (cycle counter bits) width of cycle count reg
+   * nI: number of ingresses
+   * nE: number of egresses
+   * pB: width of payload
+   */
+  class BlackBoxIngressUnit(ingressId: Int, ccb: Int, nI: Int, nE: Int, pB: Int)(implicit val p: Parameters)
+    extends BlackBox(Map(
+      "NUM_INGRESSES" -> IntParam(nI),
+      "NUM_EGRESSES"  -> IntParam(nE),
+      "INGRESS_ID" -> IntParam(ingressId),
+      "CYCLE_COUNT_BITS" -> ccb,
+      "EGRESS_BITS" -> IntParam(log2Ceil(nE)), // from Flit.scala
+      "PAYLOAD_BITS" -> IntParam(payloadBits) // from Flit.scala
+    ) with HasNocParams {
+
+    val io = IO(new Bundle {
+      val clock = Input(Clock())
+      val reset = Input(Bool())
+      val cycle_count = Input(UInt(ccb.W))
+      val noc_ready = Input(Bool())
+
+      val flit_out_valid = Output(Bool())
+      val flit_head = Output(Bool())
+      val flit_tail = Output(Bool())
+      val flit_egress_id = Output(UInt(egressIdBits.W))
+      val flit_payload = Output(UInt(payloadBits.W))
+    })
+    addResource("vsrc/IngressUnit.v")
+    addResource("csrc/InstrumentationUnit.cpp")
+  }
+
+  /**
+   * iB: number of bits needed to represent ingress ID
+   * ccb: cycle count width
+   * pB: payload width
+   */
+  class BlackBoxEgressUnit(egressId: Int, iB: Int, pB: Int)(implicit val p: Parameters)
+    extends BlackBox(Map(
+      "EGRESS_ID" -> IntParam(egressId),
+      "INGRESS_BITS" -> IntParam(iB),
+      "CYCLE_COUNT_BITS" -> IntParam(ccb),
+      "PAYLOAD_BITS" -> IntParam(pB)
+    )) with HasNocParams {
+      val io = IO(new Bundle {
+        val clock = Input(Clock())
+        val reset = Input(Bool())
+        val cycle_count = Input(UInt(ccb.W))
+        val noc_valid = Input(Bool())
+        val flit_in_head = Input(Bool())
+        val flit_in_tail = Input(Bool())
+        val flit_in_ingress_id = Input(UInt(iB.W))
+        val flit_in_payload = Input(UInt(pB.W))
+
+        val egressunit_ready = Output(Bool())
+        val success = Output(Bool())
+      })
+      addResource("vsrc/EgressUnit.v")
+      addResource("csrc/InstrumentationUnit.cpp")
+    }
+
 class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[EgressChannelParams])(implicit val p: Parameters) extends Module with HasNoCParams {
   val allPayloadBits = (inputParams.map(_.payloadBits) ++ outputParams.map(_.payloadBits)).toSet
-  require(allPayloadBits.size == 1 && allPayloadBits.head >= 64)
+  require(allPayloadBits.size == 1 && allPayloadBits.head >= 64) // ANIMESH: KEEP THIS TO MAKE SURE PAYLOAD BITS IS LARGE ENOUGH
   val payloadBits = allPayloadBits.head
 
   val io = IO(new Bundle { // C++ model should keep this IO, everything else becomes verilog though
@@ -115,30 +177,39 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
     val success = Output(Bool())
   })
 
-  /**
-   * injectionRate: number of packets to inject per 100 cycles
-   */
-  class BlackBoxIngressUnit(ingressId: Int, injectionRate: Int)
-    extends BlackBox(Map(
-      "NUM_INGRESSES" -> inputParams.length
-      "INGRESS_ID" -> IntParam(ingressId)
-      "INJECTION_RATE" -> IntParam(injectionRate) // TODO (ANIMESH) -- THIS DOESNT WORK
-      "NUM_FLITS" -> p(NoCTesterKey).maxFlits
-      ) {
-    val io = IO(new Bundle {
-      val clock = Input(Clock())
-      val reset = Input(Bool())
+  val cycCntBits: Int = 64
+  val cycleCounter = RegInit(0.U(cycCntBits.W))
 
-      // see verilog for output pseudocode
+  io.to_noc.zipWithIndex.map{ case(ingressChannel: IngressChannel, idx) =>
+    val ingressUnit = Module(new BlackBoxIngressUnit(idx, ccb, inputParams.length, outputParams.length, payloadBits)) // TODO (ANIMESH) WHY DO WE HAVE TO WRAP THIS IN MODULE
+    ingressUnit.clock := clock
+    ingressUnit.reset := reset
+    ingressUnit.cycle_count := cycleCounter
+    ingressUnit.noc_ready := ingressChannel.flit.ready // TODO (ANIMESH) not sure where to get this
 
-    })
-    addResource("/vsrc/IngressUnit.v")
-    addResource("/csrc/IngressUnit.cpp")
+    ingressChannel.flit.valid := ingressUnit.flit_out_valid
+    ingressChannel.flit.bits.head := ingressUnit.flit_out_head
+    ingressChannel.flit.bits.tail := ingressUnit.flit_out_tail
+    ingressChannel.flit.bits.egress_id := ingressUnit.flit_out_egress_id
+    ingressChannel.flit.bits.payload := ingressUnit.flit_out_payload
+  }
+
+  io.from_noc.zipWithIndex.map{ case(egressChannel: EgressChannel, idx) =>
+    val egressUnit = Module(new BlackBoxEgressUnit(idx, log2Ceil(inputParams.length), payloadBits))
+    egressUnit.clock := clock
+    egressUnit.reset := reset
+    egressUnit.cycle_count := cycleCounter
+    egressUnit.noc_valid := egressChannel.flit.valid
+    egressUnit.flit_in_head := egressChannel.flit.bits.head
+    egressUnit.flit_in_tail := egressChannel.flit.bits.tail
+    egressUnit.flit_in_ingress_id := egressChannel.flit.bits.ingress_id
+    egressUnit.flit_in_payload := egressChannel.flit.bits.payload
+
+    egressChannel.flit.ready := egressUnit.egressunit_ready
+    io.success := egressUnit.success
   }
 
 }
-
-
 
 class TestHarness(implicit val p: Parameters) extends Module with HasRouterCtrlConsts {
   val io = IO(new Bundle {
@@ -177,6 +248,7 @@ class TestHarness(implicit val p: Parameters) extends Module with HasRouterCtrlC
   }
 
   val noc_tester = Module(new NoCTester(lazyNoC.allIngressParams, lazyNoC.allEgressParams)(lazyNoC.iP))
+  // TODO (ANIMESH) allIngressParams is a sequence of all ingress params, length of this is the number of ingresses
   noc.io.ingress <> noc_tester.io.to_noc
   noc_tester.io.from_noc <> noc.io.egress
   io.success := noc_tester.io.success
