@@ -9,8 +9,12 @@ class WithConstPacketSize(sZ: Int = 9) extends Config((site, here, up) => {
   case NoCTesterKey => up(NoCTesterKey).copy(constPacketSize = true, maxFlits = sZ)
 })
 
-class WithInputStallProbability(prob: Double) extends Config((site, here, up) => {
-  case NoCTesterKey => up(NoCTesterKey).copy(inputStallProbability = prob)
+class WithInputFlitStallProbability(prob: Double) extends Config((site, here, up) => {
+  case NoCTesterKey => up(NoCTesterKey).copy(inputFlitStallProbability = prob)
+})
+
+class WithInputPacketStallProbability(prob: Double) extends Config((site, here, up) => {
+  case NoCTesterKey => up(NoCTesterKey).copy(inputPacketStallProbability = prob)
 })
 
 class WithTotalTxs(t: Int) extends Config((site, here, up) => {
@@ -142,7 +146,7 @@ class TestConfig15 extends Config(
   new constellation.routing.WithRoutingRelation(new UnidirectionalTorus1DDatelineRouting(10)) ++
   new constellation.topology.WithTopology(new UnidirectionalTorus1D(10)))
 class TestConfig16 extends Config(
-  new WithInputStallProbability(0.8) ++
+  new WithInputPacketStallProbability(0.8) ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithIngresses(0 until 10) ++
@@ -173,7 +177,7 @@ class TestConfig19 extends Config(
   new constellation.topology.WithTopology(new BidirectionalTorus1D(10)))
 
 class TestConfig20 extends Config(
-  new WithInputStallProbability(0.8) ++
+  new WithInputFlitStallProbability(0.8) ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithIngresses((0 until 10)) ++
@@ -181,13 +185,13 @@ class TestConfig20 extends Config(
   new constellation.routing.WithRoutingRelation(new BidirectionalTorus1DRandomRouting(10)) ++
   new constellation.topology.WithTopology(new BidirectionalTorus1D(10)))
 class TestConfig21 extends Config(
-  new WithInputStallProbability(0.9) ++
+  new WithInputPacketStallProbability(0.9) ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithUniformChannelSrcMultiplier(2) ++
   new constellation.channel.WithUniformChannelDestMultiplier(2) ++
-  new constellation.channel.WithIngresses((0 until 10)) ++
-  new constellation.channel.WithEgresses((0 until 10)) ++
+  new constellation.channel.WithIngresses((0 until 10) ++ (0 until 10)) ++
+  new constellation.channel.WithEgresses((0 until 10) ++ (0 until 10)) ++
   new constellation.routing.WithRoutingRelation(new BidirectionalTorus1DRandomRouting(10)) ++
   new constellation.topology.WithTopology(new BidirectionalTorus1D(10)))
 
@@ -545,7 +549,7 @@ class TestConfig62 extends Config(
   new constellation.topology.WithTerminalPlane ++
   new constellation.topology.WithTopology(new Mesh2D(4, 4)))
 class TestConfig63 extends Config(
-  new constellation.test.WithInputStallProbability(0.8) ++
+  new constellation.test.WithInputFlitStallProbability(0.8) ++
   new constellation.router.WithSafeCoupleSAVA ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
@@ -557,7 +561,7 @@ class TestConfig63 extends Config(
   new constellation.topology.WithTerminalPlane ++
   new constellation.topology.WithTopology(new Mesh2D(4, 4)))
 class TestConfig64 extends Config(
-  new constellation.test.WithInputStallProbability(0.8) ++
+  new constellation.test.WithInputFlitStallProbability(0.8) ++
   new constellation.router.WithSafeCoupleSAVA ++
   new constellation.noc.WithCtrl ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++

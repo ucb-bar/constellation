@@ -32,7 +32,8 @@ object SelectFirstNUInt
 case class NoCTesterParams(
   robSz: Int = 128,
   totalTxs: Int = 50000,
-  inputStallProbability: Double = 0.0,
+  inputFlitStallProbability: Double = 0.0,
+  inputPacketStallProbability: Double = 0.0,
   outputStallProbability: Double = 0.0,
   maxFlits: Int = 8,
   constPacketSize: Boolean = false
@@ -49,7 +50,8 @@ class Payload extends Bundle {
 class InputGen(idx: Int, cParams: IngressChannelParams)
   (implicit val p: Parameters) extends Module with HasNoCParams {
   val maxFlits = p(NoCTesterKey).maxFlits
-  val inputStallProbability = p(NoCTesterKey).inputStallProbability
+  val inputFlitStallProbability = p(NoCTesterKey).inputFlitStallProbability
+  val inputPacketStallProbability = p(NoCTesterKey).inputPacketStallProbability
   val flitIdBits = log2Ceil(maxFlits+1)
   val io = IO(new Bundle {
     val out = Irrevocable(new IngressFlit(cParams))
@@ -68,8 +70,9 @@ class InputGen(idx: Int, cParams: IngressChannelParams)
   val can_fire = (flits_left === 0.U) && io.rob_ready
 
   val packet_remaining = if (p(NoCTesterKey).constPacketSize) maxFlits.U else (LFSR(20) % maxFlits.U)
-  val random_delay = LFSR(20) < (inputStallProbability * (1 << 20)).toInt.U
-  io.out.valid := !random_delay && flits_left === 0.U && io.rob_ready
+  val random_flit_delay = (LFSR(20) < (inputFlitStallProbability * (1 << 20)).toInt.U)
+  val random_packet_delay = (LFSR(20) < (inputPacketStallProbability * (1 << 20)).toInt.U)
+  io.out.valid := !random_packet_delay && flits_left === 0.U && io.rob_ready
   io.out.bits.head := true.B
   io.out.bits.tail := packet_remaining === 0.U
   io.out.bits.egress_id := VecInit(cParams.possibleFlows.toSeq.map(_.egressId.U))(LFSR(20) % cParams.possibleFlows.size.U)
@@ -89,7 +92,7 @@ class InputGen(idx: Int, cParams: IngressChannelParams)
     flits_fired := 1.U
   }
   when (flits_left =/= 0.U) {
-    io.out.valid := !random_delay
+    io.out.valid := !random_flit_delay
     io.out.bits.head := false.B
     io.out.bits.tail := flits_left === 1.U
     io.out.bits.egress_id := egress
