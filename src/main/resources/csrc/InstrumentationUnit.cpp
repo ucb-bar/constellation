@@ -15,9 +15,9 @@
 using namespace std;
 
 /* Global Variables */
-int WARMUP_CYCLES = 200;
-int MEASUREMENT_CYCLES = 300;
-int DRAIN_TIMEOUT = 50;
+int WARMUP_CYCLES;
+int MEASUREMENT_CYCLES;
+int DRAIN_TIMEOUT;
 unsigned long long SIM_START = (unsigned long long) -1; // set to first cycle where NoC begins accepting traffic
 
 /* plusarg name for the filepath corresponding to the traffic matrix. */
@@ -144,7 +144,7 @@ extern "C" void instrumentationunit_init(
   }
   FILE* traffic_matrix_file = fopen(filepath, "r");
   fscanf(traffic_matrix_file, " "); // skip leading whitespace
-  fscanf(traffic_matrix_file, "%d", &NUM_FLITS);
+  fscanf(traffic_matrix_file, "%d %d %d %d", &NUM_FLITS, &WARMUP_CYCLES, &MEASUREMENT_CYCLES, &DRAIN_TIMEOUT);
 
   int num_iterations = 0;
   while (feof(traffic_matrix_file) == 0) {

@@ -38,3 +38,32 @@ cd sims/vcs
 make SUB_PROJECT=constellation CONFIG=TestConfig00
 python3 ../../generators/constellation/scripts/vis.py generated-src/constellation.test.TestHarness.TestConfig00/constellation.test.TestHarness.TestConfig00.noc.
 ```
+
+## Benchmarking NoC Config
+First, follow the same setup instructions as Generating Topology Diagrams.
+
+Once Chipyard has been [set up](https://chipyard.readthedocs.io/en/latest/Chipyard-Basics/Initial-Repo-Setup.html), the following commands can be used to generate a topology diagram for `TestConfig00`:
+
+```
+cd sims/vcs
+make clean && make SUB_PROJECT=constellation CONFIG=TestConfig00 MODEL=TestHarness USE_FSDB=1 BINARY=none run-binary-debug EXTRA_SIM_FLAGS="+TRAFFIC_MATRIX=./test_traffic_mat"
+```
+
+Where `test_traffic_mat` is a traffic matrix following the format:
+
+```
+<flits per packet> <warmup cycles> <measurement cycles> <drain timeout>
+
+<ingress id> <egress id> <flow rate>
+. . .
+<ingress id> <egress id> <flow rate>
+```
+
+An example `test_traffic mat` for `TestConfig00` is:
+
+```
+4 2000 3000 500
+0 0 0.25
+```
+
+This config generates `4` flits per packet, with `2000` warmup cycles, `3000` measurement cycles, and a `500` cycle drain timeout. Packets are injected from ingress `0` to egress `0` with a rate of `0.25`.
