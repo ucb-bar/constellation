@@ -122,6 +122,8 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
 
   val cycCntBits: Int = 64
   val cycleCounter = RegInit(0.U(cycCntBits.W))
+  cycleCounter := cycleCounter + 1.U
+
 
   io.to_noc.zipWithIndex.map{ case(ingressChannel: IngressChannel, idx) =>
     val ingressUnit = Module(new BlackBoxIngressUnit(idx, cycCntBits, inputParams.length, outputParams.length, payloadBits)) // TODO (ANIMESH) WHY DO WE HAVE TO WRAP THIS IN MODULE
