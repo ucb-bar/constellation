@@ -315,10 +315,11 @@ extern "C" void egressunit_tick(
   // always ready to receive packets
   *egressunit_ready = 1;
 
-  if (IS_DRAIN_TIMEOUT(cycle_count)) {
+  if (IS_DRAIN_TIMEOUT(cycle_count) && !METRICS_PRINTED) {
     printf("C++ Sim: Ending simulation at cycle %llu\n", cycle_count);
     printf("C++ Sim: Simulation timed out (drain took too long). Ending so you can view a waveform.\n", cycle_count);
     printf("C++ Sim: THROUGHPUT IS %f\n", compute_throughput());
+    METRICS_PRINTED = true;
     *success = 1;
     return;
   }

@@ -124,7 +124,6 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
   val cycleCounter = RegInit(0.U(cycCntBits.W))
   cycleCounter := cycleCounter + 1.U
 
-
   io.to_noc.zipWithIndex.map{ case(ingressChannel: IngressChannel, idx) =>
     val ingressUnit = Module(new BlackBoxIngressUnit(idx, cycCntBits, inputParams.length, outputParams.length, payloadBits)) // TODO (ANIMESH) WHY DO WE HAVE TO WRAP THIS IN MODULE
     ingressUnit.io.clock := clock
@@ -139,6 +138,8 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
     ingressChannel.flit.bits.payload := ingressUnit.io.flit_payload
   }
 
+  val successSignals = Wire(Vec(io.from_noc.length, Bool()))
+
   io.from_noc.zipWithIndex.map{ case(egressChannel: EgressChannel, idx) =>
     val egressUnit = Module(new BlackBoxEgressUnit(idx, cycCntBits, log2Ceil(inputParams.length) + 1, payloadBits))
     egressUnit.io.clock := clock
@@ -151,8 +152,10 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
     egressUnit.io.flit_in_payload := egressChannel.flit.bits.payload
 
     egressChannel.flit.ready := egressUnit.io.egressunit_ready
-    io.success := egressUnit.io.success
+    successSignals(idx) := egressUnit.io.success
   }
+
+  io.success := successSignals.exists((p: Bool) => p)
 
 }
 
