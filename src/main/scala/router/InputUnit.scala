@@ -53,7 +53,6 @@ abstract class AbstractInputUnit(
           var allow = false
           virtualChannelParams(srcV).possibleFlows.foreach { pI =>
             allow = allow || routingRelation(
-              nodeId,
               cParam.channelRoutingInfos(srcV),
               oP.channelRoutingInfos(oV),
               pI

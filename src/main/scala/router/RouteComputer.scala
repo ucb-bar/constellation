@@ -59,7 +59,6 @@ class RouteComputer(
             val table = allInParams(i).possibleFlows.toSeq.distinct.map { pI =>
               allInParams(i).channelRoutingInfos.map { cI =>
                 val v = routingRelation(
-                  nodeId,
                   cI,
                   outParams(o).channelRoutingInfos(outVId),
                   pI

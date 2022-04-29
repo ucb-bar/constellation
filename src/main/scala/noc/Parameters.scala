@@ -152,7 +152,6 @@ object InternalNoCParams {
               val nexts = nextChannelParamMap(head.dst).map { nxtC =>
                 nxtC.channelRoutingInfos.map { cI =>
                   val can_transition = routingRel(
-                    head.dst,
                     head,
                     cI,
                     flow
@@ -185,7 +184,7 @@ object InternalNoCParams {
           .flatten
           .filter(nI => possibleFlowMap(cI)
             .filter(_.dst != cI.dst)
-            .map(pI => routingRel(cI.dst, cI, nI, pI))
+            .map(pI => routingRel(cI, nI, pI))
             .fold(false)(_||_)
           )
         neighbors.foreach { nI =>
@@ -227,8 +226,8 @@ object InternalNoCParams {
         // every virtual channel accessible to each blocker is locked
         for (b <- blockeeSets) {
           checkConnectivity(vNetId, new RoutingRelation {
-            def rel(nodeId: Int, srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-              val base = nocParams.routingRelation(nodeId, srcC, nxtC, flow)
+            def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+              val base = nocParams.routingRelation(srcC, nxtC, flow)
               val blocked = b.map { v => possibleFlowMap(nxtC).map(_.vNet == v) }.flatten.fold(false)(_||_)
               base && !blocked
             }
@@ -240,9 +239,9 @@ object InternalNoCParams {
     // Check for deadlock in escape channels
     println(s"Constellation: $nocName Checking for possibility of deadlock")
     val acyclicPath = checkAcyclic(new RoutingRelation {
-      def rel(nodeId: Int, srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+      def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
         val escape = nocParams.routingRelation.isEscape(nxtC, flow.vNet)
-        nocParams.routingRelation(nodeId, srcC, nxtC, flow) && escape
+        nocParams.routingRelation(srcC, nxtC, flow) && escape
       }
     })
     require(acyclicPath.isEmpty, s"Cyclic path may cause deadlock: ${acyclicPath.get}")
