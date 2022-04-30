@@ -60,6 +60,7 @@ struct flit_comparator {
 vector<queue<struct flit*>>* SRC_QUEUES;
 
 /* All packets currently in-flight in the NoC. */
+// TODO: GIVE EACH FLIT A UNIQUE ID, MAKE IT A SET OF UNIQUE IDs (store uniqueID: egress mappings, make sure each packet arrives at the right egress id)
 set<flit*, flit_comparator>* FLITS_IN_FLIGHT;
 
 /* Returns true if cycle cycle_count is in the warmup phase. */
@@ -171,7 +172,6 @@ extern "C" void instrumentationunit_init(
     float* ingress_routing = TRAFFIC_MATRIX[i];
     float sum = 0;
     for (int e = 0; e < NUM_INGRESSES; e++) {
-      // printf("DEBUG: i(%d) to e(%d): %f\n", i, e, TRAFFIC_MATRIX[i][e]);
       sum += ingress_routing[e];
     }
     if (sum > 1.0) {
@@ -183,6 +183,11 @@ extern "C" void instrumentationunit_init(
   return;
 }
 
+// TODO: MAKE SEED PARAMETERIZABLE (OR REQUEST RANDOM SEED)
+unsigned int seed = 152; // std::chrono::system_clock::now().time_since_epoch().count();
+std::default_random_engine generator (seed);
+uniform_real_distribution<float> egress_selector(0.0, 1.0);
+
 /* Given an input ingress, returns the egressID of the egress to send a packet to
  * at this cycle. No packet should be sent if the output is -1, otherwise cast the output to
  * unsigned long long to get the egressID for the output
@@ -191,12 +196,8 @@ long long gen_packet(
   unsigned long long ingress_id,
   unsigned long long cycle_count
 ) {
-  unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-  std::default_random_engine generator (seed);
 
-  uniform_real_distribution<float> egress_selector(0.0, 1.0);
   float selected_ingress_sample = egress_selector(generator);
-  // printf("\tDEBUG: pgen rand is %f\n", selected_ingress_sample);
 
   float* ingress_traffic_pattern = TRAFFIC_MATRIX[ingress_id];
 
@@ -267,12 +268,10 @@ extern "C" void ingressunit_tick(
     *flit_out_egress_id = next_flit->egress_id;
     *flit_out_payload = next_flit->payload;
     if (next_flit->payload != (unsigned long long) -1) {
-      // printf("\tC++ SIM DEBUG: INJECTING PACKET WITH PAYLOAD %llu\n", next_flit->payload);
       (*FLITS_IN_FLIGHT).insert(next_flit);
     } else {
       delete next_flit; // no need to track warmup/drain flits
     }
-    // printf("\tC++ Sim DEBUG: NoC took packet\n");
   }
 
   return;
@@ -283,20 +282,19 @@ bool METRICS_PRINTED = false;
 double compute_throughput() {
   // expected traffic from ingress i to egress e is TRAFFIC_MATRIX[i][e] * MEASUREMENT_CYCLES
   // actual traffic is PACKETS_RECVD_M
+  FILE* csv = fopen("noc-channel-throughputs.csv", "w");
+  fprintf(csv, "ingress,egress,throughput\n");
   double min_throughput = 1.0;
   for (int i = 0; i < NUM_INGRESSES; i++) {
     for (int e = 0; e < NUM_EGRESSES; e++) {
       long expected_traffic = static_cast<long>(TRAFFIC_MATRIX[i][e] * MEASUREMENT_CYCLES);
       long actual_traffic = PACKETS_RECVD_M[i][e];
       double channel_throughput = ((double) actual_traffic / (double) expected_traffic);
-      if (channel_throughput > 1.0) {
-        printf("C++ Sim: throughput for (ingress %d, egress %d) greater than 1: %f\n", i, e, channel_throughput);
-        printf("\texpected traffic: %ld\n\tactual traffic: %ld\n", expected_traffic, actual_traffic);
-        abort();
-      }
+      fprintf(csv, "%d,%d,%f\n", i, e, channel_throughput);
       min_throughput = (channel_throughput < min_throughput) ? channel_throughput : min_throughput;
     }
   }
+  fclose(csv);
   return min_throughput;
 }
 
@@ -325,7 +323,6 @@ extern "C" void egressunit_tick(
   }
 
   if (noc_valid == 0) return;
-  // printf("C++ Sim DEBUG: Egress %d received flit from NoC\n", egress_id);
 
   struct flit received_flit;
   received_flit.head = flit_in_head;
@@ -333,7 +330,6 @@ extern "C" void egressunit_tick(
   received_flit.ingress_id = flit_in_ingress_id;
   received_flit.egress_id = egress_id;
   received_flit.payload = flit_in_payload;
-  // printf("\tDEBUG: payload was %lld\n", (long long) flit_in_payload);
 
   if (received_flit.payload != (unsigned long long) -1) {
     int num_erased = (*FLITS_IN_FLIGHT).erase(&received_flit); // TODO: NOTHING ACTUALLY GETTING ERASED
@@ -341,7 +337,6 @@ extern "C" void egressunit_tick(
   }
 
   if (received_flit.tail != 0 && IS_MEASUREMENT(received_flit.payload)) {
-    // printf("\tC++ SIM DEBUG: received tail for flit with payload %llu\n", received_flit.payload);
     PACKETS_RECVD_M[received_flit.ingress_id][received_flit.egress_id]++;
   }
 

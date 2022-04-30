@@ -67,3 +67,5 @@ An example `test_traffic mat` for `TestConfig00` is:
 ```
 
 This config generates `4` flits per packet, with `2000` warmup cycles, `3000` measurement cycles, and a `500` cycle drain timeout. Packets are injected from ingress `0` to egress `0` with a rate of `0.25`.
+
+The simulation outputs a csv `noc-channel-throughputs.csv` that lists the throughput between each ingress/egress pair.
