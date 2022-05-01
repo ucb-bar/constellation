@@ -103,6 +103,27 @@ bool IS_DRAIN_TIMEOUT(unsigned long long cycle_count) {
   return adjusted_cnt > (WARMUP_CYCLES + MEASUREMENT_CYCLES + DRAIN_TIMEOUT);
 }
 
+long _UNIQ_ID = 0;
+long gen_unique_id_flit() {
+  _UNIQ_ID = _UNIQ_ID + 1;
+  return _UNIQ_ID;
+}
+
+/* Generates the payload for a measurement flit. */
+unsigned long long gen_flit_payload(unsigned long long cycle_count) {
+  return (gen_unique_id_flit() << 32) | (0xFFFFFFFF & cycle_count);
+}
+
+/* Given a flit's payload, returns the flit's unique id (use only on measurement flits). */
+unsigned long get_unique_id_flit(unsigned long long payload) {
+  return (payload >> 32);
+}
+
+/* Given a flit's payload, returns the cycle the flit was generated (use only on measurement flits). */
+unsigned long get_cyc_flit(unsigned long long payload) {
+  return payload & 0xFFFFFFFF;
+}
+
 /* Called at the beginning of simulation to initialize global state. */
 extern "C" void instrumentationunit_init(
   unsigned long long num_ingresses,
@@ -144,16 +165,24 @@ extern "C" void instrumentationunit_init(
     abort();
   }
   FILE* traffic_matrix_file = fopen(filepath, "r");
+  if (traffic_matrix_file == NULL) {
+    printf("C++ Sim: Unable to open traffic matrix file\n");
+    abort();
+  }
   fscanf(traffic_matrix_file, " "); // skip leading whitespace
-  fscanf(traffic_matrix_file, "%d %d %d %d", &NUM_FLITS, &WARMUP_CYCLES, &MEASUREMENT_CYCLES, &DRAIN_TIMEOUT);
+  int num_matches = fscanf(traffic_matrix_file, "%d %d %d %d", &NUM_FLITS, &WARMUP_CYCLES, &MEASUREMENT_CYCLES, &DRAIN_TIMEOUT);
+  if (num_matches != 4) {
+      printf("C++ Sim: failed to read config options from traffic matrix file. Read only %d args.\n", num_matches);
+      abort();
+  }
 
   int num_iterations = 0;
   while (feof(traffic_matrix_file) == 0) {
     int ingress; int egress; float flow_rate;
     fscanf(traffic_matrix_file, " "); // skip leading whitespace
-    int num_matches = fscanf(traffic_matrix_file, "%d %d %f", &ingress, &egress, &flow_rate);
+    num_matches = fscanf(traffic_matrix_file, "%d %d %f", &ingress, &egress, &flow_rate);
     if (num_matches != 3) {
-      printf("C++ Sim: failed to read traffic matrix file (incorrect format)\n");
+      printf("C++ Sim: failed to read traffic matrix (incorrect format). Read only %d args.\n", num_matches);
       abort();
     }
     if (ingress >= NUM_INGRESSES || egress >= NUM_EGRESSES) {
