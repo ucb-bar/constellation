@@ -41,17 +41,16 @@ unsigned long long NUM_EGRESSES;
 typedef struct flit {
   bool head;
   bool tail;
-  unsigned int ingress_id; // src
-  unsigned int egress_id; // dst
+  unsigned long long ingress_id; // src
+  unsigned long long egress_id; // dst
   unsigned long long payload; // cycle_time flit was created
-  unsigned int body_id; // flit index in packet. Used only in C++ model to compare flits
 } flit;
 
 struct flit_comparator {
   /* Returns true if lflit < rflit, used by FLITS_IN_FLIGHT set. */
   bool operator() (const flit* lflit, const flit* rflit) {
-    long long lflit_sum = (long long) (lflit->ingress_id + lflit->egress_id + lflit->payload + lflit->body_id);
-    long long rflit_sum = (long long) (rflit->ingress_id + rflit->egress_id + rflit->payload + rflit->body_id);
+    long long lflit_sum = (long long) (lflit->ingress_id + lflit->egress_id + lflit->payload);
+    long long rflit_sum = (long long) (rflit->ingress_id + rflit->egress_id + rflit->payload);
     return lflit_sum < rflit_sum;
   }
 };
@@ -269,7 +268,6 @@ extern "C" void ingressunit_tick(
       new_flit->tail = i == (NUM_FLITS - 1);
       new_flit->ingress_id = ingress_id;
       new_flit->egress_id = dest;
-      new_flit->body_id = i;
       if (IS_MEASUREMENT(cycle_count)) {
         new_flit->payload = cycle_count;
       } else {
@@ -281,11 +279,6 @@ extern "C" void ingressunit_tick(
   }
 
   bool flit_available = (*SRC_QUEUES)[ingress_id].size() > 0;
-  if (flit_available) {
-    *flit_out_valid = 1;
-  } else {
-    *flit_out_valid = 0;
-  }
 
   // printf("\tDEBUG: noc ready is %d\n\tflit available is %d\n", noc_ready, flit_available);
   if (noc_ready != 0 && flit_available) {
@@ -298,9 +291,11 @@ extern "C" void ingressunit_tick(
     *flit_out_payload = next_flit->payload;
     if (next_flit->payload != (unsigned long long) -1) {
       (*FLITS_IN_FLIGHT).insert(next_flit);
-    } else {
-      delete next_flit; // no need to track warmup/drain flits
     }
+    *flit_out_valid = 1;
+    delete next_flit; // no need to track warmup/drain flits
+  } else {
+    *flit_out_valid = 0;
   }
 
   return;
@@ -311,7 +306,7 @@ bool METRICS_PRINTED = false;
 double compute_throughput() {
   // expected traffic from ingress i to egress e is TRAFFIC_MATRIX[i][e] * MEASUREMENT_CYCLES
   // actual traffic is PACKETS_RECVD_M
-  FILE* csv = fopen("noc-channel-throughputs.csv", "w");
+  FILE* csv = fopen("noc-flow-throughputs.csv", "w");
   fprintf(csv, "ingress,egress,throughput\n");
   double min_throughput = 1.0;
   for (int i = 0; i < NUM_INGRESSES; i++) {
