@@ -269,7 +269,7 @@ extern "C" void ingressunit_tick(
       new_flit->ingress_id = ingress_id;
       new_flit->egress_id = dest;
       if (IS_MEASUREMENT(cycle_count)) {
-        new_flit->payload = cycle_count;
+        new_flit->payload = gen_flit_payload(cycle_count);
       } else {
         new_flit->payload = (unsigned long long) -1;
       }
@@ -360,7 +360,7 @@ extern "C" void egressunit_tick(
     // printf("\tDEBUG: erased %d from set\n", num_erased);
   }
 
-  if (received_flit.tail != 0 && IS_MEASUREMENT(received_flit.payload)) {
+  if (received_flit.tail != 0 && received_flit.payload != (unsigned long long) -1 && IS_MEASUREMENT(get_cyc_flit(received_flit.payload))) {
     PACKETS_RECVD_M[received_flit.ingress_id][received_flit.egress_id]++;
   }
 
