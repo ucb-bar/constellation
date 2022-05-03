@@ -617,10 +617,12 @@ class TestConfig68 extends Config(
   new constellation.routing.WithRoutingRelation(new AllLegalRouting) ++
   new constellation.topology.WithTopology(new UnidirectionalLine(5)))
 class TestConfig69 extends Config(
+  new WithInputPacketStallProbability(0.9) ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(4)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithIngresses((0 until 16)) ++
   new constellation.channel.WithEgresses((0 until 16)) ++
+  new constellation.router.WithPrioritizingSingleVCAllocator ++
   new constellation.router.WithPayloadBits(8,  (3 until 16 by 4)) ++
   new constellation.router.WithPayloadBits(16, (2 until 16 by 4)) ++
   new constellation.router.WithPayloadBits(32, (1 until 16 by 4)) ++
