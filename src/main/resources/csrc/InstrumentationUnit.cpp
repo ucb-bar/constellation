@@ -2,7 +2,7 @@
 #include <iostream>
 #include <vector>
 #include <queue>
-#include <set>
+#include <map>
 #include <cmath>
 #include <cstring>
 #include <random>
@@ -14,11 +14,15 @@
 
 using namespace std;
 
-/* Global Variables */
+/* Number of cycles spent warming up and measuring performance of the network. */
 int WARMUP_CYCLES;
 int MEASUREMENT_CYCLES;
+
+/* Maximum cycles spent in drain phase. */
 int DRAIN_TIMEOUT;
-unsigned long long SIM_START = (unsigned long long) -1; // set to first cycle where NoC begins accepting traffic
+
+/* Cycle the simulation begins. */
+unsigned long long SIM_START = (unsigned long long) -1;
 
 /* plusarg name for the filepath corresponding to the traffic matrix. */
 const char* TRAFFIC_MATRIX_PLUSARG = "+TRAFFIC_MATRIX=";
@@ -46,21 +50,14 @@ typedef struct flit {
   unsigned long long payload; // cycle_time flit was created
 } flit;
 
-struct flit_comparator {
-  /* Returns true if lflit < rflit, used by FLITS_IN_FLIGHT set. */
-  bool operator() (const flit* lflit, const flit* rflit) {
-    long long lflit_sum = (long long) (lflit->ingress_id + lflit->egress_id + lflit->payload);
-    long long rflit_sum = (long long) (rflit->ingress_id + rflit->egress_id + rflit->payload);
-    return lflit_sum < rflit_sum;
-  }
-};
-
 /* Source Queues for input into NoC */
 vector<queue<struct flit*>>* SRC_QUEUES;
 
-/* All packets currently in-flight in the NoC. */
-// TODO: GIVE EACH FLIT A UNIQUE ID, MAKE IT A SET OF UNIQUE IDs (store uniqueID: egress mappings, make sure each packet arrives at the right egress id)
-set<flit*, flit_comparator>* FLITS_IN_FLIGHT;
+/* All packets currently in-flight in the NoC. keys: flit unique id, values: destination egress id */
+map<long, unsigned long long>* FLITS_IN_FLIGHT;
+
+// todo: Document
+char* last_flit_out_valid;
 
 /* Returns true if cycle cycle_count is in the warmup phase. */
 bool IS_WARMUP(unsigned long long cycle_count) {
@@ -132,7 +129,12 @@ extern "C" void instrumentationunit_init(
   NUM_INGRESSES = num_ingresses;
   NUM_EGRESSES = num_egresses;
   SRC_QUEUES = new vector<queue<flit*>>(NUM_INGRESSES, queue<flit*>());
-  FLITS_IN_FLIGHT = new set<flit*, flit_comparator>();
+  FLITS_IN_FLIGHT = new map<long, unsigned long long>();
+  last_flit_out_valid = new char[NUM_INGRESSES];
+  for (int i = 0; i < NUM_INGRESSES; i++) {
+    last_flit_out_valid[i] = 0;
+  }
+
   TRAFFIC_MATRIX = new float*[num_ingresses + 1];
   PACKETS_RECVD_M = new long*[num_ingresses + 1];
   for (int i = 0; i < num_ingresses; i++) {
@@ -208,6 +210,8 @@ extern "C" void instrumentationunit_init(
     }
   }
 
+  printf("DEBUG: C++ sim initialized\n");
+
   return;
 }
 
@@ -275,28 +279,47 @@ extern "C" void ingressunit_tick(
       }
       (*SRC_QUEUES)[ingress_id].push(new_flit);
     }
-    // printf("\tC++ Sim DEBUG: Generated packet\n");
+  }
+
+  // TODO (ANIMESH):
+  if (noc_ready != 0 && last_flit_out_valid[ingress_id] != 0) {
+    if ((*SRC_QUEUES)[ingress_id].size() == 0) {
+      printf("C++ Sim: Tried to pop from an empty source queue.\n");
+      abort();
+    }
+    flit* last_flit = (*SRC_QUEUES)[ingress_id].front();
+    (*SRC_QUEUES)[ingress_id].pop();
+
+    if (last_flit->payload != (unsigned long long) -1) {
+      (*FLITS_IN_FLIGHT).insert(pair<long, unsigned long long>(get_unique_id_flit(last_flit->payload), last_flit->egress_id));
+      printf("DEBUG: Inserting flit %ld to egress %llu at cycle %llu\n", get_unique_id_flit(last_flit->payload), last_flit->egress_id, cycle_count);
+      printf("\tFLITS_IN_FLIGHT now size %d\n", (*FLITS_IN_FLIGHT).size());
+    } else {
+      // printf("DEBUG: Inserting flit W to egress %llu at cycle %llu\n", next_flit->egress_id, cycle_count);
+    }
+    delete last_flit; // no need to track warmup/drain flits
   }
 
   bool flit_available = (*SRC_QUEUES)[ingress_id].size() > 0;
 
-  // printf("\tDEBUG: noc ready is %d\n\tflit available is %d\n", noc_ready, flit_available);
-  if (noc_ready != 0 && flit_available) {
-    flit* next_flit = (*SRC_QUEUES)[ingress_id].front();
-    (*SRC_QUEUES)[ingress_id].pop();
-
+  // TODO (ANIMESH): THE VALUES HERE ARE SENT OUT THE CYCLE AFTER THIS ONE.
+  // What the logic above does: If we outputted a valid signal last cycle, its visible this cycle.
+  // If we also see a ready cycle this signal, that means both ready and valid were high so we should
+  // remove a flit from the queue
+  flit* next_flit = NULL;
+  if (flit_available) {
+    next_flit = (*SRC_QUEUES)[ingress_id].front();
     *flit_out_head = next_flit->head;
     *flit_out_tail = next_flit->tail;
     *flit_out_egress_id = next_flit->egress_id;
     *flit_out_payload = next_flit->payload;
-    if (next_flit->payload != (unsigned long long) -1) {
-      (*FLITS_IN_FLIGHT).insert(next_flit);
-    }
+
     *flit_out_valid = 1;
-    delete next_flit; // no need to track warmup/drain flits
   } else {
     *flit_out_valid = 0;
   }
+
+  last_flit_out_valid[ingress_id] = (flit_available) ? 1 : 0;
 
   return;
 }
@@ -356,11 +379,14 @@ extern "C" void egressunit_tick(
   received_flit.payload = flit_in_payload;
 
   if (received_flit.payload != (unsigned long long) -1) {
-    int num_erased = (*FLITS_IN_FLIGHT).erase(&received_flit); // TODO: NOTHING ACTUALLY GETTING ERASED
-    // printf("\tDEBUG: erased %d from set\n", num_erased);
+    int num_erased = (*FLITS_IN_FLIGHT).erase(get_unique_id_flit(received_flit.payload));
+    printf("DEBUG: egress %llu received flit %ld at cycle %llu\n", egress_id, get_unique_id_flit(received_flit.payload), cycle_count);
+    printf("\tDEBUG: erased %d from set. %d left.\n", num_erased, (*FLITS_IN_FLIGHT).size());
+  } else {
+    // printf("DEBUG: egress %llu received W at cycle %llu\n", egress_id, cycle_count);
   }
 
-  if (received_flit.tail != 0 && received_flit.payload != (unsigned long long) -1 && IS_MEASUREMENT(get_cyc_flit(received_flit.payload))) {
+  if (received_flit.tail != 0 && received_flit.payload != (unsigned long long) -1 && IS_MEASUREMENT(cycle_count)) {
     PACKETS_RECVD_M[received_flit.ingress_id][received_flit.egress_id]++;
   }
 
