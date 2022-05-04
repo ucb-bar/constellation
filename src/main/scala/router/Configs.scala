@@ -20,7 +20,7 @@ class WithCoupleSAVA extends Config((site, here, up) => {
     up(NoCKey, site).routerParams(i).copy(coupleSAVA = true)
   )
 })
-
+ 
 // Only couple SAVA on routers with minimal SA/VA complexity
 class WithSafeCoupleSAVA extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(routerParams = (i: Int) => {
@@ -40,20 +40,25 @@ class WithEarlyRC extends Config((site, here, up) => {
 })
 
 
-class WithIterativeVCAllocator extends Config((site, here, up) => {
+class WithVCAllocator(vc: VCAllocatorParams => Parameters => VCAllocator) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(routerParams = (i: Int) =>
-    up(NoCKey, site).routerParams(i).copy(vcAllocator = (vP) => (p) => new IterativeVCAllocator(vP)(p))
+    up(NoCKey, site).routerParams(i).copy(vcAllocator = vc)
   )
 })
 
-class WithSimpleVCAllocator extends Config((site, here, up) => {
+class WithPIMMultiVCAllocator extends WithVCAllocator(vP => p => new PIMMultiVCAllocator(vP)(p))
+class WithISLIPMultiVCAllocator extends WithVCAllocator(vP => p => new ISLIPMultiVCAllocator(vP)(p))
+class WithRotatingSingleVCAllocator extends WithVCAllocator(vP => p => new RotatingSingleVCAllocator(vP)(p))
+class WithPrioritizingSingleVCAllocator extends WithVCAllocator(vP => p => new PrioritizingSingleVCAllocator(vP)(p))
+
+class WithPayloadBits(w: Int, routers: Seq[Int]) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(routerParams = (i: Int) =>
-    up(NoCKey, site).routerParams(i).copy(vcAllocator = (vP) => (p) => new SimpleVCAllocator(vP)(p))
+    if (routers.contains(i) || routers.size == 0) {
+      up(NoCKey, site).routerParams(i).copy(payloadBits=w)
+    } else {
+      up(NoCKey, site).routerParams(i)
+    }
   )
 })
 
-class WithUniformPayloadBits(w: Int) extends Config((site, here, up) => {
-  case NoCKey => up(NoCKey, site).copy(routerParams = (i: Int) =>
-    up(NoCKey, site).routerParams(i).copy(payloadBits=w)
-  )
-})
+class WithUniformPayloadBits(w: Int) extends WithPayloadBits(w, Nil)

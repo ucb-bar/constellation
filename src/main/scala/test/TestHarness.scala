@@ -34,7 +34,8 @@ object SelectFirstNUInt
 case class NoCTesterParams(
   robSz: Int = 128,
   totalTxs: Int = 50000,
-  inputStallProbability: Double = 0.0,
+  inputFlitStallProbability: Double = 0.0,
+  inputPacketStallProbability: Double = 0.0,
   outputStallProbability: Double = 0.0,
   maxFlits: Int = 8,
   constPacketSize: Boolean = false

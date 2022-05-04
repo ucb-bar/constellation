@@ -46,10 +46,18 @@ class NoC(implicit p: Parameters) extends LazyModule {
   }
 
   val routers = Seq.tabulate(nNodes) { i => router_sink_domains(i) {
-    val inParams = allChannelParams.filter(_.destId == i)
-    val outParams = allChannelParams.filter(_.srcId == i)
-    val ingressParams = allIngressParams.filter(_.destId == i)
-    val egressParams = allEgressParams.filter(_.srcId == i)
+    val inParams = allChannelParams.filter(_.destId == i).map(
+      _.copy(payloadBits=allRouterParams(i).user.payloadBits)
+    )
+    val outParams = allChannelParams.filter(_.srcId == i).map(
+      _.copy(payloadBits=allRouterParams(i).user.payloadBits)
+    )
+    val ingressParams = allIngressParams.filter(_.destId == i).map(
+      _.copy(payloadBits=allRouterParams(i).user.payloadBits)
+    )
+    val egressParams = allEgressParams.filter(_.srcId == i).map(
+      _.copy(payloadBits=allRouterParams(i).user.payloadBits)
+    )
     val noIn = inParams.size + ingressParams.size == 0
     val noOut = outParams.size + egressParams.size == 0
     if (noIn || noOut) {
@@ -58,42 +66,57 @@ class NoC(implicit p: Parameters) extends LazyModule {
     } else {
       Some(LazyModule(new Router(
         routerParams = allRouterParams(i),
-        inParams = inParams,
-        outParams = outParams,
-        ingressParams = ingressParams,
-        egressParams = egressParams,
+        preDiplomaticInParams = inParams,
+        preDiplomaticIngressParams = ingressParams,
+        outDests = outParams.map(_.destId),
+        egressIds = egressParams.map(_.egressId)
       )(iP)))
     }
   }}.flatten
 
-  val ingressNodes = allIngressParams.map { u => IngressChannelSourceNode(u) }
+  val ingressNodes = allIngressParams.map { u => IngressChannelSourceNode(u.destId) }
   val egressNodes = allEgressParams.map { u => EgressChannelDestNode(u) }
 
+  // Generate channels between routers diplomatically
   Seq.tabulate(nNodes, nNodes) { case (i, j) => if (i != j) {
     val routerI = routers.find(_.nodeId == i)
     val routerJ = routers.find(_.nodeId == j)
     if (routerI.isDefined && routerJ.isDefined) {
-      val sourceNodes = routerI.get.sourceNodes.find(_.sourceParams.destId == j)
+      val sourceNodes = routerI.get.sourceNodes.find(_.destId == j)
       val destNodes = routerJ.get.destNodes.filter(_.destParams.srcId == i)
       require (sourceNodes.size == destNodes.size)
       (sourceNodes zip destNodes).foreach { case (src, dst) =>
         val channelParam = allChannelParams.find(c => c.srcId == i && c.destId == j).get
         router_sink_domains(j) {
           implicit val p: Parameters = iP
-          dst := channelParam.channelGen(p)(src)
+          (dst
+            := ChannelWidthWidget(routerJ.get.payloadBits, routerI.get.payloadBits)
+            := channelParam.channelGen(p)(src)
+          )
         }
       }
     }
   }}
 
-  routers.foreach { dst => {
+  // Generate terminal channels diplomatically
+  routers.foreach { dst => router_sink_domains(dst.nodeId) {
     implicit val p: Parameters = iP
-    dst.ingressNodes.foreach(n =>
-      n := ingressNodes(n.destParams.asInstanceOf[IngressChannelParams].ingressId)
-    )
-    dst.egressNodes.foreach(n =>
-      egressNodes(n.sourceParams.asInstanceOf[EgressChannelParams].egressId) := n
-    )
+    dst.ingressNodes.foreach(n => {
+      val ingressId = n.destParams.ingressId
+      require(dst.payloadBits <= allIngressParams(ingressId).payloadBits)
+      (n
+        := IngressWidthWidget(dst.payloadBits, allIngressParams(ingressId).payloadBits)
+        := ingressNodes(ingressId)
+      )
+    })
+    dst.egressNodes.foreach(n => {
+      val egressId = n.egressId
+      require(dst.payloadBits <= allEgressParams(egressId).payloadBits)
+      (egressNodes(egressId)
+        := EgressWidthWidget(allEgressParams(egressId).payloadBits, dst.payloadBits)
+        := n
+      )
+    })
   }}
 
   val debugNodes = routers.map { r =>

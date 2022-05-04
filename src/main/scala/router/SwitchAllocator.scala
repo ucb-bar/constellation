@@ -21,7 +21,10 @@ class SwitchAllocator(
   val outParams: Seq[ChannelParams],
   val ingressParams: Seq[IngressChannelParams],
   val egressParams: Seq[EgressChannelParams]
-)(implicit val p: Parameters) extends Module with HasRouterParams {
+)(implicit val p: Parameters) extends Module
+    with HasRouterParams
+    with HasRouterInputParams
+    with HasRouterOutputParams {
   val io = IO(new Bundle {
     val req = MixedVec(allInParams.map(u =>
       Vec(u.destMultiplier, Flipped(Decoupled(new SwitchAllocReq(outParams, egressParams))))))

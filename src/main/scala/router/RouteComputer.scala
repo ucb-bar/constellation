@@ -11,7 +11,8 @@ import constellation.channel._
 import constellation.routing.{FlowRoutingBundle}
 import constellation.noc.{HasNoCParams}
 
-class RouteComputerReq(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
+class RouteComputerReq(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle
+    with HasChannelParams {
   val src_virt_id = UInt(virtualChannelBits.W)
   val flow = new FlowRoutingBundle
 }
@@ -33,7 +34,11 @@ class RouteComputer(
   val outParams: Seq[ChannelParams],
   val ingressParams: Seq[IngressChannelParams],
   val egressParams: Seq[EgressChannelParams]
-)(implicit val p: Parameters) extends Module with HasRouterParams with HasNoCParams {
+)(implicit val p: Parameters) extends Module
+    with HasRouterParams
+    with HasRouterInputParams
+    with HasRouterOutputParams
+    with HasNoCParams {
   val io = IO(new Bundle {
     val req = MixedVec(allInParams.map { u => Flipped(Decoupled(new RouteComputerReq(u))) })
     val resp = MixedVec(allInParams.map { u => Valid(new RouteComputerResp(u, outParams, egressParams)) })
@@ -54,7 +59,6 @@ class RouteComputer(
             val table = allInParams(i).possibleFlows.toSeq.distinct.map { pI =>
               allInParams(i).channelRoutingInfos.map { cI =>
                 val v = routingRelation(
-                  nodeId,
                   cI,
                   outParams(o).channelRoutingInfos(outVId),
                   pI

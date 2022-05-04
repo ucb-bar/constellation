@@ -11,15 +11,23 @@ import freechips.rocketchip.util._
 
 import constellation.noc.{NoC, NoCKey, NoCParams, NoCTerminalIO}
 import constellation.channel._
-import constellation.topology.{TerminalPlaneTopology}
+import constellation.topology.{TerminalPlane}
+
+import scala.collection.immutable.ListMap
 
 case class TLNoCParams(
   nocName: String,
-  nodeMappings: ConstellationTLNetworkNodeMapping,
+  nodeMappings: ConstellationDiplomaticNetworkNodeMapping,
   // if set, generates a private noc using the config,
   // else use globalNoC params to connect to global interconnect
   privateNoC: Option[NoCParams],
+  explicitPayloadWidth: Option[Int] = None, // if unset, chooses minimum with based on TL bundle width
   globalTerminalChannels: Option[() => BundleBridgeSink[NoCTerminalIO]] = None,
+)
+
+case class ConstellationDiplomaticNetworkNodeMapping(
+  inNodeMapping: ListMap[String, Int] = ListMap[String, Int](),
+  outNodeMapping: ListMap[String, Int] = ListMap[String, Int]()
 )
 
 class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
@@ -27,6 +35,7 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
   val inNodeMapping = params.nodeMappings.inNodeMapping
   val outNodeMapping = params.nodeMappings.outNodeMapping
   val privateNoC = params.privateNoC
+  val explicitPayloadWidth = params.explicitPayloadWidth
   val globalSink: Option[BundleBridgeSink[NoCTerminalIO]] = if (privateNoC.isEmpty) {
     Some(params.globalTerminalChannels.get())
   } else {
@@ -211,8 +220,10 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
     val addressC = (in zip edgesIn) map { case (i, e) => e.address(i.c.bits) }
 
     def unique(x: Vector[Boolean]): Bool = (x.filter(x=>x).size <= 1).B
-    val requestAIO = (connectAIO zip addressA) map { case (c, i) => outputPortFns(c).map { o => unique(c) || o(i) } }
-    val requestCIO = (connectCIO zip addressC) map { case (c, i) => outputPortFns(c).map { o => unique(c) || o(i) } }
+    val requestAIO = (connectAIO zip addressA) map { case (c, i) =>
+      outputPortFns(c).zipWithIndex.map { case (o, j) => c(j).B && (unique(c) || o(i)) } }
+    val requestCIO = (connectCIO zip addressC) map { case (c, i) =>
+      outputPortFns(c).zipWithIndex.map { case (o, j) => c(j).B && (unique(c) || o(i)) } }
     val requestBOI = out.map { o => inputIdRanges.map  { i => i.contains(o.b.bits.source) } }
     val requestDOI = out.map { o => inputIdRanges.map  { i => i.contains(o.d.bits.source) } }
     val requestEIO = in.map  { i => outputIdRanges.map { o => o.contains(i.e.bits.sink) } }
@@ -334,7 +345,7 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
     val actualPayloadWidth = payloadWidth + (if (debugPrintLatencies) 64 else 0)
 
     def splitToFlit(
-      i: DecoupledIO[Data], o: DecoupledIO[IngressFlit],
+      i: DecoupledIO[Data], o: IrrevocableIO[IngressFlit],
       first: Bool, last: Bool, egress: UInt, has_body: Bool, debug: UInt
     ) = {
       val is_body = RegInit(false.B)
@@ -351,7 +362,7 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
       when (o.fire() && o.bits.head) { is_body := true.B }
       when (o.fire() && o.bits.tail) { is_body := false.B }
     }
-    def combineFromFlit(i: DecoupledIO[EgressFlit], o: DecoupledIO[Data]) = {
+    def combineFromFlit(i: IrrevocableIO[EgressFlit], o: DecoupledIO[Data]) = {
       val is_const = RegInit(true.B)
       val const = Reg(UInt(constWidth(o.bits).W))
 
@@ -367,7 +378,7 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
 
     def getIndex(nodeMapping: Seq[String], l: String) = {
       val matches = nodeMapping.map(k => l.contains(k))
-      require(matches.filter(i => i).size == 1, s"Unable to find valid mapping for $l")
+      require(matches.filter(i => i).size == 1, s"$nocName unable to find valid mapping for $l\n$nodeMapping")
       matches.indexWhere(i => i)
     }
 
@@ -390,7 +401,7 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
       // If desired, create a private noc
       require(nocParams.nVirtualNetworks == 5)
       val (ingressOffset, egressOffset) = nocParams.topology match {
-        case t: TerminalPlaneTopology => (t.base.nNodes, t.base.nNodes * 2)
+        case t: TerminalPlane => (t.base.nNodes, t.base.nNodes * 2)
         case _ => (0, 0)
       }
       val flowParams = (0 until in.size).map { i => (0 until out.size).map { o =>
@@ -415,19 +426,19 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
         .flatten.zipWithIndex.map { case (i,iId) => UserIngressParams(
           destId = i + ingressOffset,
           vNetId = ingressVNets(iId),
-          payloadBits = actualPayloadWidth
+          payloadBits = explicitPayloadWidth.map(e => e * ((actualPayloadWidth + e - 1) / e)).getOrElse(actualPayloadWidth)
         )}
       val egressParams = (inNodeMapping.values.map(i => Seq(i, i)) ++ outNodeMapping.values.map(i => Seq(i, i, i)))
-      .toSeq
-      .flatten.zipWithIndex.map { case (e,eId) => UserEgressParams(
+        .toSeq
+        .flatten.zipWithIndex.map { case (e,eId) => UserEgressParams(
           srcId = e + egressOffset,
           vNetId = egressVNets(eId),
-          payloadBits = actualPayloadWidth
+          payloadBits = explicitPayloadWidth.map(e => e * ((actualPayloadWidth + e - 1) / e)).getOrElse(actualPayloadWidth)
         )}
 
       Module(LazyModule(new NoC()(p.alterPartial({
         case NoCKey => nocParams.copy(
-          routerParams = (i: Int) => nocParams.routerParams(i).copy(payloadBits = actualPayloadWidth),
+          routerParams = (i: Int) => nocParams.routerParams(i).copy(payloadBits = explicitPayloadWidth.getOrElse(actualPayloadWidth)),
           ingresses = ingressParams,
           egresses = egressParams,
           flows = flowParams,
@@ -445,8 +456,8 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
     val ingresses: Seq[IngressChannel] = noc.map(_.io.ingress).getOrElse(globalSink.get.in(0)._1.ingress)
     val egresses: Seq[EgressChannel] = noc.map(_.io.egress).getOrElse(globalSink.get.in(0)._1.egress)
 
-    for (t <- ingresses) { require(t.payloadBits >= actualPayloadWidth) }
-    for (t <-  egresses) { require(t.payloadBits >= actualPayloadWidth) }
+    for (t <- ingresses) { require(t.payloadBits >= actualPayloadWidth, s"${t.payloadBits} <= $actualPayloadWidth") }
+    for (t <-  egresses) { require(t.payloadBits >= actualPayloadWidth, s"${t.payloadBits} <= $actualPayloadWidth") }
 
     val tsc = RegInit(0.U(32.W))
     tsc := tsc + 1.U
@@ -456,7 +467,7 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
         printf(s"TLNoC, $channel, %d, %d, %d\n",
           tsc - payload(payloadWidth+32-1,payloadWidth),
           payload(payloadWidth+48-1,payloadWidth+32),
-          payload >> (payloadWidth + 48))
+          payload(actualPayloadWidth-1, payloadWidth + 48))
       }
     }
 
@@ -471,18 +482,28 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
       println(s"Constellation TLNoC $nocName: in  $i @ ${inNodeMapping.values.toSeq(i)}: ${inNames(i)}")
       println(s"Constellation TLNoC $nocName:   ingress (${idx*3} ${idx*3+1} ${idx*3+2}) egress (${idx*2} ${idx*2+1})")
 
+      val inAEgress = Mux1H(requestAIO(i).zipWithIndex.map { case (r,i) =>
+        r -> (in.size*2 + getIndex(outNodeMapping.keys.toSeq, outNames(i))*3 + 0).U
+      })
+      val inCEgress = Mux1H(requestCIO(i).zipWithIndex.map { case (r,i) =>
+        r -> (in.size*2 + getIndex(outNodeMapping.keys.toSeq, outNames(i))*3 + 1).U
+      })
+      val inEEgress = Mux1H(requestEIO(i).zipWithIndex.map { case (r,i) =>
+        r -> (in.size*2 + getIndex(outNodeMapping.keys.toSeq, outNames(i))*3 + 2).U
+      })
+
       splitToFlit(
-        in(i).a, inA.flit, firstAI(i), lastAI(i), (in.size*2+0).U +& (requestAIIds(i) * 3.U),
+        in(i).a, inA.flit, firstAI(i), lastAI(i), inAEgress,
         edgesIn(i).hasData(in(i).a.bits) || (~in(i).a.bits.mask =/= 0.U),
         Cat(requestAIIds(i), i.U(16.W), tsc)
       )
       splitToFlit(
-        in(i).c, inC.flit, firstCI(i), lastCI(i), (in.size*2+1).U +& (requestCIIds(i) * 3.U),
+        in(i).c, inC.flit, firstCI(i), lastCI(i), inCEgress,
         edgesIn(i).hasData(in(i).c.bits),
         Cat(requestCIIds(i), i.U(16.W), tsc)
       )
       splitToFlit(
-        in(i).e, inE.flit, firstEI(i), lastEI(i), (in.size*2+2).U +& (requestEIIds(i) * 3.U),
+        in(i).e, inE.flit, firstEI(i), lastEI(i), inEEgress,
         edgesIn(i).hasData(in(i).e.bits),
         Cat(requestEIIds(i), i.U(16.W), tsc)
       )
@@ -507,17 +528,24 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
       println(s"Constellation TLNoC $nocName: out $i @ ${outNodeMapping.values.toSeq(i)}: ${outNames(i)}")
       println(s"Constellation TLNoC $nocName:   ingress (${in.size*3+idx*2} ${in.size*3+idx*2+1}) egress (${in.size*2+idx*3} ${in.size*2+idx*3+1} ${in.size*2+idx*3+2})")
 
+      val inBEgress = Mux1H(requestBOI(i).zipWithIndex.map { case (r,i) =>
+        r -> (getIndex(inNodeMapping.keys.toSeq, inNames(i))*2 + 0).U
+      })
+      val inDEgress = Mux1H(requestDOI(i).zipWithIndex.map { case (r,i) =>
+        r -> (getIndex(inNodeMapping.keys.toSeq, inNames(i))*2 + 1).U
+      })
+
       combineFromFlit (outA.flit, out(i).a)
       combineFromFlit (outC.flit, out(i).c)
       combineFromFlit (outE.flit, out(i).e)
 
       splitToFlit(
-        out(i).b, inB.flit, firstBO(i), lastBO(i), 0.U +& (requestBOIds(i) * 2.U),
+        out(i).b, inB.flit, firstBO(i), lastBO(i), inBEgress,
         edgesOut(i).hasData(out(i).b.bits) || (~out(i).b.bits.mask =/= 0.U),
         Cat(requestBOIds(i), i.U(16.W), tsc)
       )
       splitToFlit(
-        out(i).d, inD.flit, firstDO(i), lastDO(i), 1.U +& (requestDOIds(i) * 2.U),
+        out(i).d, inD.flit, firstDO(i), lastDO(i), inDEgress,
         edgesOut(i).hasData(out(i).d.bits),
         Cat(requestDOIds(i), i.U(16.W), tsc)
       )

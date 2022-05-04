@@ -2,11 +2,11 @@ package constellation.channel
 
 import freechips.rocketchip.config.{Field, Parameters, Config}
 import constellation.noc.{NoCKey}
-import constellation.topology.BidirectionalTree
+import constellation.topology.{BidirectionalTree, TerminalPlane}
 
 import scala.math.{floor, log10, pow, max}
 
-class WithUniformChannels(f: UserChannelParams => UserChannelParams) extends Config((site, here, up) => {
+abstract class WithUniformChannels(f: UserChannelParams => UserChannelParams) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(channelParamGen = (src: Int, dst: Int) => {
     f(up(NoCKey, site).channelParamGen(src, dst))
   })
@@ -43,21 +43,14 @@ class WithUniformChannelDestMultiplier(mult: Int) extends WithUniformChannels(p 
 })
 
 
-/* Sets the multiplier of branches to leaf nodes to MULT and doubles the multiplier at each increasing level. */
-class WithFatTreeChannels(mult: Int) extends Config((site, here, up) => {
-  case NoCKey => up(NoCKey, site).copy(channelParamGen = (src: Int, dst: Int) => {
-    val p = up(NoCKey, site).channelParamGen(src, dst)
-      val height = up(NoCKey, site).topology.asInstanceOf[BidirectionalTree].height
-      val dAry = up(NoCKey, site).topology.asInstanceOf[BidirectionalTree].dAry
-      def level(id: Int) = floor(log10(id + 1) / log10(dAry))
-      val multiplier = pow(2, height - max(level(src), level(dst))).toInt
-      p.copy(srcMultiplier = multiplier,
-             destMultiplier = multiplier)
+class WithIngressVNets(f: Int => Int) extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(ingresses = up(NoCKey, site).ingresses.zipWithIndex.map { case (u,i) =>
+    u.copy(vNetId = f(i))
   })
 })
 
-class WithIngressVNets(f: Int => Int) extends Config((site, here, up) => {
-  case NoCKey => up(NoCKey, site).copy(ingresses = up(NoCKey, site).ingresses.zipWithIndex.map { case (u,i) =>
+class WithEgressVNets(f: Int => Int) extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(egresses = up(NoCKey, site).egresses.zipWithIndex.map { case (u,i) =>
     u.copy(vNetId = f(i))
   })
 })
@@ -91,3 +84,28 @@ class WithEgresses(egresses: Seq[Int]) extends Config((site, here, up) => {
   case NoCKey => up(NoCKey, site).copy(egresses = up(NoCKey, site).egresses ++ egresses.map(i => UserEgressParams(i)))
 })
 
+
+/* Sets the multiplier of branches to leaf nodes to MULT and doubles the multiplier at each increasing level. */
+class WithFatTreeChannels(mult: Int) extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(channelParamGen = (src: Int, dst: Int) => {
+    val p = up(NoCKey, site).channelParamGen(src, dst)
+      val height = up(NoCKey, site).topology.asInstanceOf[BidirectionalTree].height
+      val dAry = up(NoCKey, site).topology.asInstanceOf[BidirectionalTree].dAry
+      def level(id: Int) = floor(log10(id + 1) / log10(dAry))
+      val multiplier = pow(2, height - max(level(src), level(dst))).toInt
+      p.copy(srcMultiplier = multiplier,
+             destMultiplier = multiplier)
+  })
+})
+
+class WithTerminalPlaneIngressEgress extends Config((site, here, up) => {
+  case NoCKey => {
+    val topo = up(NoCKey).topology.asInstanceOf[TerminalPlane]
+    require(up(NoCKey).ingresses.map(_.destId).max < topo.base.nNodes)
+    require(up(NoCKey).egresses .map(_.srcId ).max < topo.base.nNodes)
+    up(NoCKey).copy(
+      ingresses = up(NoCKey).ingresses.map(i => i.copy(destId = i.destId + topo.base.nNodes)),
+      egresses  = up(NoCKey). egresses.map(i => i.copy( srcId =  i.srcId + topo.base.nNodes * 2))
+    )
+  }
+})

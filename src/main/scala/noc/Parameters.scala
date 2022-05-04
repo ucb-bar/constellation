@@ -8,7 +8,7 @@ import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp, BundleBridgeSink, InModuleBody}
 import constellation.router._
 import constellation.channel._
-import constellation.routing.{RoutingRelation, FlowRoutingInfo, ChannelRoutingInfo}
+import constellation.routing._
 import constellation.topology.{PhysicalTopology, UnidirectionalLine}
 
 
@@ -20,7 +20,7 @@ case class NoCParams(
   ingresses: Seq[UserIngressParams] = Nil,
   egresses: Seq[UserEgressParams] = Nil,
   flows: Seq[FlowParams] = Nil,
-  routingRelation: RoutingRelation = RoutingRelation.allLegal,
+  routingRelation: RoutingRelation = new AllLegalRouting,
   routerParams: Int => UserRouterParams = (i: Int) => UserRouterParams(),
   // (blocker, blockee) => bool
   // If true, then blocker must be able to proceed when blockee is blocked
@@ -68,24 +68,15 @@ object InternalNoCParams {
     val nocName = nocParams.nocName
     val skipValidationChecks = nocParams.skipValidationChecks
 
-    var uniqueChannelId = 0
-    def getUniqueChannelId(): Int = {
-      val r = uniqueChannelId
-      uniqueChannelId = uniqueChannelId + 1
-      r
-    }
-
     val channelParams = Seq.tabulate(nNodes, nNodes) { case (i,j) =>
       if (nocParams.topology.topo(i, j)) {
         val cP = nocParams.channelParamGen(i, j)
-        val payloadBits = nocParams.routerParams(i).payloadBits
-        require(nocParams.routerParams(i).payloadBits == nocParams.routerParams(j).payloadBits)
+        val payloadBits = nocParams.routerParams(j).payloadBits
         Some(ChannelParams(
           srcId = i,
           destId = j,
           payloadBits = payloadBits,
           user = cP,
-          uniqueId = getUniqueChannelId()
         ))
       } else {
         None
@@ -110,7 +101,6 @@ object InternalNoCParams {
         user = u,
         ingressId = i,
         flows = nocParams.flows,
-        uniqueId = getUniqueChannelId(),
         egresses = nocParams.egresses
       )
     }}
@@ -119,7 +109,6 @@ object InternalNoCParams {
       EgressChannelParams(
         user = u,
         egressId = e,
-        uniqueId = getUniqueChannelId(),
         flows = nocParams.flows
       )
     }}
@@ -143,7 +132,7 @@ object InternalNoCParams {
         .withDefaultValue(Set())
 
       // Loop through accessible ingress/egress pairs
-      ingressParams.zipWithIndex.filter(_._1.vNetId == vNetId).map { case (iP,iIdx) =>
+      ingressParams.filter(_.vNetId == vNetId).map { iP =>
         val iId = iP.destId
         //println(s"Constellation: $nocName Checking connectivity from ingress $iIdx")
         iP.possibleFlows.map { flow =>
@@ -152,6 +141,7 @@ object InternalNoCParams {
           var stack: Seq[ChannelRoutingInfo] = iP.channelRoutingInfos
           while (stack.size != 0) {
             val head = stack.head
+            flowPossibleFlows += head
             stack = stack.tail
 
             // This channel is the destination
@@ -162,7 +152,6 @@ object InternalNoCParams {
               val nexts = nextChannelParamMap(head.dst).map { nxtC =>
                 nxtC.channelRoutingInfos.map { cI =>
                   val can_transition = routingRel(
-                    head.dst,
                     head,
                     cI,
                     flow
@@ -174,7 +163,7 @@ object InternalNoCParams {
               require(nexts.size > 0,
                 s"Failed to route from $iId to ${flow.dst} at $head for vnet $vNetId")
               val toAdd = nexts.filter(n => !flowPossibleFlows.contains(n))
-              nexts.foreach(n => flowPossibleFlows += n)
+              //require((nexts.toSet | stack.toSet).size == 0)
               stack = toAdd ++ stack
             }
           }
@@ -183,24 +172,26 @@ object InternalNoCParams {
       }
       tempPossibleFlowMap.foreach { case (k,v) => possibleFlowMap(k) ++= v }
     }
-    def checkAcyclic(vNetId: Int, routingRel: RoutingRelation): Option[Seq[ChannelRoutingInfo]] = {
+    def checkAcyclic(routingRel: RoutingRelation): Option[Seq[ChannelRoutingInfo]] = {
       var visited = Set[ChannelRoutingInfo]()
       var stack = Seq[ChannelRoutingInfo]()
-
       def checkAcyclicUtil(cI: ChannelRoutingInfo): Boolean = {
         visited = visited + cI
         stack = stack ++ Seq(cI)
-
-        val neighbors = channelParams.filter(_.srcId == cI.dst).map(_.channelRoutingInfos).flatten.filter { nI =>
-          possibleFlowMap(cI).filter(_.vNet == vNetId).map { pI =>
-            routingRel(cI.dst, cI, nI, pI)
-          }.fold(false)(_||_)
-        }
-
+        val neighbors = channelParams
+          .filter(_.srcId == cI.dst)
+          .map(_.channelRoutingInfos)
+          .flatten
+          .filter(nI => possibleFlowMap(cI)
+            .filter(_.dst != cI.dst)
+            .map(pI => routingRel(cI, nI, pI))
+            .fold(false)(_||_)
+          )
         neighbors.foreach { nI =>
           if (!visited.contains(nI)) {
             if (!checkAcyclicUtil(nI)) return false
           } else if (stack.contains(nI)) {
+            stack = stack ++ Seq(nI)
             return false
           }
         }
@@ -208,7 +199,7 @@ object InternalNoCParams {
         return true
       }
 
-      ingressParams.filter(_.vNetId == vNetId).zipWithIndex.map { case (iP,iIdx) =>
+      ingressParams.zipWithIndex.map { case (iP,iIdx) =>
         if (!checkAcyclicUtil(iP.channelRoutingInfos(0))) {
           return Some(stack)
         }
@@ -234,35 +225,26 @@ object InternalNoCParams {
         // For each subset of blockers for this virtual network, recheck connectivity assuming
         // every virtual channel accessible to each blocker is locked
         for (b <- blockeeSets) {
-          checkConnectivity(vNetId, new RoutingRelation((nodeId, srcC, nxtC, flow) => {
-            val base = nocParams.routingRelation(nodeId, srcC, nxtC, flow)
-            val blocked = b.map { v => possibleFlowMap(nxtC).map(_.vNet == v) }.flatten.fold(false)(_||_)
-            base && !blocked
-          }))
+          checkConnectivity(vNetId, new RoutingRelation {
+            def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+              val base = nocParams.routingRelation(srcC, nxtC, flow)
+              val blocked = b.map { v => possibleFlowMap(nxtC).map(_.vNet == v) }.flatten.fold(false)(_||_)
+              base && !blocked
+            }
+          })
         }
       }
     }
 
     // Check for deadlock in escape channels
     println(s"Constellation: $nocName Checking for possibility of deadlock")
-    for (vNetId <- 0 until nVirtualNetworks) {
-      // blockees are vNets which the current vNet can block without affecting its own forwards progress
-      val blockees = (0 until nVirtualNetworks).filter(v => v != vNetId && nocParams.vNetBlocking(vNetId, v))
-      val blockeeSets = blockees.toSet.subsets
-      // For each subset of blockers for this virtual network, recheck connectivity assuming
-      // every virtual channel accessible to each blocker is locked
-      for (b <- blockeeSets) {
-        val acyclicPath = checkAcyclic(vNetId, new RoutingRelation((nodeId, srcC, nxtC, flow) => {
-          val base = nocParams.routingRelation(nodeId, srcC, nxtC, flow)
-          val blocked = b.map { v => possibleFlowMap(nxtC).map(_.vNet == v) }.flatten.fold(false)(_||_)
-          val escape = nocParams.routingRelation.isEscape(nxtC, vNetId)
-          base && !blocked && escape
-        }))
-        acyclicPath.foreach { path =>
-          println(s"Constellation WARNING: $nocName cyclic path on virtual network $vNetId may cause deadlock: ${acyclicPath.get}")
-        }
+    val acyclicPath = checkAcyclic(new RoutingRelation {
+      def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+        val escape = nocParams.routingRelation.isEscape(nxtC, flow.vNet)
+        nocParams.routingRelation(srcC, nxtC, flow) && escape
       }
-    }
+    })
+    require(acyclicPath.isEmpty, s"Cyclic path may cause deadlock: ${acyclicPath.get}")
 
     // Tie off inpossible virtual channels
     // Also set possible nodes for each channel

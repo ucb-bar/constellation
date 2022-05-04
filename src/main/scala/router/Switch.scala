@@ -19,7 +19,10 @@ class Switch(
   val outParams: Seq[ChannelParams],
   val ingressParams: Seq[IngressChannelParams],
   val egressParams: Seq[EgressChannelParams]
-)(implicit val p: Parameters) extends Module with HasRouterParams {
+)(implicit val p: Parameters) extends Module
+    with HasRouterParams
+    with HasRouterInputParams
+    with HasRouterOutputParams {
 
   val io = IO(new Bundle {
     val in = MixedVec(allInParams.map { u => Vec(u.destMultiplier,

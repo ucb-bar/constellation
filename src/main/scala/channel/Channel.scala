@@ -30,10 +30,10 @@ class Channel(val cParam: ChannelParams)(implicit val p: Parameters) extends Bun
 
 class IngressChannel(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   require(cParam.isInstanceOf[IngressChannelParams])
-  val flit = Decoupled(new IngressFlit(cParam))
+  val flit = Irrevocable(new IngressFlit(cParam))
 }
 
 class EgressChannel(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
   require(cParam.isInstanceOf[EgressChannelParams])
-  val flit = Decoupled(new EgressFlit(cParam))
+  val flit = Irrevocable(new EgressFlit(cParam))
 }

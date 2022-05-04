@@ -3,8 +3,8 @@ package constellation.topology
 import scala.math.{pow, cos, sin, Pi}
 
 /** A network where sequential nodes are connected unidirectionally */
-class UnidirectionalLine(n: Int) extends PhysicalTopology(n) {
-  def topo(src: Int, dest: Int) = dest - src == 1
+class UnidirectionalLine(n: Int, skips: Seq[(Int, Int)] = Nil) extends PhysicalTopology(n) {
+  def topo(src: Int, dest: Int) = dest - src == 1 || ((dest > src) && skips.contains((src, dest)))
   val plotter = new LinePlotter
 }
 
@@ -118,7 +118,7 @@ class BidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology(nX * nY) {
   val plotter = new Mesh2DPlotter(nX, nY)
 }
 
-class TerminalPlaneTopology(val base: PhysicalTopology) extends PhysicalTopology(3 * base.nNodes) {
+class TerminalPlane(val base: PhysicalTopology) extends PhysicalTopology(3 * base.nNodes) {
   def topo(src: Int, dst: Int) = {
     def isBase(n: Int) = n < base.nNodes
     def isIngress(n: Int) = !isEgress(n) && !isBase(n)
