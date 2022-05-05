@@ -240,7 +240,10 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   val vcalloc_vals = Wire(Vec(nVirtualChannels, Bool()))
   val vcalloc_filter = PriorityEncoderOH(Cat(vcalloc_vals.asUInt, vcalloc_vals.asUInt & ~mask))
   val vcalloc_sel = vcalloc_filter(nVirtualChannels-1,0) | (vcalloc_filter >> nVirtualChannels)
-  when (vcalloc_vals.orR) {
+  // Prioritize incoming packetes
+  when (io.router_resp.valid) {
+    mask := (1.U << io.router_resp.bits.src_virt_id) >> 1
+  } .elsewhen (vcalloc_vals.orR) {
     mask := Mux1H(vcalloc_sel, (0 until nVirtualChannels).map { w => ~(0.U((w+1).W)) })
   }
   io.vcalloc_req.valid := vcalloc_vals.orR
