@@ -50,20 +50,22 @@ class WithMbusNoC extends Config((site, here, up) => {
 })
 
 // Use a noc based control bus. By default instantiates a private noc within the bus
-class WithNbusNoC(in: Int, f: Int => Int, explicitWidth: Option[Int] = None) extends Config((site, here, up) => {
-  case TLNetworkTopologyLocated(InSubsystem) => up(TLNetworkTopologyLocated(InSubsystem)) ++ Seq(
-    NoCControlBusTopologyParams(nbus=ConstellationPeripheryBusParams(
-      site(PeripheryBusKey), Some(up(NoCKey)), explicitWidth
-    ))
-  )
-  case ConstellationTLNetworkNodeMappingKey(NBUS) => ConstellationDiplomaticNetworkNodeMapping(
-    inNodeMapping = ListMap("" -> in), // the inwards should only have 1 connection
-    outNodeMapping = ListMap(
-      (0 until site(GlobalTLInterconnectKey).nocParams.topology.nNodes).map { i => s"[$i]" -> f(i) }:_*
-    )
-  )
+class WithCbusNoC(explicitWidth: Option[Int] = None) extends Config((site, here, up) => {
+  case TLNetworkTopologyLocated(InSubsystem) => {
+    up(TLNetworkTopologyLocated(InSubsystem), site).map(topo => {
+      topo match {
+        case j: TLBusWrapperTopology => {
+          new TLBusWrapperTopology(j.instantiations.map(inst => inst match {
+            case (CBUS, cbus_params: PeripheryBusParams) =>
+              (CBUS, ConstellationPeripheryBusParams(cbus_params, Some(up(NoCKey)), explicitWidth))
+            case a => a
+          }), j.connections)
+        }
+        case x => x
+      }
+    })
+  }
 })
-
 
 // Config options for setting node mappings for each bus
 class WithSbusNoCInNodeMapping(matchStr: String, node: Int) extends Config((site, here, up) => {
@@ -85,6 +87,24 @@ class WithMbusNoCInNodeMapping(matchStr: String, node: Int) extends Config((site
 class WithMbusNoCOutNodeMapping(matchStr: String, node: Int) extends Config((site, here, up) => {
   case ConstellationTLNetworkNodeMappingKey(MBUS) => up(ConstellationTLNetworkNodeMappingKey(MBUS)).copy(
     outNodeMapping = up(ConstellationTLNetworkNodeMappingKey(MBUS)).outNodeMapping + (matchStr -> node)
+  )
+})
+
+class WithCbusNoCInNodeMapping(matchStr: String, node: Int) extends Config((site, here, up) => {
+  case ConstellationTLNetworkNodeMappingKey(CBUS) => up(ConstellationTLNetworkNodeMappingKey(CBUS)).copy(
+    inNodeMapping = up(ConstellationTLNetworkNodeMappingKey(CBUS)).inNodeMapping + (matchStr -> node)
+  )
+})
+class WithCbusNoCOutNodeMapping(matchStr: String, node: Int) extends Config((site, here, up) => {
+  case ConstellationTLNetworkNodeMappingKey(CBUS) => up(ConstellationTLNetworkNodeMappingKey(CBUS)).copy(
+    outNodeMapping = up(ConstellationTLNetworkNodeMappingKey(CBUS)).outNodeMapping + (matchStr -> node)
+  )
+})
+
+class WithCBusNoCGlobalNoCCtrlMapping(f: Int => Int) extends Config((site, here, up) => {
+  case ConstellationTLNetworkNodeMappingKey(CBUS) => up(ConstellationTLNetworkNodeMappingKey(CBUS)).copy(
+    outNodeMapping = up(ConstellationTLNetworkNodeMappingKey(CBUS)).outNodeMapping ++
+      (0 until site(GlobalTLInterconnectKey).nocParams.topology.nNodes).map { i => s"global_noc_ctrl[$i]" -> f(i) }.toMap
   )
 })
 

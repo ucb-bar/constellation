@@ -148,7 +148,7 @@ trait CanHaveGlobalTLInterconnect { this: BaseSubsystem =>
 
   if (hasGlobalTLInterconnect) {
     require(nocParams.nVirtualNetworks >= 5 * supportedBuses.size)
-    val tlbus = locateTLBusWrapper(NBUS)
+    val tlbus = locateTLBusWrapper(CBUS)
     global_noc_ctrl.get.zipWithIndex.foreach { case (c,i) =>
       tlbus.toVariableWidthSlave(Some(s"noc-ctrl-$i")) { c.node } }
   }

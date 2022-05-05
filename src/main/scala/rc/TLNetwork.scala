@@ -393,9 +393,9 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
     val outNames = genUniqueName(edgesOut.map(_.slave.slaves.map(_.name)))
 
     require(in.size == inNodeMapping.size,
-      s"TL Inwards count at $nocName must match mapping size ${in.size} != ${inNodeMapping.size}")
+      s"TL Inwards count at $nocName must match mapping size ${in.size} != ${inNodeMapping.size}. In: ${inNames}")
     require(out.size == outNodeMapping.size,
-      s"TL Outwards count at $nocName must match mapping size ${out.size} != ${outNodeMapping.size}")
+      s"TL Outwards count at $nocName must match mapping size ${out.size} != ${outNodeMapping.size}. Out: ${outNames}")
 
     val noc = privateNoC.map { nocParams =>
       // If desired, create a private noc
