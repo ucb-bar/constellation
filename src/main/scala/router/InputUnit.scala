@@ -8,7 +8,6 @@ import freechips.rocketchip.util._
 
 import constellation.channel._
 import constellation.routing.{FlowRoutingBundle}
-import constellation.util.{GrantHoldArbiter, WrapInc}
 import constellation.noc.{HasNoCParams}
 
 class AbstractInputUnitIO(
@@ -280,11 +279,10 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
       }
     }
   }
-  val salloc_arb = Module(new GrantHoldArbiter(
-    new SwitchAllocReq(outParams, egressParams),
+  val salloc_arb = Module(new SwitchArbiter(
     nVirtualChannels,
-    (d: SwitchAllocReq) => d.tail,
-    nOut = cParam.destMultiplier
+    cParam.destMultiplier,
+    outParams, egressParams
   ))
 
   (states zip salloc_arb.io.in).zipWithIndex.map { case ((s,r),i) =>
@@ -334,7 +332,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   for (i <- 0 until cParam.destMultiplier) {
     val salloc_out = salloc_outs(i)
     salloc_out.valid := salloc_arb.io.out(i).fire()
-    salloc_out.vid := salloc_arb.io.chosen(i)
+    salloc_out.vid := OHToUInt(salloc_arb.io.chosen_oh(i))
     val vc_sel = Mux1H(salloc_arb.io.chosen_oh(i), states.map(_.vc_sel))
     val channel_oh = vc_sel.map(_.reduce(_||_))
     val virt_channel = Mux1H(channel_oh, vc_sel.map(v => OHToUInt(v)))
