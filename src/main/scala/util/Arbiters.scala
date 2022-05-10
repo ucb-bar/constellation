@@ -12,8 +12,6 @@ import freechips.rocketchip.util._
 class GrantHoldArbiter[T <: Data](
       typ: T, arbN: Int,
       canUnlock: T => Bool,
-      needsLock: Option[T => Bool] = None,
-      policy: ArbiterPolicy.ArbiterPolicy = ArbiterPolicy.LowestFirst,
       nOut: Int = 1
 ) extends Module {
 
@@ -36,18 +34,9 @@ class GrantHoldArbiter[T <: Data](
   val valids = (0 until arbN).map(i => io.in(i).valid && !(0 until nOut).map(j => locked(j) && lockIdx(j) === i.U).orR)
 
   val choices = Wire(Vec(nOut, UInt(log2Ceil(arbN).W)))
-  choices(0) := (if (policy == ArbiterPolicy.RoundRobin) {
-    PriorityMux(
+  choices(0) := PriorityMux(
       rotateLeft(VecInit(valids), lockIdx(0) + 1.U),
       rotateLeft(VecInit((0 until arbN).map(_.U)), lockIdx(0) + 1.U))
-  } else if (policy == ArbiterPolicy.Random) {
-    val rand = LFSR(16)(log2Up(arbN)-1,0)
-    PriorityMux(
-      rotateLeft(VecInit(valids), rand + 1.U),
-      rotateLeft(VecInit((0 until arbN).map(_.U)), rand + 1.U))
-  } else {
-    PriorityEncoder(valids)
-  })
 
   var next_valids = valids.asUInt & ~Mux(locked(0), 0.U(arbN.W), UIntToOH(choices(0)))
   for (i <- 1 until nOut) {
@@ -55,10 +44,6 @@ class GrantHoldArbiter[T <: Data](
     choices(i) := OHToUInt(sel)
     next_valids = next_valids & ~Mux(locked(i), 0.U(arbN.W), sel)
   }
-
-  def realNeedsLock(data: T): Bool =
-    needsLock.map(_(data)).getOrElse(true.B)
-
 
   io.in.foreach(_.ready := false.B)
   var chosens = 0.U(arbN.W)
@@ -77,7 +62,7 @@ class GrantHoldArbiter[T <: Data](
     }
     chosens = chosens | (1.U << chosen)
 
-    when (io.out(i).fire() && realNeedsLock(io.out(i).bits)) {
+    when (io.out(i).fire()) {
       lockIdx(i) := chosen
       locked(i) := true.B
     } .elsewhen (!locked(i)) {

@@ -7,12 +7,53 @@ import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
 import constellation.channel._
-import constellation.util.{GrantHoldArbiter, ArbiterPolicy}
 
 class SwitchAllocReq(val outParams: Seq[ChannelParams], val egressParams: Seq[EgressChannelParams])
   (implicit val p: Parameters) extends Bundle with HasRouterOutputParams {
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
   val tail = Bool()
+}
+
+class SwitchArbiter(inN: Int, outN: Int, outParams: Seq[ChannelParams], egressParams: Seq[EgressChannelParams])(implicit val p: Parameters) extends Module {
+  val io = IO(new Bundle {
+    val in = Flipped(Vec(inN, Decoupled(new SwitchAllocReq(outParams, egressParams))))
+    val out = Vec(outN, Decoupled(new SwitchAllocReq(outParams, egressParams)))
+    val chosen_oh = Vec(outN, Output(UInt(inN.W)))
+  })
+
+  val lock = Seq.fill(outN) { RegInit(0.U(inN.W)) }
+  val unassigned = Cat(io.in.map(_.valid).reverse) & ~(lock.reduce(_|_))
+
+  val mask = RegInit(0.U(outN.W))
+  mask := Mux(~mask === 0.U, 0.U, (mask << 1) | 1.U(1.W))
+  val choices = Wire(Vec(outN, UInt(inN.W)))
+
+  var sel = PriorityEncoderOH(Cat(unassigned, unassigned & !mask))
+  for (i <- 0 until outN) {
+    choices(i) := sel | (sel >> inN)
+    sel = PriorityEncoderOH(unassigned & ~choices(i))
+  }
+
+  io.in.foreach(_.ready := false.B)
+
+  var chosens = 0.U(inN.W)
+  val in_tails = Cat(io.in.map(_.bits.tail).reverse)
+  for (i <- 0 until outN) {
+    val in_valids = Cat((0 until inN).map { j => io.in(j).valid && !chosens(j) }.reverse)
+    val chosen = Mux((in_valids & lock(i) & ~chosens).orR, lock(i), choices(i))
+    io.chosen_oh(i) := chosen
+    io.out(i).valid := (in_valids & chosen).orR
+    io.out(i).bits := Mux1H(chosen, io.in.map(_.bits))
+    for (j <- 0 until inN) {
+      when (chosen(j) && io.out(i).ready) {
+        io.in(j).ready := true.B
+      }
+    }
+    chosens = chosens | chosen
+    when (io.out(i).fire()) {
+      lock(i) := chosen & ~in_tails
+    }
+  }
 }
 
 class SwitchAllocator(
@@ -34,13 +75,12 @@ class SwitchAllocator(
   })
   val nInputChannels = allInParams.map(_.nVirtualChannels).sum
 
-  val arbs = allOutParams.map { oP => Module(new GrantHoldArbiter(
-    new SwitchAllocReq(outParams, egressParams),
+  val arbs = allOutParams.map { oP => Module(new SwitchArbiter(
     allInParams.map(_.destMultiplier).reduce(_+_),
-    (d: SwitchAllocReq) => d.tail,
-    policy = ArbiterPolicy.RoundRobin,
-    nOut = oP.srcMultiplier
-  )) }
+    oP.srcMultiplier,
+    outParams,
+    egressParams
+  ))}
   arbs.foreach(_.io.out.foreach(_.ready := true.B))
 
   var idx = 0
@@ -60,7 +100,7 @@ class SwitchAllocator(
       idx = 0
       for (m <- 0 until nAllInputs) {
         for (n <- 0 until allInParams(m).destMultiplier) {
-          io.switch_sel(i)(j)(m)(n) := arbs(i).io.in(idx).valid && arbs(i).io.chosen(j) === idx.U && arbs(i).io.out(j).valid
+          io.switch_sel(i)(j)(m)(n) := arbs(i).io.in(idx).valid && arbs(i).io.chosen_oh(j)(idx) && arbs(i).io.out(j).valid
           idx += 1
         }
       }

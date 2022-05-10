@@ -8,7 +8,7 @@ import freechips.rocketchip.util._
 
 import constellation.channel._
 import constellation.routing.{FlowRoutingBundle}
-import constellation.util.{GrantHoldArbiter, WrapInc, ArbiterPolicy}
+import constellation.util.{GrantHoldArbiter, WrapInc}
 import constellation.noc.{HasNoCParams}
 
 class AbstractInputUnitIO(
@@ -284,7 +284,6 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     new SwitchAllocReq(outParams, egressParams),
     nVirtualChannels,
     (d: SwitchAllocReq) => d.tail,
-    policy = ArbiterPolicy.RoundRobin,
     nOut = cParam.destMultiplier
   ))
 
