@@ -8,7 +8,6 @@ import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.rocket.{DecodeLogic}
 import freechips.rocketchip.util._
 
-import constellation.util.{GrantHoldArbiter, ArbiterPolicy}
 import constellation.channel._
 import constellation.routing._
 

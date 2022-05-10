@@ -171,15 +171,14 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   }
   input_buffer.io.deq.foreach(_.ready := false.B)
 
-  val route_arbiter = Module(new GrantHoldArbiter(
-    new RouteComputerReq(cParam), nVirtualChannels,
-    (t: RouteComputerReq) => true.B,
-    policy = ArbiterPolicy.RoundRobin))
+  val route_arbiter = Module(new Arbiter(
+    new RouteComputerReq(cParam), nVirtualChannels
+  ))
   val early_route_arbiter = Module(new Arbiter(
     new RouteComputerReq(cParam), 1 + cParam.srcMultiplier))
   early_route_arbiter.io.in.foreach(_.valid := false.B)
   early_route_arbiter.io.in.foreach(_.bits := DontCare)
-  early_route_arbiter.io.in(0) <> route_arbiter.io.out(0)
+  early_route_arbiter.io.in(0) <> route_arbiter.io.out
   io.router_req <> early_route_arbiter.io.out
 
   val states = Reg(Vec(nVirtualChannels, new InputState))

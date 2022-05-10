@@ -7,7 +7,6 @@ import chisel3.util.random.{LFSR}
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
 
-import constellation.util.{GrantHoldArbiter, ArbiterPolicy}
 import constellation.channel._
 import constellation.routing.{ChannelRoutingInfo, FlowRoutingBundle}
 
