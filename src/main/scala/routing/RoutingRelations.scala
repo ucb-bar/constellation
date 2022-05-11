@@ -464,8 +464,8 @@ class NonblockingVirtualSubnetworksRouting(f: RoutingRelation, n: Int) extends R
 
 // Virtual subnets with 1 dedicated virtual channel each, and some number of shared channels
 class SharedNonblockingVirtualSubnetworksRouting(f: RoutingRelation, n: Int, nSharedChannels: Int) extends RoutingRelation {
+  def trueVIdToVirtualVId(vId: Int) = if (vId < n) 0 else vId - n +1
   def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-    def trueVIdToVirtualVId(vId: Int) = if (vId < n) 0 else vId - n
     if (nxtC.vc < n) {
       nxtC.vc == flow.vNet && f(
         srcC.copy(vc=trueVIdToVirtualVId(srcC.vc), n_vc = 1 + nSharedChannels),
@@ -480,7 +480,6 @@ class SharedNonblockingVirtualSubnetworksRouting(f: RoutingRelation, n: Int, nSh
     }
   }
   override def isEscape(c: ChannelRoutingInfo, v: Int) = {
-    def trueVIdToVirtualVId(vId: Int) = if (vId < n) 0 else vId - n
     f.isEscape(c.copy(vc=trueVIdToVirtualVId(c.vc), n_vc = 1 + nSharedChannels), 0)
   }
 }
