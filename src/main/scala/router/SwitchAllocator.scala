@@ -24,8 +24,7 @@ class SwitchArbiter(inN: Int, outN: Int, outParams: Seq[ChannelParams], egressPa
   val lock = Seq.fill(outN) { RegInit(0.U(inN.W)) }
   val unassigned = Cat(io.in.map(_.valid).reverse) & ~(lock.reduce(_|_))
 
-  val mask = RegInit(0.U(outN.W))
-  mask := Mux(~mask === 0.U, 0.U, (mask << 1) | 1.U(1.W))
+  val mask = RegInit(0.U(inN.W))
   val choices = Wire(Vec(outN, UInt(inN.W)))
 
   var sel = PriorityEncoderOH(Cat(unassigned, unassigned & !mask))
@@ -53,6 +52,12 @@ class SwitchArbiter(inN: Int, outN: Int, outParams: Seq[ChannelParams], egressPa
     when (io.out(i).fire()) {
       lock(i) := chosen & ~in_tails
     }
+  }
+
+  when (io.out(0).fire()) {
+    mask := (0 until inN).map { i => (io.chosen_oh(0) >> i) }.reduce(_|_)
+  } .otherwise {
+    mask := Mux(~mask === 0.U, 0.U, (mask << 1) | 1.U(1.W))
   }
 }
 
