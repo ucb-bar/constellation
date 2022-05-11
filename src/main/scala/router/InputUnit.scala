@@ -77,7 +77,7 @@ class InputBuffer(cParam: ChannelParams)(implicit p: Parameters) extends Module 
   val fullSize = cParam.virtualChannelParams.map(_.bufferSize).sum
 
   // Ugly case. Use multiple queues
-  if (cParam.srcMultiplier > 1 || cParam.destMultiplier > 1 || fullSize == 1) {
+  if (cParam.srcMultiplier > 1 || cParam.destMultiplier > 1 || fullSize <= 1) {
     val qs = cParam.virtualChannelParams.map(v => Module(new Queue(new BaseFlit(cParam), v.bufferSize)))
     qs.zipWithIndex.foreach { case (q,i) =>
       val sel = io.enq.map(f => f.valid && f.bits.virt_channel_id === i.U)
@@ -89,7 +89,7 @@ class InputBuffer(cParam: ChannelParams)(implicit p: Parameters) extends Module 
     }
   } else {
 
-    val delims = cParam.virtualChannelParams.map(_.bufferSize).scanLeft(0)(_+_)
+    val delims = cParam.virtualChannelParams.map(u => if (u.traversable) u.bufferSize else 0).scanLeft(0)(_+_)
     val starts = delims.dropRight(1)
     val ends = delims.tail
 
@@ -112,7 +112,7 @@ class InputBuffer(cParam: ChannelParams)(implicit p: Parameters) extends Module 
       val tail = tails(io.enq(0).bits.virt_channel_id)
       mem.write(tail, flit)
       tails(io.enq(0).bits.virt_channel_id) := Mux(
-        tail === Mux1H(vc_sel, ends.map(_ - 1).map(_.U)),
+        tail === Mux1H(vc_sel, ends.map(_ - 1).map(_ max 0).map(_.U)),
         Mux1H(vc_sel, starts.map(_.U)),
         tail + 1.U)
     } .elsewhen (io.enq(0).valid && direct_to_q) {
@@ -130,7 +130,7 @@ class InputBuffer(cParam: ChannelParams)(implicit p: Parameters) extends Module 
     when (can_to_q.orR) {
       val head = Mux1H(to_q_oh, heads)
       heads(to_q) := Mux(
-        head === Mux1H(to_q_oh, ends.map(_ - 1).map(_.U)),
+        head === Mux1H(to_q_oh, ends.map(_ - 1).map(_ max 0).map(_.U)),
         Mux1H(to_q_oh, starts.map(_.U)),
         head + 1.U)
       for (i <- 0 until nVirtualChannels) {
