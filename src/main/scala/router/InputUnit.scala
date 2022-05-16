@@ -336,11 +336,17 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     val vc_sel = Mux1H(salloc_arb.io.chosen_oh(i), states.map(_.vc_sel))
     val channel_oh = vc_sel.map(_.reduce(_||_))
     val virt_channel = Mux1H(channel_oh, vc_sel.map(v => OHToUInt(v)))
-    salloc_out.out_vid := virt_channel
-    salloc_out.flit.payload := Mux1H(salloc_arb.io.chosen_oh(i), input_buffer.io.deq.map(_.bits.payload))
-    salloc_out.flit.head    := Mux1H(salloc_arb.io.chosen_oh(i), input_buffer.io.deq.map(_.bits.head))
-    salloc_out.flit.tail    := Mux1H(salloc_arb.io.chosen_oh(i), input_buffer.io.deq.map(_.bits.tail))
-    salloc_out.flit.flow    := Mux1H(salloc_arb.io.chosen_oh(i), states.map(_.flow))
+    when (salloc_arb.io.out(i).fire()) {
+      salloc_out.out_vid := virt_channel
+      salloc_out.flit.payload := Mux1H(salloc_arb.io.chosen_oh(i), input_buffer.io.deq.map(_.bits.payload))
+      salloc_out.flit.head    := Mux1H(salloc_arb.io.chosen_oh(i), input_buffer.io.deq.map(_.bits.head))
+      salloc_out.flit.tail    := Mux1H(salloc_arb.io.chosen_oh(i), input_buffer.io.deq.map(_.bits.tail))
+      salloc_out.flit.flow    := Mux1H(salloc_arb.io.chosen_oh(i), states.map(_.flow))
+    } .otherwise {
+      salloc_out.out_vid := DontCare
+      salloc_out.flit := DontCare
+    }
+
     salloc_out.flit.virt_channel_id := DontCare // this gets set in the switch
 
     io.out(i).valid := salloc_out.valid
