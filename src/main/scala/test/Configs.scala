@@ -679,6 +679,16 @@ class TLTestConfig05 extends Config(
   new constellation.topology.WithTerminalPlane ++
   new constellation.topology.WithTopology(new Mesh2D(4, 3)))
 
+class TLTestConfig06 extends Config(
+  new WithTLNoCTesterParams(TLNoCTesterParams(Seq(4, 0, 2, 5, 6, 9, 11), Seq(7, 1, 3, 8, 10), delay=0.0)) ++
+  new constellation.router.WithPrioritizingSingleVCAllocator ++
+  new constellation.routing.WithNNonblockingVirtualNetworksWithSharing(5, 10) ++
+  new constellation.channel.WithUniformNVirtualChannels(15, UserVirtualChannelParams(7)) ++
+  new constellation.routing.WithTerminalPlaneRouting ++
+  new constellation.routing.WithRoutingRelation(new Mesh2DEscapeRouting(4, 3)) ++
+  new constellation.topology.WithTerminalPlane ++
+  new constellation.topology.WithTopology(new Mesh2D(4, 3)))
+
 
 // test configs for AXI4 network
 class AXI4TestConfig00 extends Config(

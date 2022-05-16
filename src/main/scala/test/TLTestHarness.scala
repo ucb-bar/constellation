@@ -21,6 +21,7 @@ case class TLNoCTesterParams(
   outNodeMapping: Seq[Int] = Nil,
   ctrlSourceNode: Int = 0,
   explicitPayloadWidth: Option[Int] = None,
+  delay: Double = 0.0,
   txns: Int = 1000
 )
 
@@ -44,13 +45,13 @@ class TLNoCTester(implicit p: Parameters) extends LazyModule {
 
   val fuzzers = (0 until nClients) map { n =>
     val fuzz = LazyModule(new TLFuzzer(txns))
-    noc.node := TLDelayer(0.1) := fuzz.node
+    noc.node := TLDelayer(tParams.delay) := fuzz.node
     fuzz
   }
 
   (0 until nManagers) foreach { n =>
     val ram = LazyModule(new TLRAM(AddressSet(0x0+0x400*n, 0x3ff)))
-    DisableMonitors { implicit p => ram.node := TLFragmenter(4, 256) } := TLDelayer(0.1) := noc.node
+    DisableMonitors { implicit p => ram.node := TLFragmenter(4, 256) } := TLDelayer(tParams.delay) := noc.node
   }
 
   lazy val module = new LazyModuleImp(this) {

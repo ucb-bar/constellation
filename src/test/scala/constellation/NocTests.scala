@@ -116,6 +116,7 @@ class NoCTestTL02 extends TLNoCTest(Seq(new TLTestConfig02))
 class NoCTestTL03 extends TLNoCTest(Seq(new TLTestConfig03))
 class NoCTestTL04 extends TLNoCTest(Seq(new TLTestConfig04))
 class NoCTestTL05 extends TLNoCTest(Seq(new TLTestConfig05))
+class NoCTestTL06 extends TLNoCTest(Seq(new TLTestConfig06))
 
 class NoCTestAXI400 extends AXI4NoCTest(Seq(new AXI4TestConfig00))
 class NoCTestAXI401 extends AXI4NoCTest(Seq(new AXI4TestConfig01))
