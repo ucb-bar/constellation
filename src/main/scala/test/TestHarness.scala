@@ -14,6 +14,12 @@ import constellation.channel._
 import constellation.rc.{TLNoC, TLNoCParams}
 import constellation.router.{HasRouterCtrlConsts}
 
+trait HasSuccessIO { this: Module =>
+  val io = IO(new Bundle {
+    val success = Output(Bool())
+  })
+}
+
 object SelectFirstNUInt
 {
   def apply(in: UInt, n: Int): (Vec[UInt], Vec[Bool]) = {
@@ -226,10 +232,7 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
 
 
 
-class TestHarness(implicit val p: Parameters) extends Module with HasRouterCtrlConsts {
-  val io = IO(new Bundle {
-    val success = Output(Bool())
-  })
+class TestHarness(implicit val p: Parameters) extends Module with HasRouterCtrlConsts with HasSuccessIO {
   val lazyNoC = LazyModule(new NoC)
   val noc = Module(lazyNoC.module)
   noc.io.router_clocks.foreach(_.clock := clock)

@@ -62,10 +62,7 @@ class TLNoCTester(implicit p: Parameters) extends LazyModule {
   }
 }
 
-class TLTestHarness(implicit val p: Parameters) extends Module {
-  val io = IO(new Bundle {
-    val success = Output(Bool())
-  })
+class TLTestHarness(implicit val p: Parameters) extends Module with HasSuccessIO {
   val tester = Module(LazyModule(new TLNoCTester).module)
   io.success := tester.io.finished
 
