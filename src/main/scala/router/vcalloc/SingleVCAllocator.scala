@@ -18,7 +18,7 @@ abstract class SingleVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) 
   val in_arb_vals = Wire(Vec(allInParams.size, Bool()))
   val in_arb_filter = PriorityEncoderOH(Cat(in_arb_vals.asUInt, in_arb_vals.asUInt & ~mask))
   val in_arb_sel = (in_arb_filter(allInParams.size-1,0) | (in_arb_filter >> allInParams.size))
-  when (io.req.map(_.valid).orR) {
+  when (in_arb_vals.orR) {
     mask := Mux1H(in_arb_sel, (0 until allInParams.size).map { w => ~(0.U((w+1).W)) })
   }
 
