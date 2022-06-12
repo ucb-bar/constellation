@@ -65,11 +65,7 @@ class AXI4NoCTester(implicit p: Parameters) extends LazyModule {
 
 }
 
-class AXI4TestHarness(implicit val p: Parameters) extends Module {
-  val io = IO(new Bundle {
-    val success = Output(Bool())
-  })
-
+class AXI4TestHarness(implicit val p: Parameters) extends Module with HasSuccessIO {
   val tester = Module(LazyModule(new AXI4NoCTester).module)
   io.success := tester.io.finished
 

@@ -2,6 +2,7 @@ package constellation
 
 import chipsalliance.rocketchip.config.{Config, Parameters}
 import chiseltest._
+import chiseltest.simulator.VerilatorCFlags
 import org.scalatest.flatspec.AnyFlatSpec
 import chisel3._
 import constellation.test._
@@ -21,13 +22,21 @@ class AXI4NoCChiselTester(implicit val p: Parameters) extends Module {
   when (th.io.success) { stop() }
 }
 
-abstract class BaseNoCTest(gen: Parameters => Module, configs: Seq[Config]) extends AnyFlatSpec with ChiselScalatestTester {
+class EvalNoCChiselTester(implicit val p: Parameters) extends Module {
+  val th = Module(new EvalHarness)
+  when (th.io.success) { stop() }
+}
+
+abstract class BaseNoCTest(
+  gen: Parameters => Module,
+  configs: Seq[Config]) extends AnyFlatSpec with ChiselScalatestTester {
   behavior of "NoC"
 
   configs.foreach { config =>
     it should s"pass test with config ${config.getClass.getName}" in {
       implicit val p: Parameters = config
-      test(gen(p)).withAnnotations(Seq(VerilatorBackendAnnotation))
+      test(gen(p))
+        .withAnnotations(Seq(VerilatorBackendAnnotation, VerilatorCFlags(Seq("-DNO_VPI"))))
         .runUntilStop(timeout = 1000 * 1000)
     }
   }
@@ -36,6 +45,7 @@ abstract class BaseNoCTest(gen: Parameters => Module, configs: Seq[Config]) exte
 abstract class NoCTest(configs: Seq[Config]) extends BaseNoCTest(p => new NoCChiselTester()(p), configs)
 abstract class TLNoCTest(configs: Seq[Config]) extends BaseNoCTest(p => new TLNoCChiselTester()(p), configs)
 abstract class AXI4NoCTest(configs: Seq[Config]) extends BaseNoCTest(p => new AXI4NoCChiselTester()(p), configs)
+abstract class EvalNoCTest(configs: Seq[Config]) extends BaseNoCTest(p => new EvalNoCChiselTester()(p), configs)
 
 
 // these tests allow you to run an infividual config
@@ -122,3 +132,5 @@ class NoCTestAXI400 extends AXI4NoCTest(Seq(new AXI4TestConfig00))
 class NoCTestAXI401 extends AXI4NoCTest(Seq(new AXI4TestConfig01))
 class NoCTestAXI402 extends AXI4NoCTest(Seq(new AXI4TestConfig02))
 class NoCTestAXI403 extends AXI4NoCTest(Seq(new AXI4TestConfig03))
+
+class NoCTestEval00 extends EvalNoCTest(Seq(new EvalTestConfig00))
