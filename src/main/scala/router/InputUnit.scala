@@ -240,7 +240,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   val vcalloc_sel = vcalloc_filter(nVirtualChannels-1,0) | (vcalloc_filter >> nVirtualChannels)
   // Prioritize incoming packetes
   when (io.router_resp.valid) {
-    mask := (1.U << io.router_resp.bits.src_virt_id) >> 1
+    mask := (1.U << io.router_resp.bits.src_virt_id) - 1.U
   } .elsewhen (vcalloc_vals.orR) {
     mask := Mux1H(vcalloc_sel, (0 until nVirtualChannels).map { w => ~(0.U((w+1).W)) })
   }
