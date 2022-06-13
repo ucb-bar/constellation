@@ -5,6 +5,7 @@ import constellation.routing._
 import constellation.topology._
 import constellation.noc.{NoCKey}
 import constellation.channel.{UserVirtualChannelParams, FlowParams}
+import scala.collection.immutable.ListMap
 
 class WithConstPacketSize(sZ: Int = 9) extends Config((site, here, up) => {
   case NoCTesterKey => up(NoCTesterKey).copy(constPacketSize = true, maxFlits = sZ)
@@ -29,13 +30,14 @@ class WithEvalFlow(ingress_id: Int, egress_id: Int, rate: Double) extends Config
 })
 class WithEvalUniformFlow(rate: Double) extends Config((site, here, up) => {
   case NoCEvalKey => {
+    val flows = site(NoCKey).flows
     val counts = (0 until site(NoCKey).ingresses.size).map { i =>
-      site(NoCKey).flows.filter(_.ingressId == i).size
+      flows.filter(_.ingressId == i).size
     }
     up(NoCEvalKey).copy(
-      flows = site(NoCKey).flows.map {
+      flows = ListMap(flows.map {
         case FlowParams(i,e,_) => ((i, e) -> rate / counts(i))
-      }.toMap
+      }:_*)
     )
   }
 })
@@ -774,3 +776,31 @@ class EvalTestConfig02 extends Config(
   new constellation.channel.WithEgresses(Seq(1)) ++
   new constellation.routing.WithRoutingRelation(new UnidirectionalLineRouting) ++
   new constellation.topology.WithTopology(new UnidirectionalLine(2)))
+class EvalTestConfig03 extends Config(
+  new WithEvalDesiredThroughput(0.9) ++
+  new WithEvalUniformFlow(0.1) ++
+  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
+  new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngresses(0 until 10) ++
+  new constellation.channel.WithEgresses(0 until 10) ++
+  new constellation.routing.WithRoutingRelation(new UnidirectionalTorus1DDatelineRouting(10)) ++
+  new constellation.topology.WithTopology(new UnidirectionalTorus1D(10)))
+class EvalTestConfig04 extends Config(
+  new WithEvalDesiredThroughput(0.73) ++
+  new WithEvalUniformFlow(0.4) ++
+  new constellation.channel.WithUniformNVirtualChannels(1, UserVirtualChannelParams(5)) ++
+  new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngresses((0 until 4) ++ (0 until 4)) ++
+  new constellation.channel.WithEgresses(((0 until 4) ++ (0 until 4)).map(_ + 4*2)) ++
+  new constellation.routing.WithRoutingRelation(new ButterflyRouting(2, 3)) ++
+  new constellation.topology.WithTopology(new Butterfly(2, 3)))
+class EvalTestConfig05 extends Config(
+  new WithEvalDesiredThroughput(0.92) ++
+  new WithEvalUniformFlow(0.5) ++
+  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(4)) ++
+  new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngresses(0 until 25) ++
+  new constellation.channel.WithEgresses(0 until 25) ++
+  new constellation.router.WithRotatingSingleVCAllocator ++
+  new constellation.routing.WithRoutingRelation(new Mesh2DEscapeRouting(5, 5)) ++
+  new constellation.topology.WithTopology(new Mesh2D(5, 5)))

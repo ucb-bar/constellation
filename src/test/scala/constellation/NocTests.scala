@@ -134,3 +134,8 @@ class NoCTestAXI402 extends AXI4NoCTest(Seq(new AXI4TestConfig02))
 class NoCTestAXI403 extends AXI4NoCTest(Seq(new AXI4TestConfig03))
 
 class NoCTestEval00 extends EvalNoCTest(Seq(new EvalTestConfig00))
+class NoCTestEval01 extends EvalNoCTest(Seq(new EvalTestConfig01))
+class NoCTestEval02 extends EvalNoCTest(Seq(new EvalTestConfig02))
+class NoCTestEval03 extends EvalNoCTest(Seq(new EvalTestConfig03))
+class NoCTestEval04 extends EvalNoCTest(Seq(new EvalTestConfig04))
+class NoCTestEval05 extends EvalNoCTest(Seq(new EvalTestConfig05))

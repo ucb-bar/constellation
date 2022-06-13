@@ -39,7 +39,8 @@ jobs:
             "60", "61", "62", "63", "64", "65", "66", "67", "68", "69",
             "TL00", "TL01", "TL02", "TL03", "TL04", "TL05",
             "AXI400", "AXI401", "AXI402", "AXI403",
-            "Eval00", "Eval01", "Eval02"
+            "Eval00", "Eval01", "Eval02", "Eval03", "Eval04",
+            "Eval05"
         ]
     env:
       CONSTELLATION_CI: 1

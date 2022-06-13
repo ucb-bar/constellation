@@ -15,6 +15,8 @@ import constellation.channel._
 import constellation.rc.{TLNoC, TLNoCParams}
 import constellation.router.{HasRouterCtrlConsts}
 
+import scala.collection.immutable.ListMap
+
 class TrafficEvalIngress(ingress_id: Int, config_str: String) extends BlackBox(Map(
   "INGRESS_ID" -> IntParam(ingress_id),
   "CONFIG_STR" -> config_str
@@ -66,10 +68,10 @@ class TrafficEvalEgress(egress_id: Int, config_str: String) extends BlackBox(Map
 
 case class NoCEvalParams(
   warmupCycles: Int = 5000,
-  measurementCycles: Int = 10000,
-  drainTimeoutCycles: Int = 100000,
+  measurementCycles: Int = 50000,
+  drainTimeoutCycles: Int = 1000000,
   flitsPerPacket: Int = 4,
-  flows: Map[(Int, Int), Double] = Map[(Int, Int), Double](),
+  flows: ListMap[(Int, Int), Double] = ListMap[(Int, Int), Double](),
   desiredThroughput: Double = 0.0
 ) {
   def toConfigStr = s"""
@@ -102,6 +104,7 @@ class EvalHarness(implicit val p: Parameters) extends Module with HasSuccessIO {
   cycle := cycle + 1.U
 
   val configStr = p(NoCEvalKey).toConfigStr
+  ElaborationArtefacts.add("noceval.cfg", configStr)
 
   noc.io.ingress.zipWithIndex.map { case (in,i) =>
     val ingress = Module(new TrafficEvalIngress(i, configStr))
@@ -109,6 +112,8 @@ class EvalHarness(implicit val p: Parameters) extends Module with HasSuccessIO {
     ingress.io.reset := reset
     ingress.io.current_cycle := cycle
 
+    // This queue handles the delayed response from the ingress unit
+    // and restores the decoupled handshake
     val flit_q = Module(new Queue(in.flit.bits.cloneType, 1, flow=true, pipe=true))
     ingress.io.flit_out.ready := flit_q.io.count === 0.U && in.flit.ready
     flit_q.io.enq.valid := ingress.io.flit_out.valid
