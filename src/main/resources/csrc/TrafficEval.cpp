@@ -44,8 +44,7 @@ void init_params(std::string config_str) {
   std::istream* stream;
   std::string line;
   if (filepath == NULL) {
-    std::cout << "No traffic matrix plusarg found. Falling back on default config str:" << std::endl;
-    std::cout << config_str << std::endl << std::endl;
+    std::cout << "No traffic matrix plusarg found. Falling back on default config str." << std::endl;
     stream = new std::stringstream(config_str);
   } else {
     std::cout << "Constructing params from " << std::string(filepath) << std::endl;
@@ -309,5 +308,9 @@ bool traffic_eval_t::final_stats() {
 	      << std::to_string(throughput)
 	      << std::endl;
   }
+  std::cout << std::endl << "Min throughput: "
+	    << min_flow->ingress_id << ", "
+	    << min_flow->egress_id << ", "
+	    << min_throughput << std::endl;
   return min_throughput >= params->min_throughput;
 }
