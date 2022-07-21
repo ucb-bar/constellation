@@ -38,6 +38,10 @@ class TrafficEvalIngress(ingress_id: Int, config_str: String) extends BlackBox(M
   addResource("/vsrc/TrafficEval.v")
   addResource("/csrc/TrafficEval.cpp")
   addResource("/csrc/TrafficEval.h")
+  addResource("/csrc/netrace/netrace.c")
+  addResource("/csrc/netrace/netrace.h")
+  addResource("/csrc/netrace/queue.c")
+  addResource("/csrc/netrace/queue.h")
 }
 
 class TrafficEvalEgress(egress_id: Int, config_str: String) extends BlackBox(Map(
@@ -63,23 +67,35 @@ class TrafficEvalEgress(egress_id: Int, config_str: String) extends BlackBox(Map
   addResource("/vsrc/TrafficEval.v")
   addResource("/csrc/TrafficEval.cpp")
   addResource("/csrc/TrafficEval.h")
+  addResource("/csrc/netrace/netrace.c")
+  addResource("/csrc/netrace/netrace.h")
+  addResource("/csrc/netrace/queue.c")
+  addResource("/csrc/netrace/queue.h")
 }
 
 
 case class NoCEvalParams(
   warmupCycles: Int = 5000,
-  measurementCycles: Int = 50000,
-  drainTimeoutCycles: Int = 1000000,
+  measurementCycles: Int = 20000,
+  drainTimeoutCycles: Int = 100000,
   flitsPerPacket: Int = 4,
   flows: ListMap[(Int, Int), Double] = ListMap[(Int, Int), Double](),
-  desiredThroughput: Double = 0.0
+  desiredThroughput: Double = 0.0,
+  netraceEnable: Boolean = false,
+  netraceRegion: Int = 2, // this is the PARSEC region-of-interest
+  netraceTrace: String = "blackscholes_64c_simsmall.tra.bz2",
+  netraceIgnoreDependencies: Boolean = false
 ) {
-  def toConfigStr = s"""
+  def toConfigStr = s"""# Default generated trafficeval config
 warmup           $warmupCycles
 measurement      $measurementCycles
 drain            $drainTimeoutCycles
 flits_per_packet $flitsPerPacket
 min_throughput   $desiredThroughput
+netrace_enable   $netraceEnable
+netrace_trace    $netraceTrace
+netrace_region   $netraceRegion
+netrace_ignore_dependencies $netraceIgnoreDependencies
 """ + flows.map {
     case ((ingress_id, egress_id), rate) => s"flow             $ingress_id $egress_id $rate"
   }.mkString("\n")

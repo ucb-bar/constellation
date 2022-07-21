@@ -749,7 +749,7 @@ class AXI4TestConfig03 extends Config(
 
 // Performance eval configs
 class EvalTestConfig00 extends Config(
-  new WithEvalDesiredThroughput(0.81) ++
+  new WithEvalDesiredThroughput(0.79) ++
   new WithEvalFlow(0, 0, 1.0) ++
   new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
@@ -804,3 +804,28 @@ class EvalTestConfig05 extends Config(
   new constellation.router.WithRotatingSingleVCAllocator ++
   new constellation.routing.WithRoutingRelation(new Mesh2DEscapeRouting(5, 5)) ++
   new constellation.topology.WithTopology(new Mesh2D(5, 5)))
+class EvalTestConfig06 extends Config(
+  new WithEvalDesiredThroughput(0.90) ++
+  new WithEvalUniformFlow(0.2) ++
+  new constellation.channel.WithUniformNVirtualChannels(1, UserVirtualChannelParams(4)) ++
+  new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngresses(0 until 16) ++
+  new constellation.channel.WithEgresses(0 until 16) ++
+  new constellation.routing.WithRoutingRelation(new Mesh2DDimensionOrderedRouting(4, 4)) ++
+  new constellation.topology.WithTopology(new Mesh2D(4, 4)))
+class EvalTestConfig07 extends Config(
+  new WithEvalUniformFlow(0.001) ++
+  new constellation.channel.WithUniformNVirtualChannels(2, UserVirtualChannelParams(4)) ++
+  new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngresses(0 until 64) ++
+  new constellation.channel.WithEgresses(0 until 64) ++
+  new constellation.routing.WithRoutingRelation(new Mesh2DEscapeRouting(8, 8)) ++
+  new constellation.topology.WithTopology(new Mesh2D(8, 8)))
+class EvalTestConfig08 extends Config(
+  new WithEvalUniformFlow(1.0) ++
+  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(4)) ++
+  new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithIngresses(Seq.fill(4) { 0 until 16 }.flatten) ++
+  new constellation.channel.WithEgresses((Seq.fill(4) { 0 until 16 }.flatten).map(_ + 16*4)) ++
+  new constellation.routing.WithRoutingRelation(new ButterflyRouting(2, 5)) ++
+  new constellation.topology.WithTopology(new Butterfly(2, 5)))
