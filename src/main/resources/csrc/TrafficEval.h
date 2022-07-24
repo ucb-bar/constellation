@@ -129,6 +129,12 @@ public:
     return this->get_median(this->latencies,
 			    this->total_flits_received);
   };
+  uint64_t get_overall_latency_count(uint64_t latency) {
+    if (this->latencies.find(latency) == this->latencies.end()) {
+      return 0;
+    }
+    return this->latencies[latency];
+  }
 
 protected:
   uint64_t inject_flits_for_packet(uint64_t ingress_id, uint64_t egress_id,

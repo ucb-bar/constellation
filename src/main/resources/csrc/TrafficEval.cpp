@@ -160,6 +160,7 @@ extern "C" void egress_tick(long long int egress_id,
 		  << max_latency
 		  << std::endl;
       }
+      uint64_t max_latency = eval->get_overall_max_latency();
       std::cout << std::endl
 		<< "Min throughput: "
 		<< min_flow->ingress_id << ", "
@@ -170,8 +171,17 @@ extern "C" void egress_tick(long long int egress_id,
 		<< eval->get_overall_median_latency()
 		<< std::endl
 		<< "Max latency: "
-		<< eval->get_overall_max_latency()
-		<< std::endl;
+		<< max_latency
+		<< std::endl
+		<< "Latency hist: ";
+      size_t bucket_size = 10;
+      for (uint64_t i = 0; i < max_latency; i += bucket_size) {
+	uint64_t c = 0;
+	for (uint64_t j = i; j < i + bucket_size; j++) {
+	  c += eval->get_overall_latency_count(j);
+	}
+	std::cout << "  " << i << "-" << i + bucket_size << ": " << c << std::endl;
+      }
 
       bool error = min_throughput < params->min_throughput;
       *success = !error;
