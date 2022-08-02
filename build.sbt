@@ -9,21 +9,22 @@ scalacOptions ++= Seq(
   "-feature"
 )
 
-val constellation_ci = sys.env.get("CONSTELLATION_CI").isDefined
+val standalone = sys.env.get("CONSTELLATION_STANDALONE").isDefined
 
 // SNAPSHOT repositories
-resolvers += Resolver.sonatypeRepo("snapshots")
-libraryDependencies ++= (if (constellation_ci) {
+libraryDependencies ++= (if (standalone) {
   Seq(
-    "edu.berkeley.cs" %% "rocketchip" % "1.5-SNAPSHOT",
-    "edu.berkeley.cs" %% "chiseltest" % "0.5-SNAPSHOT" % "test"
+    "edu.berkeley.cs" %% "rocketchip" % "1.2-SNAPSHOT",
+    "edu.berkeley.cs" %% "api-config-chipsalliance" % "1.2-SNAPSHOT",
+    "edu.berkeley.cs" %% "rocket-macros" % "1.2-SNAPSHOT",
+    "edu.berkeley.cs" %% "chiseltest" % "0.5.4" % "test"
   )
 } else {
   Nil
 })
 
 addCompilerPlugin("edu.berkeley.cs" % "chisel3-plugin"
-  % (if (constellation_ci) "3.5-SNAPSHOT" else "3.4.1") cross CrossVersion.full)
+  % (if (standalone) "3.5.2" else "3.4.1") cross CrossVersion.full)
 
 import Tests._
 
@@ -34,3 +35,4 @@ Test / testGrouping := (Test / testGrouping).value.flatMap { group =>
    }
 }
 concurrentRestrictions := Seq(Tags.limit(Tags.ForkedTestGroup, 16))
+

@@ -10,7 +10,7 @@ jobs:
     name: "Try to compile the project"
     runs-on: self-hosted
     env:
-      CONSTELLATION_CI: 1
+      CONSTELLATION_STANDALONE: 1
       JAVA_TOOL_OPTIONS: -Xmx4G -Xss8M
     steps:
     - uses: actions/checkout@v2
@@ -20,7 +20,16 @@ jobs:
       with:
         java-version: 11
     - name: Compile
-      run: sbt "Test / compile"
+      run: |
+        git clone https://github.com/chipsalliance/rocket-chip.git
+        cd rocket-chip
+        git checkout 045d03c54bce7636401b1b4b17d6a3677356dfe0
+        git submodule update --init --recursive
+        sbt "publishLocal"
+        sbt "project api-config-chipsalliance; set publishArtifact := true; publishLocal"
+        sbt "project rocket-macros; set publishArtifact := true; publishLocal"
+        cd ../
+        sbt "Test / compile"
 
   test:
     needs: [compile]
@@ -43,7 +52,7 @@ jobs:
             "Eval05"
         ]
     env:
-      CONSTELLATION_CI: 1
+      CONSTELLATION_STANDALONE: 1
       JAVA_TOOL_OPTIONS: -Xmx4G -Xss8M
 
     steps:
