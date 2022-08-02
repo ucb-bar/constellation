@@ -3,19 +3,19 @@ The Constellation NoC Generator
 
 ## Compile
 
-`CONSTELLATION_CI=1 sbt compile`
+`CONSTELLATION_STANDALONE=1 sbt compile`
 
 ## Test
 
-`CONSTELLATION_CI=1 sbt "testOnly constellation.NoCTest00"`
+`CONSTELLATION_STANDALONE=1 sbt "testOnly constellation.NoCTest00"`
 
-`CONSTELLATION_CI=1 sbt "testOnly constellation.NoCTest01"`
+`CONSTELLATION_STANDALONE=1 sbt "testOnly constellation.NoCTest01"`
 
 etc.
 
 You can also run all tests with
 
-`CONSTELLATION_CI=1 sbt "testOnly constellation.NoCTest*"`
+`CONSTELLATION_STANDALONE=1 sbt "testOnly constellation.NoCTest*"`
 
 ## Generating Topology Diagrams
 A GUI is required to view the diagram.
