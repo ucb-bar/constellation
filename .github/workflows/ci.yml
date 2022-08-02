@@ -28,6 +28,7 @@ jobs:
         sbt "publishLocal"
         sbt "project api-config-chipsalliance; set publishArtifact := true; publishLocal"
         sbt "project rocket-macros; set publishArtifact := true; publishLocal"
+        sbt "project hardfloat; set publishArtifact := true; publishLocal"
         cd ../
         sbt "Test / compile"
 
