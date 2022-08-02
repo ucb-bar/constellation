@@ -11,7 +11,7 @@ jobs:
     runs-on: self-hosted
     env:
       CONSTELLATION_STANDALONE: 1
-      JAVA_TOOL_OPTIONS: -Xmx4G -Xss8M
+      JAVA_TOOL_OPTIONS: -Xmx4G -Xss8M -Dsbt.ivy.home=${{ github.workspace }}/.ivy2/ -Divy.home=${{ github.workspace }}/.ivy2/
     steps:
     - uses: actions/checkout@v2
 
@@ -31,6 +31,11 @@ jobs:
         sbt "project hardfloat; set publishArtifact := true; publishLocal"
         cd ../
         sbt "Test / compile"
+    - name: Cache ivy directory
+      uses: actions/cache@v3
+      with:
+        path: .ivy2
+        key: constellation-ivy2-${{ github.sha }}
 
   test:
     needs: [compile]
@@ -54,7 +59,7 @@ jobs:
         ]
     env:
       CONSTELLATION_STANDALONE: 1
-      JAVA_TOOL_OPTIONS: -Xmx4G -Xss8M
+      JAVA_TOOL_OPTIONS: -Xmx4G -Xss8M -Dsbt.ivy.home=${{ github.workspace }}/.ivy2/ -Divy.home=${{ github.workspace }}/.ivy2/
 
     steps:
     - uses: actions/checkout@v2
@@ -63,6 +68,12 @@ jobs:
       uses: actions/setup-java@v1
       with:
         java-version: 11
+
+    - name: Restore ivy directory
+      uses: actions/cache@v3
+      with:
+        path: .ivy2
+        key: constellation-ivy2-${{ github.sha }}
 
     - name: Compile
       run: sbt compile
