@@ -786,7 +786,7 @@ class EvalTestConfig03 extends Config(
   new constellation.routing.WithRoutingRelation(new UnidirectionalTorus1DDatelineRouting(10)) ++
   new constellation.topology.WithTopology(new UnidirectionalTorus1D(10)))
 class EvalTestConfig04 extends Config(
-  new WithEvalDesiredThroughput(0.73) ++
+  new WithEvalDesiredThroughput(0.69) ++
   new WithEvalUniformFlow(0.4) ++
   new constellation.channel.WithUniformNVirtualChannels(1, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
@@ -795,7 +795,7 @@ class EvalTestConfig04 extends Config(
   new constellation.routing.WithRoutingRelation(new ButterflyRouting(2, 3)) ++
   new constellation.topology.WithTopology(new Butterfly(2, 3)))
 class EvalTestConfig05 extends Config(
-  new WithEvalDesiredThroughput(0.92) ++
+  new WithEvalDesiredThroughput(0.90) ++
   new WithEvalUniformFlow(0.5) ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(4)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
