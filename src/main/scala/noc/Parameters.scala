@@ -138,33 +138,30 @@ object InternalNoCParams {
         iP.possibleFlows.map { flow =>
           val flowPossibleFlows = scala.collection.mutable.Set[ChannelRoutingInfo]()
 
-          var stack: Seq[ChannelRoutingInfo] = iP.channelRoutingInfos
-          while (stack.size != 0) {
-            val head = stack.head
-            flowPossibleFlows += head
-            stack = stack.tail
-
-            // This channel is the destination
-            val atDest = head.dst == flow.dst
-
-            if (!atDest) {
-              // Find all possible VCs a flow in head can route to
-              val nexts = nextChannelParamMap(head.dst).map { nxtC =>
-                nxtC.channelRoutingInfos.map { cI =>
-                  val can_transition = routingRel(
-                    head,
-                    cI,
-                    flow
-                  )
-                  if (can_transition) Some(cI) else None
+          var unexplored: Seq[ChannelRoutingInfo] = iP.channelRoutingInfos
+          while (unexplored.size != 0) {
+            var stack: Seq[ChannelRoutingInfo] = Seq(unexplored.head)
+            unexplored = unexplored.tail
+            while (stack.size != 0) {
+              val head = stack.head
+              val atDest = head.dst == flow.dst || flowPossibleFlows.contains(head)
+              if (!atDest) {
+                val nexts = nextChannelParamMap(head.dst).map { nxtC =>
+                  nxtC.channelRoutingInfos.map { cI =>
+                    if (routingRel(head, cI, flow)) Some(cI) else None
+                  }.flatten
                 }.flatten
-              }.flatten
-              // If the flow can't route to any VCs, this is an error
-              require(nexts.size > 0,
-                s"Failed to route from $iId to ${flow.dst} at $head for vnet $vNetId")
-              val toAdd = nexts.filter(n => !flowPossibleFlows.contains(n))
-              //require((nexts.toSet | stack.toSet).size == 0)
-              stack = toAdd ++ stack
+                require(nexts.size > 0,
+                  s"Failed to route from $iId to ${flow.dst} at $head for vnet $vNetId")
+                require((nexts.toSet & stack.toSet).size == 0,
+                  s"$nexts, $stack")
+                stack = Seq(nexts.head) ++ stack
+                unexplored = nexts.tail.filter(n => !unexplored.contains(n)) ++ unexplored
+              } else {
+                flowPossibleFlows += head
+                flowPossibleFlows ++= stack
+                stack = Nil
+              }
             }
           }
           flowPossibleFlows.foreach { k => tempPossibleFlowMap(k) += flow }
