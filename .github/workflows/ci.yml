@@ -21,6 +21,7 @@ jobs:
         java-version: 11
     - name: Compile
       run: |
+        git submodule update --init --recursive
         git clone https://github.com/chipsalliance/rocket-chip.git
         cd rocket-chip
         git checkout 045d03c54bce7636401b1b4b17d6a3677356dfe0
@@ -76,7 +77,9 @@ jobs:
         key: constellation-ivy2-${{ github.sha }}
 
     - name: Compile
-      run: sbt compile
+      run: |
+        git submodule update --init --recursive
+        sbt compile
 
     - name: Unit Tests
       run: sbt "testOnly constellation.NoCTest${{ matrix.config }}"
