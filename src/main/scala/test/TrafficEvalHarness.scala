@@ -35,13 +35,10 @@ class TrafficEvalIngress(ingress_id: Int, config_str: String) extends BlackBox(M
       val unique_id = Output(UInt(64.W))
     }
   })
+  addResource("/csrc/netrace/netrace.h")
   addResource("/vsrc/TrafficEval.v")
   addResource("/csrc/TrafficEval.cpp")
   addResource("/csrc/TrafficEval.h")
-  addResource("/csrc/netrace/netrace.c")
-  addResource("/csrc/netrace/netrace.h")
-  addResource("/csrc/netrace/queue.c")
-  addResource("/csrc/netrace/queue.h")
 }
 
 class TrafficEvalEgress(egress_id: Int, config_str: String) extends BlackBox(Map(
@@ -64,13 +61,10 @@ class TrafficEvalEgress(egress_id: Int, config_str: String) extends BlackBox(Map
     val success = Output(Bool())
     val fatal = Output(Bool())
   })
+  addResource("/csrc/netrace/netrace.h")
   addResource("/vsrc/TrafficEval.v")
   addResource("/csrc/TrafficEval.cpp")
   addResource("/csrc/TrafficEval.h")
-  addResource("/csrc/netrace/netrace.c")
-  addResource("/csrc/netrace/netrace.h")
-  addResource("/csrc/netrace/queue.c")
-  addResource("/csrc/netrace/queue.h")
 }
 
 

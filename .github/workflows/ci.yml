@@ -79,6 +79,7 @@ jobs:
     - name: Compile
       run: |
         git submodule update --init --recursive
+        make -C src/main/resources/csrc/netrace CFLAGS="-O3 -fPIC" netrace.o
         sbt compile
 
     - name: Unit Tests

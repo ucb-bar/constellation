@@ -2,7 +2,7 @@ package constellation
 
 import chipsalliance.rocketchip.config.{Config, Parameters}
 import chiseltest._
-import chiseltest.simulator.VerilatorCFlags
+import chiseltest.simulator.{VerilatorFlags, VerilatorCFlags}
 import org.scalatest.flatspec.AnyFlatSpec
 import chisel3._
 import constellation.test._
@@ -36,8 +36,16 @@ abstract class BaseNoCTest(
     it should s"pass test with config ${config.getClass.getName}" in {
       implicit val p: Parameters = config
       test(gen(p))
-        .withAnnotations(Seq(VerilatorBackendAnnotation, VerilatorCFlags(Seq("-DNO_VPI"))))
-        .runUntilStop(timeout = 1000 * 1000)
+      .withAnnotations(Seq(
+        VerilatorBackendAnnotation,
+        VerilatorFlags(Seq(
+          "../../../src/main/resources/csrc/netrace/netrace.o")),
+        VerilatorCFlags(Seq(
+          "-DNO_VPI",
+          "-fpermissive"))
+      ))
+      //.withAnnotations(Seq(VcsBackendAnnotation))
+      .runUntilStop(timeout = 1000 * 1000)
     }
   }
 }
