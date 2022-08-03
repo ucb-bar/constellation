@@ -575,7 +575,7 @@ class TestConfig62 extends Config(
   new constellation.topology.WithTerminalPlane ++
   new constellation.topology.WithTopology(new Mesh2D(4, 4)))
 class TestConfig63 extends Config(
-  new constellation.test.WithInputFlitStallProbability(0.8) ++
+  new constellation.test.WithInputFlitStallProbability(0.9) ++
   new constellation.router.WithSafeCoupleSAVA ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
@@ -587,7 +587,7 @@ class TestConfig63 extends Config(
   new constellation.topology.WithTerminalPlane ++
   new constellation.topology.WithTopology(new Mesh2D(4, 4)))
 class TestConfig64 extends Config(
-  new constellation.test.WithInputFlitStallProbability(0.8) ++
+  new constellation.test.WithInputFlitStallProbability(0.9) ++
   new constellation.router.WithSafeCoupleSAVA ++
   new constellation.noc.WithCtrl ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
