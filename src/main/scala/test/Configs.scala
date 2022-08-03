@@ -767,7 +767,7 @@ class EvalTestConfig01 extends Config(
   new constellation.routing.WithRoutingRelation(new UnidirectionalLineRouting) ++
   new constellation.topology.WithTopology(new UnidirectionalLine(2)))
 class EvalTestConfig02 extends Config(
-  new WithEvalDesiredThroughput(0.997) ++
+  new WithEvalDesiredThroughput(0.99) ++
   new WithEvalUniformFlow(1.0) ++
   new constellation.router.WithCoupleSAVA ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
