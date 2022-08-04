@@ -74,21 +74,25 @@ case class NoCEvalParams(
   drainTimeoutCycles: Int = 100000,
   flitsPerPacket: Int = 4,
   flows: ListMap[(Int, Int), Double] = ListMap[(Int, Int), Double](),
-  desiredThroughput: Double = 0.0,
+  requiredThroughput: Double = 0.0,
+  requiredMedianLatency: Int = 99999,
+  requiredMaxLatency: Int = 99999,
   netraceEnable: Boolean = false,
   netraceRegion: Int = 2, // this is the PARSEC region-of-interest
   netraceTrace: String = "blackscholes_64c_simsmall.tra.bz2",
   netraceIgnoreDependencies: Boolean = false
 ) {
   def toConfigStr = s"""# Default generated trafficeval config
-warmup           $warmupCycles
-measurement      $measurementCycles
-drain            $drainTimeoutCycles
-flits_per_packet $flitsPerPacket
-min_throughput   $desiredThroughput
-netrace_enable   $netraceEnable
-netrace_trace    $netraceTrace
-netrace_region   $netraceRegion
+warmup                  $warmupCycles
+measurement             $measurementCycles
+drain                   $drainTimeoutCycles
+flits_per_packet        $flitsPerPacket
+required_throughput     $requiredThroughput
+required_median_latency $requiredMedianLatency
+required_max_latency    $requiredMaxLatency
+netrace_enable          $netraceEnable
+netrace_trace           $netraceTrace
+netrace_region          $netraceRegion
 netrace_ignore_dependencies $netraceIgnoreDependencies
 """ + flows.map {
     case ((ingress_id, egress_id), rate) => s"flow             $ingress_id $egress_id $rate"
