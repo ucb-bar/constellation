@@ -57,8 +57,10 @@ public:
   std::vector<flow_rate_t> flow_rates;
   /* Static number of flits per packet. */
   uint64_t flits_per_packet;
-  /* min throughput, if not met, causes the simulation to error */
-  float min_throughput;
+
+  float required_throughput;
+  uint64_t required_median_latency;
+  uint64_t required_max_latency;
 
   /* use netrace-generated traces */
   bool netrace_enable;

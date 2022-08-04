@@ -4,7 +4,7 @@ import freechips.rocketchip.config.{Field, Parameters, Config}
 import constellation.routing._
 import constellation.topology._
 import constellation.noc.{NoCKey}
-import constellation.channel.{UserVirtualChannelParams, FlowParams}
+import constellation.channel.{UserVirtualChannelParams, UserChannelParams, FlowParams}
 import scala.collection.immutable.ListMap
 
 class WithConstPacketSize(sZ: Int = 9) extends Config((site, here, up) => {
@@ -42,8 +42,15 @@ class WithEvalUniformFlow(rate: Double) extends Config((site, here, up) => {
   }
 })
 
-class WithEvalDesiredThroughput(t: Double) extends Config((site, here, up) => {
-  case NoCEvalKey => up(NoCEvalKey).copy(desiredThroughput=t)
+class WithEvalRequiredThroughput(t: Double) extends Config((site, here, up) => {
+  case NoCEvalKey => up(NoCEvalKey).copy(requiredThroughput=t)
+})
+
+class WithEvalRequiredMedianLatency(t: Int) extends Config((site, here, up) => {
+  case NoCEvalKey => up(NoCEvalKey).copy(requiredMedianLatency=t)
+})
+class WithEvalRequiredMaxLatency(t: Int) extends Config((site, here, up) => {
+  case NoCEvalKey => up(NoCEvalKey).copy(requiredMaxLatency=t)
 })
 
 
@@ -749,7 +756,7 @@ class AXI4TestConfig03 extends Config(
 
 // Performance eval configs
 class EvalTestConfig00 extends Config(
-  new WithEvalDesiredThroughput(0.79) ++
+  new WithEvalRequiredThroughput(0.79) ++
   new WithEvalFlow(0, 0, 1.0) ++
   new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
@@ -758,7 +765,7 @@ class EvalTestConfig00 extends Config(
   new constellation.routing.WithRoutingRelation(new UnidirectionalLineRouting) ++
   new constellation.topology.WithTopology(new UnidirectionalLine(2)))
 class EvalTestConfig01 extends Config(
-  new WithEvalDesiredThroughput(0.85) ++
+  new WithEvalRequiredThroughput(0.85) ++
   new WithEvalUniformFlow(0.5) ++
   new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
@@ -767,7 +774,9 @@ class EvalTestConfig01 extends Config(
   new constellation.routing.WithRoutingRelation(new UnidirectionalLineRouting) ++
   new constellation.topology.WithTopology(new UnidirectionalLine(2)))
 class EvalTestConfig02 extends Config(
-  new WithEvalDesiredThroughput(0.99) ++
+  new WithEvalRequiredMedianLatency(150) ++
+  new WithEvalRequiredMaxLatency(260) ++
+  new WithEvalRequiredThroughput(0.99) ++
   new WithEvalUniformFlow(1.0) ++
   new constellation.router.WithCoupleSAVA ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
@@ -777,7 +786,9 @@ class EvalTestConfig02 extends Config(
   new constellation.routing.WithRoutingRelation(new UnidirectionalLineRouting) ++
   new constellation.topology.WithTopology(new UnidirectionalLine(2)))
 class EvalTestConfig03 extends Config(
-  new WithEvalDesiredThroughput(0.9) ++
+  new WithEvalRequiredMedianLatency(30) ++
+  new WithEvalRequiredMaxLatency(175) ++
+  new WithEvalRequiredThroughput(0.9) ++
   new WithEvalUniformFlow(0.1) ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
@@ -786,7 +797,7 @@ class EvalTestConfig03 extends Config(
   new constellation.routing.WithRoutingRelation(new UnidirectionalTorus1DDatelineRouting(10)) ++
   new constellation.topology.WithTopology(new UnidirectionalTorus1D(10)))
 class EvalTestConfig04 extends Config(
-  new WithEvalDesiredThroughput(0.69) ++
+  new WithEvalRequiredThroughput(0.69) ++
   new WithEvalUniformFlow(0.4) ++
   new constellation.channel.WithUniformNVirtualChannels(1, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
@@ -795,7 +806,9 @@ class EvalTestConfig04 extends Config(
   new constellation.routing.WithRoutingRelation(new ButterflyRouting(2, 3)) ++
   new constellation.topology.WithTopology(new Butterfly(2, 3)))
 class EvalTestConfig05 extends Config(
-  new WithEvalDesiredThroughput(0.90) ++
+  new WithEvalRequiredMedianLatency(75) ++
+  new WithEvalRequiredMaxLatency(1400) ++
+  new WithEvalRequiredThroughput(0.90) ++
   new WithEvalUniformFlow(0.5) ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(4)) ++
   new constellation.channel.WithFullyConnectedIngresses ++

@@ -161,6 +161,7 @@ extern "C" void egress_tick(long long int egress_id,
 		  << std::endl;
       }
       uint64_t max_latency = eval->get_overall_max_latency();
+      uint64_t median_latency = eval->get_overall_median_latency();
       std::cout << std::endl
 		<< "Min throughput: "
 		<< min_flow->ingress_id << ", "
@@ -168,7 +169,7 @@ extern "C" void egress_tick(long long int egress_id,
 		<< min_throughput
 		<< std::endl
 		<< "Median latency: "
-		<< eval->get_overall_median_latency()
+		<< median_latency
 		<< std::endl
 		<< "Max latency: "
 		<< max_latency
@@ -183,7 +184,19 @@ extern "C" void egress_tick(long long int egress_id,
 	std::cout << "  " << i << "-" << i + bucket_size << ": " << c << std::endl;
       }
 
-      bool error = min_throughput < params->min_throughput;
+      bool error = false;
+      if (min_throughput < params->required_throughput) {
+	std::cout << min_throughput << " < " << params->required_throughput << std::endl;
+	error = true;
+      }
+      if (median_latency > params->required_median_latency) {
+	std::cout << median_latency << " > " << params->required_median_latency << std::endl;
+	error = true;
+      }
+      if (max_latency > params->required_max_latency) {
+	std::cout << max_latency << " > " << params->required_max_latency << std::endl;
+	error = true;
+      }
       *success = !error;
       *fatal = error;
     }
@@ -194,14 +207,16 @@ extern "C" void egress_tick(long long int egress_id,
  * Construct a runtime_params_t object from a config string
  * Example config string:
  *
- *  warmup           5000
- *  measurement      10000
- *  drain            100000
- *  flits_per_packet 4
- *  min_throughput   1.0
- *  netrace_enable   false
- *  netrace_trace    blackscholes_64c_simsmall.tra.bz2
- *  netrace_region   0
+ *  warmup                  5000
+ *  measurement             10000
+ *  drain                   100000
+ *  flits_per_packet        4
+ *  required_throughput     1.0
+ *  required_median_latency 99999
+ *  required_max_latency    99999
+ *  netrace_enable          false
+ *  netrace_trace           blackscholes_64c_simsmall.tra.bz2
+ *  netrace_region          0
  *  netrace_ignore_dependencies false
  *  flow             0 0 0.5
  *  flow             0 1 0.5
@@ -213,7 +228,9 @@ runtime_params_t::runtime_params_t(std::vector<std::string> args) {
   this->flits_per_packet = 4;
   this->num_ingresses = 0;
   this->num_egresses = 0;
-  this->min_throughput = 0.0f;
+  this->required_throughput = 0.0f;
+  this->required_median_latency = 99999;
+  this->required_max_latency = 99999;
   this->netrace_enable = false;
   this->netrace_trace = "blackscholes_64c_simsmall.tra.bz2";
   this->netrace_ignore_dependencies = false;
@@ -239,9 +256,15 @@ runtime_params_t::runtime_params_t(std::vector<std::string> args) {
     } else if (flag == "flits_per_packet") {
       assert(argv.size() == 2);
       this->flits_per_packet = stoi(argv[1]);
-    } else if (flag == "min_throughput") {
+    } else if (flag == "required_throughput") {
       assert(argv.size() == 2);
-      this->min_throughput = stof(argv[1]);
+      this->required_throughput = stof(argv[1]);
+    } else if (flag == "required_median_latency") {
+      assert(argv.size() == 2);
+      this->required_median_latency = stoi(argv[1]);
+    } else if (flag == "required_max_latency") {
+      assert(argv.size() == 2);
+      this->required_max_latency = stoi(argv[1]);
     } else if (flag == "netrace_enable") {
       assert(argv.size() == 2);
       this->netrace_enable = argv[1] == "true";
