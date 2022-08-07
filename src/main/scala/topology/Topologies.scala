@@ -79,6 +79,13 @@ case class BidirectionalTree(val height: Int, val dAry: Int = 2) extends Physica
   val plotter = new TreePlotter(height, dAry)
 }
 
+trait Mesh2DLikePhysicalTopology extends PhysicalTopology {
+  val nX: Int
+  val nY: Int
+  val nNodes = nX * nY
+  val plotter = new Mesh2DPlotter(nX, nY)
+}
+
 /** A 2D mesh network with nX * nY nodes. Bidirectional channels exist between nodes that are a
  *  Manhattan distance of 1 away from each other. Node i can be thought of as being located
  *  at euclidean coordinate (i % nX, i / nX) where nX is as described below.
@@ -86,14 +93,12 @@ case class BidirectionalTree(val height: Int, val dAry: Int = 2) extends Physica
  *  @param nX maximum x-coordinate of a node
  *  @param nY maximum y-coordinate of a node
  */
-case class Mesh2D(nX: Int, nY: Int) extends PhysicalTopology {
-  val nNodes = nX * nY
+case class Mesh2D(nX: Int, nY: Int) extends Mesh2DLikePhysicalTopology {
   def topo(src: Int, dst: Int) = {
     val (srcX, srcY) = (src % nX, src / nX)
     val (dstX, dstY) = (dst % nX, dst / nX)
       (srcX == dstX && (srcY - dstY).abs == 1) || (srcY == dstY && (srcX - dstX).abs == 1)
   }
-  val plotter = new Mesh2DPlotter(nX, nY)
 }
 
 /** A 2D unidirectional torus network with nX * nY nodes.
@@ -101,15 +106,13 @@ case class Mesh2D(nX: Int, nY: Int) extends PhysicalTopology {
  *  @param nX maximum x-coordinate of a node
  *  @param nY maximum y-coordinate of a node
  */
-case class UnidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology {
-  val nNodes = nX * nY
+case class UnidirectionalTorus2D(nX: Int, nY: Int) extends Mesh2DLikePhysicalTopology {
   def topo(src: Int, dst: Int) = {
     val (srcX, srcY) = (src % nX, src / nX)
     val (dstX, dstY) = (dst % nX, dst / nX)
     ((srcY == dstY && new UnidirectionalTorus1D(nX).topo(srcX, dstX)) ||
       (srcX == dstX && new UnidirectionalTorus1D(nY).topo(srcY, dstY)))
   }
-  val plotter = new Mesh2DPlotter(nX, nY)
 }
 
 /** A 2D bidirectional torus network with nX * nY nodes.
@@ -117,15 +120,13 @@ case class UnidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology {
  *  @param nX maximum x-coordinate of a node
  *  @param nY maximum y-coordinate of a node
  */
-case class BidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology {
-  val nNodes = nX * nY
+case class BidirectionalTorus2D(nX: Int, nY: Int) extends Mesh2DLikePhysicalTopology {
   def topo(src: Int, dst: Int) = {
     val (srcX, srcY) = (src % nX, src / nX)
     val (dstX, dstY) = (dst % nX, dst / nX)
     ((srcY == dstY && new BidirectionalTorus1D(nX).topo(srcX, dstX)) ||
       (srcX == dstX && new BidirectionalTorus1D(nY).topo(srcY, dstY)))
   }
-  val plotter = new Mesh2DPlotter(nX, nY)
 }
 
 case class TerminalPlane(val base: PhysicalTopology) extends PhysicalTopology {
