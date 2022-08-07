@@ -50,6 +50,3 @@ class WithRoutingRelation(r: PhysicalTopology => RoutingRelation) extends Config
   case NoCKey => up(NoCKey, site).copy(routingRelation = r)
 })
 
-class WithTerminalPlaneRouting extends Config((site, here, up) => {
-  case NoCKey => up(NoCKey).copy(routingRelation = TerminalPlaneRouting(up(NoCKey).routingRelation))
-})

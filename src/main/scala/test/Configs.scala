@@ -514,60 +514,48 @@ class TestConfig56 extends Config(
   new constellation.channel.WithTerminalPlaneIngressEgress ++
   new constellation.channel.WithIngresses(Seq(0, 1, 1)) ++
   new constellation.channel.WithEgresses(Seq(1, 1, 2)) ++
-  new constellation.routing.WithTerminalPlaneRouting ++
-  new constellation.routing.WithRoutingRelation(AllLegalRouting()) ++
-  new constellation.topology.WithTerminalPlane ++
-  new constellation.topology.WithTopology(UnidirectionalLine(3)))
+  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(AllLegalRouting())) ++
+  new constellation.topology.WithTopology(TerminalPlane(UnidirectionalLine(3))))
 class TestConfig57 extends Config(
   new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithTerminalPlaneIngressEgress ++
   new constellation.channel.WithIngresses(Seq(1, 1, 2, 2)) ++
   new constellation.channel.WithEgresses(Seq(0, 0, 1, 1, 2, 2, 3, 3)) ++
-  new constellation.routing.WithTerminalPlaneRouting ++
-  new constellation.routing.WithRoutingRelation(BidirectionalLineRouting()) ++
-  new constellation.topology.WithTerminalPlane ++
-  new constellation.topology.WithTopology(BidirectionalLine(4)))
+  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(BidirectionalLineRouting())) ++
+  new constellation.topology.WithTopology(TerminalPlane(BidirectionalLine(4))))
 class TestConfig58 extends Config(
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithTerminalPlaneIngressEgress ++
   new constellation.channel.WithIngresses((0 until 6)) ++
   new constellation.channel.WithEgresses((0 until 6)) ++
-  new constellation.routing.WithTerminalPlaneRouting ++
-  new constellation.routing.WithRoutingRelation(UnidirectionalTorus1DDatelineRouting()) ++
-  new constellation.topology.WithTerminalPlane ++
-  new constellation.topology.WithTopology(UnidirectionalTorus1D(6)))
+  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(UnidirectionalTorus1DDatelineRouting())) ++
+  new constellation.topology.WithTopology(TerminalPlane(UnidirectionalTorus1D(6))))
 class TestConfig59 extends Config(
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithTerminalPlaneIngressEgress ++
   new constellation.channel.WithIngresses((0 until 6) ++ (0 until 6)) ++
   new constellation.channel.WithEgresses((0 until 6) ++ (0 until 6)) ++
-  new constellation.routing.WithTerminalPlaneRouting ++
-  new constellation.routing.WithRoutingRelation(BidirectionalTorus1DShortestRouting()) ++
-  new constellation.topology.WithTerminalPlane ++
-  new constellation.topology.WithTopology(BidirectionalTorus1D(6)))
+  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(BidirectionalTorus1DShortestRouting())) ++
+  new constellation.topology.WithTopology(TerminalPlane(BidirectionalTorus1D(6))))
 class TestConfig60 extends Config(
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithTerminalPlaneIngressEgress ++
   new constellation.channel.WithIngresses((0 until 25)) ++
   new constellation.channel.WithEgresses ((0 until 25)) ++
-  new constellation.routing.WithTerminalPlaneRouting ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTerminalPlane ++
-  new constellation.topology.WithTopology(Mesh2D(5, 5)))
+  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
+  new constellation.topology.WithTopology(TerminalPlane(Mesh2D(5, 5))))
 class TestConfig61 extends Config(
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithTerminalPlaneIngressEgress ++
   new constellation.channel.WithIngresses((0 until 25)) ++
   new constellation.channel.WithEgresses ((0 until 25)) ++
-  new constellation.routing.WithTerminalPlaneRouting ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTerminalPlane ++
-  new constellation.topology.WithTopology(Mesh2D(5, 5)))
+  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
+  new constellation.topology.WithTopology(TerminalPlane(Mesh2D(5, 5))))
 class TestConfig62 extends Config(
   new constellation.routing.WithNBlockingVirtualNetworks(4) ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(3)) ++
@@ -577,10 +565,8 @@ class TestConfig62 extends Config(
   new constellation.channel.WithEgressVNets((i: Int) => (i + 1) % 4) ++
   new constellation.channel.WithIngresses(0 until 16) ++
   new constellation.channel.WithEgresses (0 until 16) ++
-  new constellation.routing.WithTerminalPlaneRouting ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTerminalPlane ++
-  new constellation.topology.WithTopology(Mesh2D(4, 4)))
+  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
+  new constellation.topology.WithTopology(TerminalPlane(Mesh2D(4, 4))))
 class TestConfig63 extends Config(
   new constellation.test.WithInputFlitStallProbability(0.9) ++
   new constellation.router.WithSafeCoupleSAVA ++
@@ -589,10 +575,8 @@ class TestConfig63 extends Config(
   new constellation.channel.WithTerminalPlaneIngressEgress ++
   new constellation.channel.WithIngresses(4 until 16) ++
   new constellation.channel.WithEgresses(0 until 4) ++
-  new constellation.routing.WithTerminalPlaneRouting ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTerminalPlane ++
-  new constellation.topology.WithTopology(Mesh2D(4, 4)))
+  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
+  new constellation.topology.WithTopology(TerminalPlane(Mesh2D(4, 4))))
 class TestConfig64 extends Config(
   new constellation.test.WithInputFlitStallProbability(0.9) ++
   new constellation.router.WithSafeCoupleSAVA ++
@@ -602,20 +586,16 @@ class TestConfig64 extends Config(
   new constellation.channel.WithTerminalPlaneIngressEgress ++
   new constellation.channel.WithIngresses(4 until 16) ++
   new constellation.channel.WithEgresses(0 until 4) ++
-  new constellation.routing.WithTerminalPlaneRouting ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTerminalPlane ++
-  new constellation.topology.WithTopology(Mesh2D(4, 4)))
+  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
+  new constellation.topology.WithTopology(TerminalPlane(Mesh2D(4, 4))))
 class TestConfig65 extends Config(
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithTerminalPlaneIngressEgress ++
   new constellation.channel.WithIngresses(0 until 16) ++
   new constellation.channel.WithEgresses(0 until 16) ++
-  new constellation.routing.WithTerminalPlaneRouting ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTerminalPlane ++
-  new constellation.topology.WithTopology(Mesh2D(4, 4)))
+  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
+  new constellation.topology.WithTopology(TerminalPlane(Mesh2D(4, 4))))
 
 // test configs for channel width adapters
 class TestConfig66 extends Config(
@@ -697,30 +677,24 @@ class TLTestConfig04 extends Config(
   new WithTLNoCTesterParams(TLNoCTesterParams(Seq(4, 0, 2, 5, 6, 9, 11), Seq(7, 1, 3, 8, 10))) ++
   new constellation.routing.WithNBlockingVirtualNetworks(5) ++
   new constellation.channel.WithUniformNVirtualChannels(5, UserVirtualChannelParams(3)) ++
-  new constellation.routing.WithTerminalPlaneRouting ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTerminalPlane ++
-  new constellation.topology.WithTopology(Mesh2D(4, 3)))
+  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
+  new constellation.topology.WithTopology(TerminalPlane(Mesh2D(4, 3))))
 
 class TLTestConfig05 extends Config(
   new WithTLNoCTesterParams(TLNoCTesterParams(Seq(4, 0, 2, 5, 6, 9, 11), Seq(7, 1, 3, 8, 10),
     explicitPayloadWidth=Some(32))) ++
   new constellation.routing.WithNBlockingVirtualNetworks(5) ++
   new constellation.channel.WithUniformNVirtualChannels(5, UserVirtualChannelParams(3)) ++
-  new constellation.routing.WithTerminalPlaneRouting ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTerminalPlane ++
-  new constellation.topology.WithTopology(Mesh2D(4, 3)))
+  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
+  new constellation.topology.WithTopology(TerminalPlane(Mesh2D(4, 3))))
 
 class TLTestConfig06 extends Config(
   new WithTLNoCTesterParams(TLNoCTesterParams(Seq(4, 0, 2, 5, 6, 9, 11), Seq(7, 1, 3, 8, 10), delay=0.0)) ++
   new constellation.router.WithPrioritizingSingleVCAllocator ++
   new constellation.routing.WithNNonblockingVirtualNetworksWithSharing(5, 10) ++
   new constellation.channel.WithUniformNVirtualChannels(15, UserVirtualChannelParams(7)) ++
-  new constellation.routing.WithTerminalPlaneRouting ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTerminalPlane ++
-  new constellation.topology.WithTopology(Mesh2D(4, 3)))
+  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
+  new constellation.topology.WithTopology(TerminalPlane(Mesh2D(4, 3))))
 
 
 // test configs for AXI4 network
@@ -734,10 +708,8 @@ class AXI4TestConfig01 extends Config(
   new WithAXI4NoCTesterParams(AXI4NoCTesterParams(Seq(0, 2), Seq(1))) ++
   new constellation.routing.WithNNonblockingVirtualNetworks(5) ++
   new constellation.channel.WithUniformNVirtualChannels(5, UserVirtualChannelParams(5)) ++
-  new constellation.routing.WithTerminalPlaneRouting ++
-  new constellation.routing.WithRoutingRelation(BidirectionalLineRouting()) ++
-  new constellation.topology.WithTerminalPlane ++
-  new constellation.topology.WithTopology(BidirectionalLine(3)))
+  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(BidirectionalLineRouting())) ++
+  new constellation.topology.WithTopology(TerminalPlane(BidirectionalLine(3))))
 class AXI4TestConfig02 extends Config(
   new WithAXI4NoCTesterParams(AXI4NoCTesterParams(Seq(0, 1, 2, 3, 5, 6, 7, 8), Seq(4))) ++
   new constellation.routing.WithNNonblockingVirtualNetworks(5) ++
@@ -748,10 +720,8 @@ class AXI4TestConfig03 extends Config(
   new WithAXI4NoCTesterParams(AXI4NoCTesterParams(Seq(1, 3, 5, 7), Seq(0, 2, 4, 6, 8))) ++
   new constellation.routing.WithNNonblockingVirtualNetworks(5) ++
   new constellation.channel.WithUniformNVirtualChannels(10, UserVirtualChannelParams(3)) ++
-  new constellation.routing.WithTerminalPlaneRouting ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTerminalPlane ++
-  new constellation.topology.WithTopology(Mesh2D(3, 3)))
+  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
+  new constellation.topology.WithTopology(TerminalPlane(Mesh2D(3, 3))))
 
 
 // Performance eval configs
@@ -807,7 +777,7 @@ class EvalTestConfig04 extends Config(
   new constellation.topology.WithTopology(Butterfly(2, 3)))
 class EvalTestConfig05 extends Config(
   new WithEvalRequiredMedianLatency(75) ++
-  new WithEvalRequiredMaxLatency(1400) ++
+  new WithEvalRequiredMaxLatency(1500) ++
   new WithEvalRequiredThroughput(0.90) ++
   new WithEvalUniformFlow(0.5) ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(4)) ++
