@@ -55,7 +55,7 @@ jobs:
             "TL00", "TL01", "TL02", "TL03", "TL04", "TL05",
             "AXI400", "AXI401", "AXI402", "AXI403",
             "Eval00", "Eval01", "Eval02", "Eval03", "Eval04",
-            "Eval05"
+            "Eval05", "Eval06", "Eval07", "Eval08"
         ]
     env:
       CONSTELLATION_STANDALONE: 1

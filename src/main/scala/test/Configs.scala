@@ -818,7 +818,9 @@ class EvalTestConfig05 extends Config(
   new constellation.routing.WithRoutingRelation(new Mesh2DEscapeRouting(5, 5)) ++
   new constellation.topology.WithTopology(new Mesh2D(5, 5)))
 class EvalTestConfig06 extends Config(
-  new WithEvalDesiredThroughput(0.90) ++
+  new WithEvalRequiredMedianLatency(25) ++
+  new WithEvalRequiredMaxLatency(125) ++
+  new WithEvalRequiredThroughput(0.94) ++
   new WithEvalUniformFlow(0.2) ++
   new constellation.channel.WithUniformNVirtualChannels(1, UserVirtualChannelParams(4)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
@@ -827,18 +829,24 @@ class EvalTestConfig06 extends Config(
   new constellation.routing.WithRoutingRelation(new Mesh2DDimensionOrderedRouting(4, 4)) ++
   new constellation.topology.WithTopology(new Mesh2D(4, 4)))
 class EvalTestConfig07 extends Config(
-  new WithEvalUniformFlow(0.001) ++
+  new WithEvalRequiredMedianLatency(20) ++
+  new WithEvalRequiredMaxLatency(75) ++
+  new WithEvalRequiredThroughput(0.95) ++
+  new WithEvalUniformFlow(0.2) ++
   new constellation.channel.WithUniformNVirtualChannels(2, UserVirtualChannelParams(4)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 64) ++
-  new constellation.channel.WithEgresses(0 until 64) ++
-  new constellation.routing.WithRoutingRelation(new Mesh2DEscapeRouting(8, 8)) ++
-  new constellation.topology.WithTopology(new Mesh2D(8, 8)))
+  new constellation.channel.WithIngresses(0 until 16) ++
+  new constellation.channel.WithEgresses(0 until 16) ++
+  new constellation.routing.WithRoutingRelation(new Mesh2DEscapeRouting(4, 4)) ++
+  new constellation.topology.WithTopology(new Mesh2D(4, 4)))
 class EvalTestConfig08 extends Config(
-  new WithEvalUniformFlow(1.0) ++
+  new WithEvalRequiredMedianLatency(35) ++
+  new WithEvalRequiredMaxLatency(250) ++
+  new WithEvalRequiredThroughput(0.95) ++
+  new WithEvalUniformFlow(0.5) ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(4)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(Seq.fill(4) { 0 until 16 }.flatten) ++
-  new constellation.channel.WithEgresses((Seq.fill(4) { 0 until 16 }.flatten).map(_ + 16*4)) ++
-  new constellation.routing.WithRoutingRelation(new ButterflyRouting(2, 5)) ++
-  new constellation.topology.WithTopology(new Butterfly(2, 5)))
+  new constellation.channel.WithIngresses(Seq.fill(2) { 0 until 8 }.flatten) ++
+  new constellation.channel.WithEgresses((Seq.fill(2) { 0 until 8 }.flatten).map(_ + 8*3)) ++
+  new constellation.routing.WithRoutingRelation(new ButterflyRouting(2, 4)) ++
+  new constellation.topology.WithTopology(new Butterfly(2, 4)))
