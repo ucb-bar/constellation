@@ -15,7 +15,7 @@ import constellation.topology.{PhysicalTopology, UnidirectionalLine}
 case class NoCParams(
   nVirtualNetworks: Int = 1,
 
-  topology: PhysicalTopology = new UnidirectionalLine(1),
+  topology: PhysicalTopology = UnidirectionalLine(1),
   channelParamGen: (Int, Int) => UserChannelParams = (a: Int, b: Int) => UserChannelParams(),
   ingresses: Seq[UserIngressParams] = Nil,
   egresses: Seq[UserEgressParams] = Nil,

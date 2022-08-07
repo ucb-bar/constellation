@@ -3,25 +3,29 @@ package constellation.topology
 import scala.math.{pow, cos, sin, Pi}
 
 /** A network where sequential nodes are connected unidirectionally */
-class UnidirectionalLine(n: Int, skips: Seq[(Int, Int)] = Nil) extends PhysicalTopology(n) {
+case class UnidirectionalLine(n: Int, skips: Seq[(Int, Int)] = Nil) extends PhysicalTopology {
+  val nNodes = n
   def topo(src: Int, dest: Int) = dest - src == 1 || ((dest > src) && skips.contains((src, dest)))
   val plotter = new LinePlotter
 }
 
 /** A network where sequential nodes are connected bidirectionally */
-class BidirectionalLine(n: Int) extends PhysicalTopology(n) {
+case class BidirectionalLine(n: Int) extends PhysicalTopology {
+  val nNodes = n
   def topo(src: Int, dest: Int) = (dest - src).abs == 1
   val plotter = new LinePlotter
 }
 
 /** An n-node network shaped like a torus, with clockwise channels */
-class UnidirectionalTorus1D(n: Int) extends PhysicalTopology(n) {
+case class UnidirectionalTorus1D(n: Int) extends PhysicalTopology {
+  val nNodes = n
   def topo(src: Int, dest: Int) = dest - src == 1 || (dest == 0 && src == nNodes - 1)
   val plotter = new Torus1DPlotter(nNodes)
 }
 
 /** An n-node network shaped like a torus, with bidirectional channels */
-class BidirectionalTorus1D(n: Int) extends PhysicalTopology(n) {
+case class BidirectionalTorus1D(n: Int) extends PhysicalTopology {
+  val nNodes = n
   def topo(src: Int, dest: Int) = (dest + nNodes - src) % nNodes == 1 || (src + nNodes - dest) % nNodes == 1
   val plotter = new Torus1DPlotter(nNodes)
 }
@@ -32,9 +36,11 @@ class BidirectionalTorus1D(n: Int) extends PhysicalTopology(n) {
   * @param kAry number of channels of a node that connect to the previous and/or next stage
   * @param nFly number of stages in network
   */
-class Butterfly(kAry: Int, nFly: Int) extends PhysicalTopology(pow(kAry, nFly-1).toInt * nFly) {
-  require(kAry >= 2 && nFly >= 2)
+case class Butterfly(kAry: Int, nFly: Int) extends PhysicalTopology {
   val height = pow(kAry, nFly-1).toInt
+  val nNodes = height * nFly
+  require(kAry >= 2 && nFly >= 2)
+
   def digitsToNum(dig: Seq[Int]) = dig.zipWithIndex.map { case (d,i) => d * pow(kAry,i).toInt }.sum
   val table = (0 until pow(kAry, nFly).toInt).map { i =>
     (0 until nFly).map { n => (i / pow(kAry, n).toInt) % kAry }
@@ -58,8 +64,9 @@ class Butterfly(kAry: Int, nFly: Int) extends PhysicalTopology(pow(kAry, nFly-1)
 
 /** An dary**height tree topology.
   */
-class BidirectionalTree(val height: Int, val dAry: Int = 2)
-  extends PhysicalTopology(((dAry * pow(dAry, height) - 1) / (dAry - 1)).toInt) {
+case class BidirectionalTree(val height: Int, val dAry: Int = 2) extends PhysicalTopology {
+
+  val nNodes = (((dAry * pow(dAry, height) - 1) / (dAry - 1)).toInt)
   require(dAry > 1)
 
   def topo(src: Int, dest: Int) = {
@@ -79,7 +86,8 @@ class BidirectionalTree(val height: Int, val dAry: Int = 2)
  *  @param nX maximum x-coordinate of a node
  *  @param nY maximum y-coordinate of a node
  */
-class Mesh2D(nX: Int, nY: Int) extends PhysicalTopology(nX * nY) {
+case class Mesh2D(nX: Int, nY: Int) extends PhysicalTopology {
+  val nNodes = nX * nY
   def topo(src: Int, dst: Int) = {
     val (srcX, srcY) = (src % nX, src / nX)
     val (dstX, dstY) = (dst % nX, dst / nX)
@@ -93,7 +101,8 @@ class Mesh2D(nX: Int, nY: Int) extends PhysicalTopology(nX * nY) {
  *  @param nX maximum x-coordinate of a node
  *  @param nY maximum y-coordinate of a node
  */
-class UnidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology(nX * nY) {
+case class UnidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology {
+  val nNodes = nX * nY
   def topo(src: Int, dst: Int) = {
     val (srcX, srcY) = (src % nX, src / nX)
     val (dstX, dstY) = (dst % nX, dst / nX)
@@ -108,7 +117,8 @@ class UnidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology(nX * nY) 
  *  @param nX maximum x-coordinate of a node
  *  @param nY maximum y-coordinate of a node
  */
-class BidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology(nX * nY) {
+case class BidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology {
+  val nNodes = nX * nY
   def topo(src: Int, dst: Int) = {
     val (srcX, srcY) = (src % nX, src / nX)
     val (dstX, dstY) = (dst % nX, dst / nX)
@@ -118,7 +128,8 @@ class BidirectionalTorus2D(nX: Int, nY: Int) extends PhysicalTopology(nX * nY) {
   val plotter = new Mesh2DPlotter(nX, nY)
 }
 
-class TerminalPlane(val base: PhysicalTopology) extends PhysicalTopology(3 * base.nNodes) {
+case class TerminalPlane(val base: PhysicalTopology) extends PhysicalTopology {
+  val nNodes = (3 * base.nNodes)
   def topo(src: Int, dst: Int) = {
     def isBase(n: Int) = n < base.nNodes
     def isIngress(n: Int) = !isEgress(n) && !isBase(n)
