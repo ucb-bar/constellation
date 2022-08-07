@@ -3,6 +3,8 @@ package constellation.routing
 import scala.math.{min, max, pow}
 import scala.collection.mutable.HashMap
 import freechips.rocketchip.config.{Parameters}
+import scala.collection.immutable.ListMap
+import constellation.topology.{PhysicalTopology, Mesh2DLikePhysicalTopology}
 
 /** Routing and channel allocation policy
  *
@@ -14,7 +16,7 @@ import freechips.rocketchip.config.{Parameters}
  *                 By default, we ignore the escape-channel-based deadlock-free properties, and just check
  *                 for deadlock-freedom by verifying lack of a cyclic dependency.
  */
-abstract class RoutingRelation {
+abstract class RoutingRelation(topo: PhysicalTopology) {
   def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo): Boolean
 
   val memoize = new HashMap[(ChannelRoutingInfo, ChannelRoutingInfo, FlowRoutingInfo), Boolean]()
@@ -36,46 +38,51 @@ abstract class RoutingRelation {
   *  @param normalrouter deadlock-prone routing relation
   *  @param nEscapeChannels number of escape channels
   */
-class EscapeChannelRouting(
-  escapeRouter: RoutingRelation, normalRouter: RoutingRelation, nEscapeChannels: Int = 1
-) extends RoutingRelation {
-  def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-    if (srcC.src == -1) {
-      if (nxtC.vc >= nEscapeChannels) { // if ingress and jumping into normal channel, use normal relation
-        normalRouter(srcC, nxtC.copy(vc=nxtC.vc-nEscapeChannels, n_vc=nxtC.n_vc-nEscapeChannels), flow)
-      } else { // else use ingress and jump into escape channel
-        escapeRouter(srcC, nxtC.copy(n_vc=nEscapeChannels), flow)
+object EscapeChannelRouting {
+  def apply(
+    escapeRouter: PhysicalTopology => RoutingRelation,
+    normalRouter: PhysicalTopology => RoutingRelation,
+    nEscapeChannels: Int = 1) = (topo: PhysicalTopology) => new RoutingRelation(topo) {
+    val escape = escapeRouter(topo)
+    val normal = normalRouter(topo)
+    def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+      if (srcC.src == -1) {
+        if (nxtC.vc >= nEscapeChannels) { // if ingress and jumping into normal channel, use normal relation
+          normal(srcC, nxtC.copy(vc=nxtC.vc-nEscapeChannels, n_vc=nxtC.n_vc-nEscapeChannels), flow)
+        } else { // else use ingress and jump into escape channel
+          escape(srcC, nxtC.copy(n_vc=nEscapeChannels), flow)
+        }
+      } else if (nxtC.vc < nEscapeChannels) {
+        escape(srcC, nxtC.copy(n_vc=nEscapeChannels), flow)
+      } else if (srcC.vc >= nEscapeChannels && nxtC.vc >= nEscapeChannels) {
+        normal(
+          srcC.copy(vc=srcC.vc-nEscapeChannels, n_vc=srcC.n_vc-nEscapeChannels),
+          nxtC.copy(vc=nxtC.vc-nEscapeChannels, n_vc=nxtC.n_vc-nEscapeChannels),
+          flow)
+      } else {
+        false
       }
-    } else if (nxtC.vc < nEscapeChannels) {
-      escapeRouter(srcC, nxtC.copy(n_vc=nEscapeChannels), flow)
-    } else if (srcC.vc >= nEscapeChannels && nxtC.vc >= nEscapeChannels) {
-      normalRouter(
-        srcC.copy(vc=srcC.vc-nEscapeChannels, n_vc=srcC.n_vc-nEscapeChannels),
-        nxtC.copy(vc=nxtC.vc-nEscapeChannels, n_vc=nxtC.n_vc-nEscapeChannels),
-        flow)
-    } else {
-      false
     }
-  }
-  override def isEscape(c: ChannelRoutingInfo, v: Int) = {
-    c.isIngress || c.isEgress || c.vc < nEscapeChannels
-  }
-  override def getNPrios(c: ChannelRoutingInfo): Int = {
-    escapeRouter.getNPrios(c) + normalRouter.getNPrios(c)
-  }
-  override def getPrio(src: ChannelRoutingInfo, a: ChannelRoutingInfo, flow: FlowRoutingInfo): Int = {
-    val aEscape = isEscape(a, flow.vNetId)
-    val nSrc = if (src.isIngress) {
-      src
-    } else if (isEscape(src, flow.vNetId)) {
-      src.copy(vc=src.vc, n_vc=nEscapeChannels)
-    } else {
-      src.copy(vc=src.vc-nEscapeChannels, n_vc=src.n_vc-nEscapeChannels)
+    override def isEscape(c: ChannelRoutingInfo, v: Int) = {
+      c.isIngress || c.isEgress || c.vc < nEscapeChannels
     }
-    if (aEscape) {
-      escapeRouter.getPrio(nSrc, a.copy(n_vc=nEscapeChannels), flow) + normalRouter.getNPrios(src)
-    } else {
-      normalRouter.getPrio(nSrc, a.copy(vc=a.vc-nEscapeChannels, n_vc=a.n_vc-nEscapeChannels), flow)
+    override def getNPrios(c: ChannelRoutingInfo): Int = {
+      escape.getNPrios(c) + normal.getNPrios(c)
+    }
+    override def getPrio(src: ChannelRoutingInfo, a: ChannelRoutingInfo, flow: FlowRoutingInfo): Int = {
+      val aEscape = isEscape(a, flow.vNet)
+      val nSrc = if (src.isIngress) {
+        src
+      } else if (isEscape(src, flow.vNet)) {
+        src.copy(vc=src.vc, n_vc=nEscapeChannels)
+      } else {
+        src.copy(vc=src.vc-nEscapeChannels, n_vc=src.n_vc-nEscapeChannels)
+      }
+      if (aEscape) {
+        escape.getPrio(nSrc, a.copy(n_vc=nEscapeChannels), flow) + normal.getNPrios(src)
+      } else {
+        normal.getPrio(nSrc, a.copy(vc=a.vc-nEscapeChannels, n_vc=a.n_vc-nEscapeChannels), flow)
+      }
     }
   }
 }
@@ -83,350 +90,397 @@ class EscapeChannelRouting(
 /**
   * Allows all routing. Probably not very useful
   */
-class AllLegalRouting extends RoutingRelation {
-  def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = true
-}
-
-class UnidirectionalLineRouting extends RoutingRelation {
-  def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-    nxtC.dst <= flow.egressNode
-  }
-  override def getNPrios(src: ChannelRoutingInfo) = 4
-  override def getPrio(src: ChannelRoutingInfo, a: ChannelRoutingInfo, flow: FlowRoutingInfo): Int = {
-    max(src.dst - a.dst + getNPrios(src), 0)
+object AllLegalRouting {
+  def apply() = (topo: PhysicalTopology) => new RoutingRelation(topo) {
+    def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = true
   }
 }
 
-/** An example of the parameter `f` for the RoutingRelation class that routes traffic along a
-  * straight-line network in the direction of the packet's destination. Returns true if the selected
-  * next channel moves the packet in the direction of the destination node and false if it does not.
-  *
-  * @param srcC the source channel that brought the packet
-  * @param nxtC the channel proposed for the packet's next hop along the network
-  * @param flow the packet's routing info, including its destination node
-  */
-class BidirectionalLineRouting extends RoutingRelation {
-  def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-    if (nxtC.src < nxtC.dst) flow.egressNode >= nxtC.dst else flow.egressNode <= nxtC.dst
-  }
-}
-
-class UnidirectionalTorus1DDatelineRouting(nNodes: Int) extends RoutingRelation {
-  def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-    if (srcC.src == -1)  {
-      nxtC.vc == nxtC.n_vc - 1
-    } else if (srcC.vc == 0) {
-      nxtC.vc == 0
-    } else if (nxtC.src == nNodes - 1) {
-      nxtC.vc < srcC.vc
-    } else {
-      nxtC.vc <= srcC.vc && (nxtC.vc != 0 || flow.egressNode > nxtC.src)
+object UnidirectionalLineRouting {
+  def apply() = (topo: PhysicalTopology) => new RoutingRelation(topo) {
+    def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+      nxtC.dst <= flow.dst
+    }
+    override def getNPrios(src: ChannelRoutingInfo) = 4
+    override def getPrio(src: ChannelRoutingInfo, a: ChannelRoutingInfo, flow: FlowRoutingInfo): Int = {
+      max(src.dst - a.dst + getNPrios(src), 0)
     }
   }
 }
 
-class BidirectionalTorus1DDatelineRouting(nNodes: Int) extends RoutingRelation {
-  def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-    if (srcC.src == -1)  {
-      nxtC.vc == nxtC.n_vc - 1
-    } else if (srcC.vc == 0) {
-      nxtC.vc == 0
-    } else if ((nxtC.dst + nNodes - nxtC.src) % nNodes == 1) {
-      if (nxtC.src == nNodes - 1) {
+object BidirectionalLineRouting {
+  def apply() = (topo: PhysicalTopology) => new RoutingRelation(topo) {
+    def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+      if (nxtC.src < nxtC.dst) flow.dst >= nxtC.dst else flow.dst <= nxtC.dst
+    }
+  }
+}
+
+object UnidirectionalTorus1DDatelineRouting {
+  def apply() = (topo: PhysicalTopology) => new RoutingRelation(topo) {
+    def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+      if (srcC.src == -1)  {
+        nxtC.vc != 0
+      } else if (srcC.vc == 0) {
+        nxtC.vc == 0
+      } else if (nxtC.src == topo.nNodes - 1) {
         nxtC.vc < srcC.vc
       } else {
         nxtC.vc <= srcC.vc && (nxtC.vc != 0 || flow.egressNode > nxtC.src)
       }
-    } else if ((nxtC.src + nNodes - nxtC.dst) % nNodes == 1) {
-      if (nxtC.src == 0) {
-        nxtC.vc < srcC.vc
+    }
+  }
+}
+
+object BidirectionalTorus1DDatelineRouting {
+  def apply() = (topo: PhysicalTopology) => new RoutingRelation(topo) {
+    def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+      if (srcC.src == -1)  {
+        nxtC.vc == nxtC.n_vc - 1
+      } else if (srcC.vc == 0) {
+        nxtC.vc == 0
+      } else if ((nxtC.dst + topo.nNodes - nxtC.src) % topo.nNodes == 1) {
+        if (nxtC.src == topo.nNodes - 1) {
+          nxtC.vc < srcC.vc
+        } else {
+          nxtC.vc <= srcC.vc && (nxtC.vc != 0 || flow.dst > nxtC.src)
+        }
+      } else if ((nxtC.src + topo.nNodes - nxtC.dst) % topo.nNodes == 1) {
+        if (nxtC.src == 0) {
+          nxtC.vc < srcC.vc
+        } else {
+          nxtC.vc <= srcC.vc && (nxtC.vc != 0 || flow.dst < nxtC.src)
+        }
       } else {
-        nxtC.vc <= srcC.vc && (nxtC.vc != 0 || flow.egressNode < nxtC.src)
+        false
       }
-    } else {
-      false
     }
   }
 }
 
-class BidirectionalTorus1DShortestRouting(nNodes: Int) extends RoutingRelation {
-  val base = new BidirectionalTorus1DDatelineRouting(nNodes)
-  def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-    val cwDist = (flow.egressNode + nNodes - nxtC.src) % nNodes
-    val ccwDist = (nxtC.src + nNodes - flow.egressNode) % nNodes
-    val distSel = if (cwDist < ccwDist) {
-      (nxtC.dst + nNodes - nxtC.src) % nNodes == 1
-    } else if (cwDist > ccwDist) {
-      (nxtC.src + nNodes - nxtC.dst) % nNodes == 1
-    } else {
-      true
-    }
-    distSel && base(srcC, nxtC, flow)
-  }
-}
-
-class BidirectionalTorus1DRandomRouting(nNodes: Int) extends RoutingRelation {
-  val base = new BidirectionalTorus1DDatelineRouting(nNodes)
-  def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-    val sel = if (srcC.src == -1) {
-      true
-    } else if ((nxtC.src + nNodes - srcC.src) % nNodes == 1) {
-      (nxtC.dst + nNodes - nxtC.src) % nNodes == 1
-    } else {
-      (nxtC.src + nNodes - nxtC.dst) % nNodes == 1
-    }
-    sel && base(srcC, nxtC, flow)
-  }
-}
-
-class ButterflyRouting(kAry: Int, nFly: Int) extends RoutingRelation {
-  require(kAry >= 2 && nFly >= 2)
-  val height = pow(kAry, nFly-1).toInt
-  def digitsToNum(dig: Seq[Int]) = dig.zipWithIndex.map { case (d,i) => d * pow(kAry,i).toInt }.sum
-  val table = (0 until pow(kAry, nFly).toInt).map { i =>
-    (0 until nFly).map { n => (i / pow(kAry, n).toInt) % kAry }
-  }
-  val channels = (1 until nFly).map { i =>
-    table.map { e => (digitsToNum(e.drop(1)), digitsToNum(e.updated(i, e(0)).drop(1))) }
-  }
-
-  def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-    val (nxtX, nxtY) = (nxtC.dst / height, nxtC.dst % height)
-    val (nodeX, nodeY) = (nxtC.src / height, nxtC.src % height)
-    val (dstX, dstY) = (flow.egressNode / height, flow.egressNode % height)
-    if (dstX <= nodeX) {
-      false
-    } else if (nodeX == nFly-1) {
-      true
-    } else {
-      val dsts = (nxtX until nFly-1).foldRight((0 until height).map { i => Seq(i) }) {
-        case (i,l) => (0 until height).map { s => channels(i).filter(_._1 == s).map { case (_,d) =>
-          l(d)
-        }.flatten }
-      }
-      dsts(nxtY).contains(flow.egressNode % height)
-    }
-  }
-}
-
-class BidirectionalTreeRouting(dAry: Int) extends RoutingRelation {
-  /** Returns a boolean indicating whether src is an ancestor node of dst */
-  def isAncestor(src: Int, dst: Int): Boolean = {
-    if (src == dst) {
-      true
-    } else if (src > dst) {
-      false
-    } else {
-      ((dAry * src + 1) to (dAry * src + dAry)).foldLeft(false)((sofar, nextChild) => sofar || isAncestor(nextChild, dst))
-    }
-  }
-  def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-    if (isAncestor(nxtC.src, flow.egressNode)) {
-      isAncestor(nxtC.dst, flow.egressNode) && (nxtC.dst >= nxtC.src)
-    } else {
-      isAncestor(nxtC.dst, nxtC.src)
-    }
-  }
-}
-
-class Mesh2DDimensionOrderedRouting(nX: Int, nY: Int, firstDim: Int = 0) extends RoutingRelation {
-  def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-    val (nxtX, nxtY)   = (nxtC.dst % nX , nxtC.dst / nX)
-    val (nodeX, nodeY) = (nxtC.src % nX, nxtC.src / nX)
-    val (dstX, dstY)   = (flow.egressNode % nX , flow.egressNode / nX)
-
-    if (firstDim == 0) {
-      if (dstX != nodeX) {
-        (if (nodeX < nxtX) dstX >= nxtX else dstX <= nxtX) && nxtY == nodeY
+object BidirectionalTorus1DShortestRouting {
+  def apply() = (topo: PhysicalTopology) => new RoutingRelation(topo) {
+    val base = BidirectionalTorus1DDatelineRouting()(topo)
+    def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+      val cwDist = (flow.dst + topo.nNodes - nxtC.src) % topo.nNodes
+      val ccwDist = (nxtC.src + topo.nNodes - flow.dst) % topo.nNodes
+      val distSel = if (cwDist < ccwDist) {
+        (nxtC.dst + topo.nNodes - nxtC.src) % topo.nNodes == 1
+      } else if (cwDist > ccwDist) {
+        (nxtC.src + topo.nNodes - nxtC.dst) % topo.nNodes == 1
       } else {
-        (if (nodeY < nxtY) dstY >= nxtY else dstY <= nxtY) && nxtX == nodeX
+        true
       }
-    } else {
-      if (dstY != nodeY) {
-        (if (nodeY < nxtY) dstY >= nxtY else dstY <= nxtY) && nxtX == nodeX
+      distSel && base(srcC, nxtC, flow)
+    }
+  }
+}
+
+object BidirectionalTorus1DRandomRouting {
+  def apply() = (topo: PhysicalTopology) => new RoutingRelation(topo) {
+    val base = BidirectionalTorus1DDatelineRouting()(topo)
+    def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+      val sel = if (srcC.src == -1) {
+        true
+      } else if ((nxtC.src + topo.nNodes - srcC.src) % topo.nNodes == 1) {
+        (nxtC.dst + topo.nNodes - nxtC.src) % topo.nNodes == 1
       } else {
-        (if (nodeX < nxtX) dstX >= nxtX else dstX <= nxtX) && nxtY == nodeY
+        (nxtC.src + topo.nNodes - nxtC.dst) % topo.nNodes == 1
+      }
+      sel && base(srcC, nxtC, flow)
+    }
+  }
+}
+
+object ButterflyRouting {
+  def apply() = (topo: PhysicalTopology) => topo match {
+    case topo: constellation.topology.Butterfly => new RoutingRelation(topo) {
+      def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+        val (nxtX, nxtY) = (nxtC.dst / topo.height, nxtC.dst % topo.height)
+        val (nodeX, nodeY) = (nxtC.src / topo.height, nxtC.src % topo.height)
+        val (dstX, dstY) = (flow.dst / topo.height, flow.dst % topo.height)
+        if (dstX <= nodeX) {
+          false
+        } else if (nodeX == topo.nFly-1) {
+          true
+        } else {
+          val dsts = (nxtX until topo.nFly-1).foldRight((0 until topo.height).map { i => Seq(i) }) {
+            case (i,l) => (0 until topo.height).map { s => topo.channels(i).filter(_._1 == s).map { case (_,d) =>
+              l(d)
+            }.flatten }
+          }
+          dsts(nxtY).contains(flow.dst % topo.height)
+        }
+      }
+    }
+  }
+}
+
+object BidirectionalTreeRouting {
+  def apply() = (topo: PhysicalTopology) => topo match {
+    case topo: constellation.topology.BidirectionalTree => new RoutingRelation(topo) {
+      /** Returns a boolean indicating whether src is an ancestor node of dst */
+      def isAncestor(src: Int, dst: Int): Boolean = {
+        if (src == dst) {
+          true
+        } else if (src > dst) {
+          false
+        } else {
+          ((topo.dAry * src + 1) to (topo.dAry * src + topo.dAry)).foldLeft(false)((sofar, nextChild) => sofar || isAncestor(nextChild, dst))
+        }
+      }
+      def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+        if (isAncestor(nxtC.src, flow.dst)) {
+          isAncestor(nxtC.dst, flow.dst) && (nxtC.dst >= nxtC.src)
+        } else {
+          isAncestor(nxtC.dst, nxtC.src)
+        }
+      }
+    }
+  }
+}
+
+object Mesh2DDimensionOrderedRouting {
+  def apply(firstDim: Int = 0) = (topo: PhysicalTopology) => topo match {
+    case topo: Mesh2DLikePhysicalTopology => new RoutingRelation(topo) {
+      def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+        val (nxtX, nxtY)   = (nxtC.dst % topo.nX , nxtC.dst / topo.nX)
+        val (nodeX, nodeY) = (nxtC.src % topo.nX , nxtC.src / topo.nX)
+        val (dstX, dstY)   = (flow.dst % topo.nX , flow.dst / topo.nX)
+
+        if (firstDim == 0) {
+          if (dstX != nodeX) {
+            (if (nodeX < nxtX) dstX >= nxtX else dstX <= nxtX) && nxtY == nodeY
+          } else {
+            (if (nodeY < nxtY) dstY >= nxtY else dstY <= nxtY) && nxtX == nodeX
+          }
+        } else {
+          if (dstY != nodeY) {
+            (if (nodeY < nxtY) dstY >= nxtY else dstY <= nxtY) && nxtX == nodeX
+          } else {
+            (if (nodeX < nxtX) dstX >= nxtX else dstX <= nxtX) && nxtY == nodeY
+          }
+        }
       }
     }
   }
 }
 
 // WARNING: Not deadlock free
-class Mesh2DMinimalRouting(nX: Int, nY: Int) extends RoutingRelation {
-  def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-    val (nxtX, nxtY)   = (nxtC.dst % nX , nxtC.dst / nX)
-    val (nodeX, nodeY) = (nxtC.src % nX, nxtC.src / nX)
-    val (dstX, dstY)   = (flow.egressNode % nX, flow.egressNode / nX)
+object Mesh2DMinimalRouting {
+  def apply() = (topo: PhysicalTopology) => topo match {
+    case topo: Mesh2DLikePhysicalTopology => new RoutingRelation(topo) {
+      def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+        val (nxtX, nxtY)   = (nxtC.dst % topo.nX , nxtC.dst / topo.nX)
+        val (nodeX, nodeY) = (nxtC.src % topo.nX , nxtC.src / topo.nX)
+        val (dstX, dstY)   = (flow.dst % topo.nX , flow.dst / topo.nX)
 
-    val xR = (if (nodeX < nxtX) dstX >= nxtX else if (nodeX > nxtX) dstX <= nxtX else nodeX == nxtX)
-    val yR = (if (nodeY < nxtY) dstY >= nxtY else if (nodeY > nxtY) dstY <= nxtY else nodeY == nxtY)
-    xR && yR
-  }
-}
-
-class Mesh2DWestFirstRouting(nX: Int, nY: Int) extends RoutingRelation {
-  val base = new Mesh2DMinimalRouting(nX, nY)
-  def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-    val (nxtX, nxtY)   = (nxtC.dst % nX , nxtC.dst / nX)
-    val (nodeX, nodeY) = (nxtC.src % nX, nxtC.src / nX)
-    val (dstX, dstY)   = (flow.egressNode % nX , flow.egressNode / nX)
-
-    if (dstX < nodeX) {
-      nxtX == nodeX - 1
-    } else {
-      base(srcC, nxtC, flow)
-    }
-  }
-}
-
-class Mesh2DNorthLastRouting(nX: Int, nY: Int) extends RoutingRelation {
-  val base = new Mesh2DMinimalRouting(nX, nY)
-  def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-    val (nxtX, nxtY)   = (nxtC.dst % nX , nxtC.dst / nX)
-    val (nodeX, nodeY) = (nxtC.src % nX, nxtC.src / nX)
-    val (dstX, dstY)   = (flow.egressNode % nX , flow.egressNode / nX)
-
-    val minimal = base(srcC, nxtC, flow)
-    if (dstY > nodeY && dstX != nodeX) {
-      minimal && nxtY != nodeY + 1
-    } else if (dstY > nodeY) {
-      nxtY == nodeY + 1
-    } else {
-      minimal
-    }
-  }
-}
-
-class Mesh2DEscapeRouting(nX: Int, nY: Int) extends EscapeChannelRouting(
-  new Mesh2DDimensionOrderedRouting(nX, nY), new Mesh2DMinimalRouting(nX, nY))
-
-class UnidirectionalTorus2DDatelineRouting(nX: Int, nY: Int) extends RoutingRelation {
-  val baseX = new UnidirectionalTorus1DDatelineRouting(nX)
-  val baseY = new UnidirectionalTorus1DDatelineRouting(nY)
-  def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-
-    val (nxtX, nxtY)   = (nxtC.dst % nX , nxtC.dst / nX)
-    val (nodeX, nodeY) = (nxtC.src % nX, nxtC.src / nX)
-    val (dstX, dstY)   = (flow.egressNode % nX , flow.egressNode / nX)
-    val (srcX, srcY)   = (srcC.src % nX , srcC.src / nX)
-
-    val turn = nxtX != srcX && nxtY != srcY
-    if (srcC.src == -1 || turn) {
-      nxtC.vc == nxtC.n_vc - 1
-    } else if (srcX == nxtX) {
-      baseY(
-        srcC.copy(src=srcY, dst=nodeY),
-        nxtC.copy(src=nodeY, dst=nxtY),
-        flow.copy(egressNode=dstY)
-      )
-    } else if (srcY == nxtY) {
-      baseX(
-        srcC.copy(src=srcX, dst=nodeX),
-        nxtC.copy(src=nodeX, dst=nxtX),
-        flow.copy(egressNode=dstX)
-      )
-    } else {
-      false
-    }
-  }
-}
-
-class BidirectionalTorus2DDatelineRouting(nX: Int, nY: Int) extends RoutingRelation {
-  val baseX = new UnidirectionalTorus1DDatelineRouting(nX)
-  val baseY = new UnidirectionalTorus1DDatelineRouting(nY)
-  def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-    val (nxtX, nxtY)   = (nxtC.dst % nX , nxtC.dst / nX)
-    val (nodeX, nodeY) = (nxtC.src % nX, nxtC.src / nX)
-    val (dstX, dstY)   = (flow.egressNode % nX , flow.egressNode / nX)
-    val (srcX, srcY)   = (srcC.src % nX , srcC.src / nX)
-
-    if (srcC.src == -1) {
-      nxtC.vc == nxtC.n_vc - 1
-    } else if (nodeX == nxtX) {
-      baseY(
-        srcC.copy(src=srcY, dst=nodeY),
-        nxtC.copy(src=nodeY, dst=nxtY),
-        flow.copy(egressNode=dstY)
-      )
-    } else if (nodeY == nxtY) {
-      baseX(
-        srcC.copy(src=srcX, dst=nodeX),
-        nxtC.copy(src=nodeX, dst=nxtX),
-        flow.copy(egressNode=dstX)
-      )
-    } else {
-      false
-    }
-  }
-}
-
-class DimensionOrderedUnidirectionalTorus2DDatelineRouting(nX: Int, nY: Int) extends RoutingRelation {
-  val base = new UnidirectionalTorus2DDatelineRouting(nX, nY)
-  def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-    val (nxtX, nxtY)   = (nxtC.dst % nX , nxtC.dst / nX)
-    val (nodeX, nodeY) = (nxtC.src % nX, nxtC.src / nX)
-    val (dstX, dstY)   = (flow.egressNode % nX , flow.egressNode / nX)
-    val (srcX, srcY)   = (srcC.src % nX , srcC.src / nX)
-
-    def sel = if (dstX != nodeX) {
-      nxtY == nodeY
-    } else {
-      nxtX == nodeX
-    }
-    base(srcC, nxtC, flow) && sel
-  }
-}
-
-class DimensionOrderedBidirectionalTorus2DDatelineRouting(nX: Int, nY: Int) extends RoutingRelation {
-  val baseX = new BidirectionalTorus1DShortestRouting(nX)
-  val baseY = new BidirectionalTorus1DShortestRouting(nY)
-  val base = new BidirectionalTorus2DDatelineRouting(nX, nY)
-  def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-
-    val (nxtX, nxtY)   = (nxtC.dst % nX , nxtC.dst / nX)
-    val (nodeX, nodeY) = (nxtC.src % nX, nxtC.src / nX)
-    val (dstX, dstY)   = (flow.egressNode % nX , flow.egressNode / nX)
-    val (srcX, srcY)   = (srcC.src % nX , srcC.src / nX)
-
-    val xdir = baseX(
-      srcC.copy(src=(if (srcC.src == -1) -1 else srcX), dst=nodeX),
-      nxtC.copy(src=nodeX, dst=nxtX),
-      flow.copy(egressNode=dstX)
-    )
-    val ydir = baseY(
-      srcC.copy(src=(if (srcC.src == -1) -1 else srcY), dst=nodeY),
-      nxtC.copy(src=nodeY, dst=nxtY),
-      flow.copy(egressNode=dstY)
-    )
-
-    val sel = if (dstX != nodeX) xdir else ydir
-
-    sel && base(srcC, nxtC, flow)
-  }
-}
-
-class TerminalPlaneRouting(f: RoutingRelation, nNodes: Int) extends RoutingRelation {
-  def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-    if (srcC.isIngress && nxtC.dst < nNodes) {
-      true
-    } else if (nxtC.dst == flow.egressNode) {
-      true
-    } else if (nxtC.src < nNodes && nxtC.dst < nNodes && nxtC.src != flow.egressNode - 2 * nNodes) {
-      if (srcC.src >= nNodes) {
-        f(srcC.copy(src=(-1), vc=0, n_vc=1),
-          nxtC,
-          flow.copy(egressNode=flow.egressNode-2*nNodes))
-      } else {
-        f(srcC,
-          nxtC,
-          flow.copy(egressNode=flow.egressNode-2*nNodes))
+        val xR = (if (nodeX < nxtX) dstX >= nxtX else if (nodeX > nxtX) dstX <= nxtX else nodeX == nxtX)
+        val yR = (if (nodeY < nxtY) dstY >= nxtY else if (nodeY > nxtY) dstY <= nxtY else nodeY == nxtY)
+        xR && yR
       }
-    } else {
-      false
     }
   }
-  override def isEscape(c: ChannelRoutingInfo, v: Int) = {
-    c.src >= nNodes || c.dst >= nNodes || f.isEscape(c, v)
+}
+
+object Mesh2DWestFirstRouting {
+  def apply() = (topo: PhysicalTopology) => topo match {
+    case topo: Mesh2DLikePhysicalTopology => new RoutingRelation(topo) {
+      val base = Mesh2DMinimalRouting()(topo)
+      def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+        val (nxtX, nxtY)   = (nxtC.dst % topo.nX , nxtC.dst / topo.nX)
+        val (nodeX, nodeY) = (nxtC.src % topo.nX , nxtC.src / topo.nX)
+        val (dstX, dstY)   = (flow.dst % topo.nX , flow.dst / topo.nX)
+
+        if (dstX < nodeX) {
+          nxtX == nodeX - 1
+        } else {
+          base(srcC, nxtC, flow)
+        }
+      }
+    }
+  }
+}
+
+object Mesh2DNorthLastRouting {
+  def apply() = (topo: PhysicalTopology) => topo match {
+    case topo: Mesh2DLikePhysicalTopology => new RoutingRelation(topo) {
+      val base = Mesh2DMinimalRouting()(topo)
+      def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+        val (nxtX, nxtY)   = (nxtC.dst % topo.nX , nxtC.dst / topo.nX)
+        val (nodeX, nodeY) = (nxtC.src % topo.nX , nxtC.src / topo.nX)
+        val (dstX, dstY)   = (flow.dst % topo.nX , flow.dst / topo.nX)
+
+        val minimal = base(srcC, nxtC, flow)
+        if (dstY > nodeY && dstX != nodeX) {
+          minimal && nxtY != nodeY + 1
+        } else if (dstY > nodeY) {
+          nxtY == nodeY + 1
+        } else {
+          minimal
+        }
+      }
+    }
+  }
+}
+
+object Mesh2DEscapeRouting {
+  def apply() = (topo: PhysicalTopology) => topo match {
+    case topo: Mesh2DLikePhysicalTopology => EscapeChannelRouting(
+      escapeRouter=Mesh2DDimensionOrderedRouting(),
+      normalRouter=Mesh2DMinimalRouting())(topo)
+  }
+}
+
+object UnidirectionalTorus2DDatelineRouting {
+  def apply() = (topo: PhysicalTopology) => topo match {
+    case topo: Mesh2DLikePhysicalTopology => new RoutingRelation(topo) {
+      val baseX = UnidirectionalTorus1DDatelineRouting()(constellation.topology.UnidirectionalTorus1D(topo.nX))
+      val baseY = UnidirectionalTorus1DDatelineRouting()(constellation.topology.UnidirectionalTorus1D(topo.nY))
+      def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+
+        val (nxtX, nxtY)   = (nxtC.dst % topo.nX , nxtC.dst / topo.nX)
+        val (nodeX, nodeY) = (nxtC.src % topo.nX , nxtC.src / topo.nX)
+        val (dstX, dstY)   = (flow.dst % topo.nX , flow.dst / topo.nX)
+        val (srcX, srcY)   = (srcC.src % topo.nX , srcC.src / topo.nX)
+
+        val turn = nxtX != srcX && nxtY != srcY
+        if (srcC.src == -1 || turn) {
+          nxtC.vc == nxtC.n_vc - 1
+        } else if (srcX == nxtX) {
+          baseY(
+            srcC.copy(src=srcY, dst=nodeY),
+            nxtC.copy(src=nodeY, dst=nxtY),
+            flow.copy(dst=dstY)
+          )
+        } else if (srcY == nxtY) {
+          baseX(
+            srcC.copy(src=srcX, dst=nodeX),
+            nxtC.copy(src=nodeX, dst=nxtX),
+            flow.copy(dst=dstX)
+          )
+        } else {
+          false
+        }
+      }
+    }
+  }
+}
+
+object BidirectionalTorus2DDatelineRouting {
+  def apply() = (topo: PhysicalTopology) => topo match {
+    case topo: Mesh2DLikePhysicalTopology => new RoutingRelation(topo) {
+      val baseX = UnidirectionalTorus1DDatelineRouting()(constellation.topology.UnidirectionalTorus1D(topo.nX))
+      val baseY = UnidirectionalTorus1DDatelineRouting()(constellation.topology.UnidirectionalTorus1D(topo.nY))
+      def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+        val (nxtX, nxtY)   = (nxtC.dst % topo.nX , nxtC.dst / topo.nX)
+        val (nodeX, nodeY) = (nxtC.src % topo.nX , nxtC.src / topo.nX)
+        val (dstX, dstY)   = (flow.dst % topo.nX , flow.dst / topo.nX)
+        val (srcX, srcY)   = (srcC.src % topo.nX , srcC.src / topo.nX)
+
+        if (srcC.src == -1) {
+          nxtC.vc == nxtC.n_vc - 1
+        } else if (nodeX == nxtX) {
+          baseY(
+            srcC.copy(src=srcY, dst=nodeY),
+            nxtC.copy(src=nodeY, dst=nxtY),
+            flow.copy(dst=dstY)
+          )
+        } else if (nodeY == nxtY) {
+          baseX(
+            srcC.copy(src=srcX, dst=nodeX),
+            nxtC.copy(src=nodeX, dst=nxtX),
+            flow.copy(dst=dstX)
+          )
+        } else {
+          false
+        }
+      }
+    }
+  }
+}
+
+object DimensionOrderedUnidirectionalTorus2DDatelineRouting {
+  def apply() = (topo: PhysicalTopology) => topo match {
+    case topo: Mesh2DLikePhysicalTopology => new RoutingRelation(topo) {
+      val base = UnidirectionalTorus2DDatelineRouting()(topo)
+      def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+        val (nxtX, nxtY)   = (nxtC.dst % topo.nX , nxtC.dst / topo.nX)
+        val (nodeX, nodeY) = (nxtC.src % topo.nX , nxtC.src / topo.nX)
+        val (dstX, dstY)   = (flow.dst % topo.nX , flow.dst / topo.nX)
+        val (srcX, srcY)   = (srcC.src % topo.nX , srcC.src / topo.nX)
+
+        def sel = if (dstX != nodeX) {
+          nxtY == nodeY
+        } else {
+          nxtX == nodeX
+        }
+        base(srcC, nxtC, flow) && sel
+      }
+    }
+  }
+}
+
+object DimensionOrderedBidirectionalTorus2DDatelineRouting {
+  def apply() = (topo: PhysicalTopology) => topo match {
+    case topo: Mesh2DLikePhysicalTopology => new RoutingRelation(topo) {
+      val baseX = BidirectionalTorus1DShortestRouting()(constellation.topology.BidirectionalTorus1D(topo.nX))
+      val baseY = BidirectionalTorus1DShortestRouting()(constellation.topology.BidirectionalTorus1D(topo.nY))
+      val base = BidirectionalTorus2DDatelineRouting()(topo)
+      def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+
+        val (nxtX, nxtY)   = (nxtC.dst % topo.nX , nxtC.dst / topo.nX)
+        val (nodeX, nodeY) = (nxtC.src % topo.nX , nxtC.src / topo.nX)
+        val (dstX, dstY)   = (flow.dst % topo.nX , flow.dst / topo.nX)
+        val (srcX, srcY)   = (srcC.src % topo.nX , srcC.src / topo.nX)
+
+        val xdir = baseX(
+          srcC.copy(src=(if (srcC.src == -1) -1 else srcX), dst=nodeX),
+          nxtC.copy(src=nodeX, dst=nxtX),
+          flow.copy(dst=dstX)
+        )
+        val ydir = baseY(
+          srcC.copy(src=(if (srcC.src == -1) -1 else srcY), dst=nodeY),
+          nxtC.copy(src=nodeY, dst=nxtY),
+          flow.copy(dst=dstY)
+        )
+
+        val sel = if (dstX != nodeX) xdir else ydir
+
+        sel && base(srcC, nxtC, flow)
+      }
+    }
+  }
+}
+
+
+object TerminalPlaneRouting {
+  def apply(baseRouting: PhysicalTopology => RoutingRelation) = (topo: PhysicalTopology) => topo match {
+    case topo: constellation.topology.TerminalPlane => new RoutingRelation(topo) {
+      val base = baseRouting(topo.base)
+      def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+        if (srcC.isIngress && nxtC.dst < topo.base.nNodes) {
+          true
+        } else if (nxtC.dst == flow.dst) {
+          true
+        } else if (nxtC.src < topo.base.nNodes && nxtC.dst < topo.base.nNodes && nxtC.src != flow.dst - 2 * topo.base.nNodes) {
+          if (srcC.src >= topo.base.nNodes) {
+            base(srcC.copy(src=(-1), vc=0, n_vc=1),
+              nxtC,
+              flow.copy(dst=flow.dst-2*topo.base.nNodes))
+          } else {
+            base(srcC,
+              nxtC,
+              flow.copy(dst=flow.dst-2*topo.base.nNodes))
+          }
+        } else {
+          false
+        }
+      }
+      override def isEscape(c: ChannelRoutingInfo, v: Int) = {
+        c.src >= topo.base.nNodes || c.dst >= topo.base.nNodes || base.isEscape(c, v)
+      }
+    }
   }
 }
 
@@ -440,69 +494,78 @@ class TerminalPlaneRouting(f: RoutingRelation, nNodes: Int) extends RoutingRelat
   * virtual channels to each subnetwork; all physical resources are shared between virtual subnetworks
   * but virtual channels and buffers are not shared.
   */
-class NonblockingVirtualSubnetworksRouting(f: RoutingRelation, n: Int) extends RoutingRelation {
-  def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-    if (srcC.isIngress) {
-      (nxtC.vc % n == flow.vNetId) && f(
-        srcC,
-        nxtC.copy(vc=nxtC.vc / n, n_vc=nxtC.n_vc / n),
-        flow.copy(vNetId=0)
-      )
-    } else {
-      // only allow a virtual subnet to use virtual channel is channelID % numnetworks = virtual network ID
-      (nxtC.vc % n == flow.vNetId) && f(
-        srcC.copy(vc=srcC.vc / n, n_vc=srcC.n_vc / n),
-        nxtC.copy(vc=nxtC.vc / n, n_vc=nxtC.n_vc / n),
-        flow.copy(vNetId=0)
-      )
+object NonblockingVirtualSubnetworksRouting {
+  def apply(f: PhysicalTopology => RoutingRelation, n: Int) = (topo: PhysicalTopology) => new RoutingRelation(topo) {
+    val base = f(topo)
+    def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+      if (srcC.isIngress) {
+        (nxtC.vc % n == flow.vNet) && base(
+          srcC,
+          nxtC.copy(vc=nxtC.vc / n, n_vc=nxtC.n_vc / n),
+          flow.copy(vNet=0)
+        )
+      } else {
+        // only allow a virtual subnet to use virtual channel is channelID % numnetworks = virtual network ID
+        (nxtC.vc % n == flow.vNet) && base(
+          srcC.copy(vc=srcC.vc / n, n_vc=srcC.n_vc / n),
+          nxtC.copy(vc=nxtC.vc / n, n_vc=nxtC.n_vc / n),
+          flow.copy(vNet=0)
+        )
+      }
     }
-  }
-  override def isEscape(c: ChannelRoutingInfo, v: Int) = {
-    f.isEscape(c.copy(vc=c.vc / n, n_vc=c.n_vc / n), 0)
+    override def isEscape(c: ChannelRoutingInfo, v: Int) = {
+      base.isEscape(c.copy(vc=c.vc / n, n_vc=c.n_vc / n), 0)
+    }
   }
 }
 
 // Virtual subnets with 1 dedicated virtual channel each, and some number of shared channels
-class SharedNonblockingVirtualSubnetworksRouting(f: RoutingRelation, n: Int, nSharedChannels: Int) extends RoutingRelation {
-  def trueVIdToVirtualVId(vId: Int) = if (vId < n) 0 else vId - n +1
-  def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-    if (nxtC.vc < n) {
-      nxtC.vc == flow.vNetId && f(
-        srcC.copy(vc=trueVIdToVirtualVId(srcC.vc), n_vc = 1 + nSharedChannels),
-        nxtC.copy(vc=0, n_vc = 1 + nSharedChannels),
-        flow.copy(vNetId=0)
-      )
-    } else {
-      f(srcC.copy(vc=trueVIdToVirtualVId(srcC.vc), n_vc = 1 + nSharedChannels),
-        nxtC.copy(vc=trueVIdToVirtualVId(nxtC.vc), n_vc = 1 + nSharedChannels),
-        flow.copy(vNetId=0)
-      )
+object SharedNonblockingVirtualSubnetworksRouting {
+  def apply(f: PhysicalTopology => RoutingRelation, n: Int, nSharedChannels: Int) = (topo: PhysicalTopology) => new RoutingRelation(topo) {
+    def trueVIdToVirtualVId(vId: Int) = if (vId < n) 0 else vId - n +1
+    val base = f(topo)
+    def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+      if (nxtC.vc < n) {
+        nxtC.vc == flow.vNet && base(
+          srcC.copy(vc=trueVIdToVirtualVId(srcC.vc), n_vc = 1 + nSharedChannels),
+          nxtC.copy(vc=0, n_vc = 1 + nSharedChannels),
+          flow.copy(vNet=0)
+        )
+      } else {
+        base(srcC.copy(vc=trueVIdToVirtualVId(srcC.vc), n_vc = 1 + nSharedChannels),
+          nxtC.copy(vc=trueVIdToVirtualVId(nxtC.vc), n_vc = 1 + nSharedChannels),
+          flow.copy(vNet=0)
+        )
+      }
     }
-  }
-  override def isEscape(c: ChannelRoutingInfo, v: Int) = {
-    f.isEscape(c.copy(vc=trueVIdToVirtualVId(c.vc), n_vc = 1 + nSharedChannels), 0)
+    override def isEscape(c: ChannelRoutingInfo, v: Int) = {
+      base.isEscape(c.copy(vc=trueVIdToVirtualVId(c.vc), n_vc = 1 + nSharedChannels), 0)
+    }
   }
 }
 
-class BlockingVirtualSubnetworksRouting(f: RoutingRelation, n: Int, nDedicated: Int = 1) extends RoutingRelation {
-  def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-    val lNxtV = nxtC.vc - flow.vNetId * nDedicated
-    val lSrcV = srcC.vc - flow.vNetId * nDedicated
-    if (srcC.isIngress && lNxtV >= 0) {
-      f(srcC,
-        nxtC.copy(n_vc = nxtC.n_vc - flow.vNetId * nDedicated, vc = lNxtV),
-        flow.copy(vNetId=0)
-      )
-    } else if (lNxtV < 0 || lSrcV < 0) {
-      false
-    } else {
-      f(srcC.copy(n_vc = srcC.n_vc - flow.vNetId * nDedicated, vc = lSrcV),
-        nxtC.copy(n_vc = nxtC.n_vc - flow.vNetId * nDedicated, vc = lNxtV),
-        flow.copy(vNetId=0)
-      )
+object BlockingVirtualSubnetworksRouting {
+  def apply(f: PhysicalTopology => RoutingRelation, n: Int, nDedicated: Int = 1) = (topo: PhysicalTopology) => new RoutingRelation(topo) {
+    val base = f(topo)
+    def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+      val lNxtV = nxtC.vc - flow.vNet * nDedicated
+      val lSrcV = srcC.vc - flow.vNet * nDedicated
+      if (srcC.isIngress && lNxtV >= 0) {
+        base(srcC,
+          nxtC.copy(n_vc = nxtC.n_vc - flow.vNet * nDedicated, vc = lNxtV),
+          flow.copy(vNet=0)
+        )
+      } else if (lNxtV < 0 || lSrcV < 0) {
+        false
+      } else {
+        base(srcC.copy(n_vc = srcC.n_vc - flow.vNet * nDedicated, vc = lSrcV),
+          nxtC.copy(n_vc = nxtC.n_vc - flow.vNet * nDedicated, vc = lNxtV),
+          flow.copy(vNet=0)
+        )
+      }
     }
-  }
-  override def isEscape(c: ChannelRoutingInfo, v: Int) = {
-    c.vc >= v && f.isEscape(c.copy(vc=c.vc - v * nDedicated, n_vc=c.n_vc - v * nDedicated), 0)
+    override def isEscape(c: ChannelRoutingInfo, v: Int) = {
+      c.vc >= v && base.isEscape(c.copy(vc=c.vc - v * nDedicated, n_vc=c.n_vc - v * nDedicated), 0)
+    }
   }
 }

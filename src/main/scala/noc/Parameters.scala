@@ -20,7 +20,7 @@ case class NoCParams(
   ingresses: Seq[UserIngressParams] = Nil,
   egresses: Seq[UserEgressParams] = Nil,
   flows: Seq[FlowParams] = Nil,
-  routingRelation: RoutingRelation = new AllLegalRouting,
+  routingRelation: PhysicalTopology => RoutingRelation = AllLegalRouting(),
   routerParams: Int => UserRouterParams = (i: Int) => UserRouterParams(),
   // (blocker, blockee) => bool
   // If true, then blocker must be able to proceed when blockee is blocked
@@ -36,6 +36,7 @@ case object InternalNoCKey extends Field[InternalNoCParams]
 
 case class InternalNoCParams(
   userParams: NoCParams,
+  routingRelation: RoutingRelation,
   channelParams: Seq[ChannelParams],
   ingressParams: Seq[IngressChannelParams],
   egressParams: Seq[EgressChannelParams],
@@ -58,10 +59,9 @@ trait HasNoCParams {
   val egressIdBits = log2Up(nEgresses)
   val ingressIdBits = log2Up(nIngresses)
   val egressSrcIds = nocParams.egressParams.map(_.srcId)
-  val routingRelation = nocParams.userParams.routingRelation
   val maxIngressesAtNode = nocParams.routerParams.map(_.nIngress).max
   val maxEgressesAtNode = nocParams.routerParams.map(_.nEgress).max
-
+  val routingRelation = nocParams.routingRelation
 }
 
 object InternalNoCParams {
@@ -219,10 +219,12 @@ object InternalNoCParams {
       return None
     }
 
+    val routingRelation = nocParams.routingRelation(nocParams.topology)
+
     // Check connectivity, ignoring blocking properties of virtual subnets
     println(s"Constellation: $nocName Checking full connectivity")
     for (vNetId <- 0 until nVirtualNetworks) {
-      checkConnectivity(vNetId, nocParams.routingRelation)
+      checkConnectivity(vNetId, routingRelation)
     }
 
     // Connectivity for each virtual subnet
@@ -237,9 +239,9 @@ object InternalNoCParams {
         // For each subset of blockers for this virtual network, recheck connectivity assuming
         // every virtual channel accessible to each blocker is locked
         for (b <- blockeeSets) {
-          checkConnectivity(vNetId, new RoutingRelation {
+          checkConnectivity(vNetId, new RoutingRelation(nocParams.topology) {
             def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-              val base = nocParams.routingRelation(srcC, nxtC, flow)
+              val base = routingRelation(srcC, nxtC, flow)
               val blocked = b.map { v => possibleFlowMap(nxtC).map(_.vNetId == v) }.flatten.fold(false)(_||_)
               base && !blocked
             }
@@ -250,9 +252,9 @@ object InternalNoCParams {
 
     // Check for deadlock in escape channels
     println(s"Constellation: $nocName Checking for possibility of deadlock")
-    val acyclicPath = checkAcyclic(new RoutingRelation {
+    val acyclicPath = checkAcyclic(new RoutingRelation(nocParams.topology) {
       def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-        val escape = nocParams.routingRelation.isEscape(nxtC, flow.vNetId)
+        val escape = routingRelation.isEscape(nxtC, flow.vNetId)
         nocParams.routingRelation(srcC, nxtC, flow) && escape
       }
     })
@@ -287,6 +289,7 @@ object InternalNoCParams {
 
     InternalNoCParams(
       userParams = nocParams,
+      routingRelation = routingRelation,
       channelParams = finalChannelParams,
       ingressParams = ingressParams,
       egressParams = egressParams,
