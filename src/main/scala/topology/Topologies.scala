@@ -1,6 +1,8 @@
 package constellation.topology
 
 import scala.math.{pow, cos, sin, Pi}
+import scala.collection.immutable.ListMap
+
 
 /** A network where sequential nodes are connected unidirectionally */
 case class UnidirectionalLine(n: Int, skips: Seq[(Int, Int)] = Nil) extends PhysicalTopology {
@@ -153,3 +155,35 @@ case class TerminalPlane(val base: PhysicalTopology) extends PhysicalTopology {
   }
   val plotter = new TerminalPlanePlotter(base.plotter, base.nNodes)
 }
+
+// case class HierarchicalTopology(val base: PhysicalTopology, val children: ListMap[Int, PhysicalTopology])
+//     extends PhysicalTopology(base.nNodes + children.values.map(_.nNodes).sum) {
+
+//   val childrenKeys = children.keys
+//   val childrenOffsets = children.values.toSeq.map(_.nNodes).scanLeft(base.nNodes)(_+_)
+//   def getChildID(node: Int): Int = childrenOffsets.drop(1).indexWhere(_ > node)
+
+//   def topo(src: Int, dst: Int) = {
+//     def isBase(n: Int) = n < base.nNodes
+//     if (isBase(src) && isBase(dst)) {
+//       base.topo(src, dst)
+//     } else if (isBase(src) && !isBase(dst)) {
+//       val id = getChildID(dst)
+//       val k = children.keys.toSeq(id)
+//       k == src && ((dst - childrenOffsets(id)) == 0)
+//     } else if (isBase(dst) && !isBase(src)) {
+//       val id = getChildID(src)
+//       val k = children.keys.toSeq(id)
+//       k == dst && ((src - childrenOffsets(id)) == 0)
+//     } else if (!isBase(src) && !isBase(dst)) {
+//       val sid = getChildID(src)
+//       val did = getChildID(dst)
+//       (sid == did && children.values.toSeq(sid).topo(src - childrenOffsets(sid), dst - childrenOffsets(did)))
+//     } else {
+//       false
+//     }
+//   }
+
+//   // TODO fix
+//   val plotter = new LinePlotter
+// }
