@@ -2,6 +2,20 @@ package constellation.topology
 
 import scala.math.{pow, cos, sin, Pi, atan2, floor}
 
+abstract class PhysicalTopologyPlotter {
+  /* Given a node ID, returns x, y position of a node. */
+  def node(nodeId: Int): (Double, Double) = node(nodeId.toDouble)
+  /* iID: index of ingress within number of ingresses for that node
+   nI: number of ingresses into node
+   nodeID: node these ingresses connect to*/
+  def ingress(iId: Int, nI: Int, nodeId: Int): (Double, Double) = ingress(iId.toDouble, nI.toDouble, nodeId.toDouble)
+  def egress (eId: Int, nE: Int, nodeId: Int): (Double, Double) =  egress(eId.toDouble, nE.toDouble, nodeId.toDouble)
+  def node(nodeId: Double): (Double, Double)
+  def ingress(iId: Double, nI: Double, nodeId: Double): (Double, Double)
+  def egress (eId: Double, nE: Double, nodeId: Double): (Double, Double)
+}
+
+
 class LinePlotter extends PhysicalTopologyPlotter {
   def node(n: Double) = (n, 0)
   def ingress(t: Double, nT: Double, n: Double) = (n - 0.5 + (t + 1) / (nT + 1),  0.5)

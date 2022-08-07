@@ -3,6 +3,23 @@ package constellation.topology
 import scala.math.{pow, cos, sin, Pi}
 import scala.collection.immutable.ListMap
 
+trait PhysicalTopology {
+  // Number of nodes in this physical topology
+  val nNodes: Int
+
+  /** Method that describes the particular topology represented by the concrete class. Returns true
+    *  if the two nodes SRC and DST can be connected via a channel in this topology and false if they cannot.
+    *
+    *  @param src source point
+    *  @param dst destination point
+    */
+  def topo(src: Int, dst: Int): Boolean
+
+  /** Plotter from TopologyPlotters.scala. Helps construct diagram of a concrete topology. */
+  val plotter: PhysicalTopologyPlotter
+  //var router: Option[RoutingRelation] = None
+}
+
 
 /** A network where sequential nodes are connected unidirectionally */
 case class UnidirectionalLine(n: Int, skips: Seq[(Int, Int)] = Nil) extends PhysicalTopology {
