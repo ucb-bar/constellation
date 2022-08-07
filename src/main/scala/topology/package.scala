@@ -2,6 +2,8 @@ package constellation
 
 package object topology {
 
+  import constellation.routing.RoutingRelation
+
   abstract class PhysicalTopologyPlotter {
     /* Given a node ID, returns x, y position of a node. */
     def node(nodeId: Int): (Double, Double) = node(nodeId.toDouble)
@@ -15,11 +17,10 @@ package object topology {
     def egress (eId: Double, nE: Double, nodeId: Double): (Double, Double)
   }
 
-  /** Abstract class for the network topology. See Topologies.scala for concrete network topologies.
-   *
-   *  @param nNodes number of nodes in the network.
-   */
-  abstract class PhysicalTopology(val nNodes: Int) {
+  trait PhysicalTopology {
+    // Number of nodes in this physical topology
+    val nNodes: Int
+
     /** Method that describes the particular topology represented by the concrete class. Returns true
      *  if the two nodes SRC and DST can be connected via a channel in this topology and false if they cannot.
      *
