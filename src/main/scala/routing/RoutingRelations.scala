@@ -120,7 +120,7 @@ object UnidirectionalTorus1DDatelineRouting {
   def apply() = (topo: PhysicalTopology) => new RoutingRelation(topo) {
     def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
       if (srcC.src == -1)  {
-        nxtC.vc != 0
+        nxtC.vc == nxtC.n_vc - 1
       } else if (srcC.vc == 0) {
         nxtC.vc == 0
       } else if (nxtC.src == topo.nNodes - 1) {
