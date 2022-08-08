@@ -41,8 +41,12 @@ case class FlowRoutingInfo(
   }
 }
 
-class FlowRoutingBundle(implicit val p: Parameters) extends Bundle with HasNoCParams{
+class FlowRoutingBundle(implicit val p: Parameters) extends Bundle with HasNoCParams {
   val ingress_id = UInt(ingressIdBits.W)
   val egress_id = UInt(egressIdBits.W)
+  // egress_dst_id is the physical node of the egress
+  // it can be computed from egress_id, but to improve design of route decoders
+  // it is also computed at ingress and sent along with the packet
+  val egress_dst_id = UInt(log2Ceil(nNodes).W)
 }
 

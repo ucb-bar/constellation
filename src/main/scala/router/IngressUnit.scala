@@ -31,6 +31,11 @@ class IngressUnit(
   route_buffer.io.enq.bits.tail := io.in.bits.tail
   route_buffer.io.enq.bits.flow.ingress_id := cParam.ingressId.U
   route_buffer.io.enq.bits.flow.egress_id := io.in.bits.egress_id
+  val flows = cParam.possibleFlows.toSeq
+  route_buffer.io.enq.bits.flow.egress_dst_id := Mux1H(
+    flows.map(_.egressId.U === io.in.bits.egress_id),
+    flows.map(_.dst.U)
+  )
   route_buffer.io.enq.bits.payload := io.in.bits.payload
   route_buffer.io.enq.bits.virt_channel_id := DontCare
   io.router_req.bits.src_virt_id := 0.U
