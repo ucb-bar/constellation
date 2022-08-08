@@ -212,5 +212,7 @@ class NoC(implicit p: Parameters) extends LazyModule {
       (outs ++ egresses ++ ingresses).mkString("\n")
     }.mkString("\n")
     ElaborationArtefacts.add(prepend("noc.edgeprops"), edgeProps)
+
+    println("Constellation: $nocName Finished NoC RTL generation")
   }
 }

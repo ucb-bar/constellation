@@ -17,7 +17,6 @@ trait PhysicalTopology {
 
   /** Plotter from TopologyPlotters.scala. Helps construct diagram of a concrete topology. */
   val plotter: PhysicalTopologyPlotter
-  //var router: Option[RoutingRelation] = None
 }
 
 
@@ -173,34 +172,34 @@ case class TerminalPlane(val base: PhysicalTopology) extends PhysicalTopology {
   val plotter = new TerminalPlanePlotter(base.plotter, base.nNodes)
 }
 
-// case class HierarchicalTopology(val base: PhysicalTopology, val children: ListMap[Int, PhysicalTopology])
-//     extends PhysicalTopology(base.nNodes + children.values.map(_.nNodes).sum) {
+// Hierarchical topologies add bidirection connections between a src in the base and a dst in the child
+case class HierarchicalSubTopology(src: Int, dst: Int, topo: PhysicalTopology)
+case class HierarchicalTopology(val base: PhysicalTopology, val children: Seq[HierarchicalSubTopology])
+    extends PhysicalTopology {
+  val nNodes = base.nNodes + children.map(_.topo.nNodes).sum
+  val offsets = children.map(_.topo.nNodes).scanLeft(base.nNodes)(_+_)
+  def childId(node: Int): Int = offsets.drop(1).indexWhere(_ > node)
+  def toChildNode(node: Int): Int = node - offsets(childId(node))
+  def isBase(n: Int) = n < base.nNodes
+  def topo(src: Int, dst: Int) = {
+    (isBase(src), isBase(dst)) match {
+      case (true , true ) => base.topo(src, dst)
+      case (true , false) => {
+        val sub = children(childId(dst))
+        sub.src == src && sub.dst == toChildNode(dst)
+      }
+      case (false, true ) => {
+        val sub = children(childId(src))
+        sub.src == dst && sub.dst == toChildNode(src)
+      }
+      case (false, false) => {
+        val sid = childId(src)
+        val did = childId(dst)
+        sid == did && children(sid).topo.topo(toChildNode(src), toChildNode(dst))
+      }
+    }
+  }
+  // TODO fix
+  val plotter = new LinePlotter
+}
 
-//   val childrenKeys = children.keys
-//   val childrenOffsets = children.values.toSeq.map(_.nNodes).scanLeft(base.nNodes)(_+_)
-//   def getChildID(node: Int): Int = childrenOffsets.drop(1).indexWhere(_ > node)
-
-//   def topo(src: Int, dst: Int) = {
-//     def isBase(n: Int) = n < base.nNodes
-//     if (isBase(src) && isBase(dst)) {
-//       base.topo(src, dst)
-//     } else if (isBase(src) && !isBase(dst)) {
-//       val id = getChildID(dst)
-//       val k = children.keys.toSeq(id)
-//       k == src && ((dst - childrenOffsets(id)) == 0)
-//     } else if (isBase(dst) && !isBase(src)) {
-//       val id = getChildID(src)
-//       val k = children.keys.toSeq(id)
-//       k == dst && ((src - childrenOffsets(id)) == 0)
-//     } else if (!isBase(src) && !isBase(dst)) {
-//       val sid = getChildID(src)
-//       val did = getChildID(dst)
-//       (sid == did && children.values.toSeq(sid).topo(src - childrenOffsets(sid), dst - childrenOffsets(did)))
-//     } else {
-//       false
-//     }
-//   }
-
-//   // TODO fix
-//   val plotter = new LinePlotter
-// }
