@@ -112,7 +112,7 @@ object InternalNoCParams {
       )
     }
     val ingressParams = nocParams.ingresses.zipWithIndex.map { case (u,i) => {
-      require(u.destId < nNodes)
+      require(u.destId < nNodes, s"Ingress $i: ${u.destId} >= $nNodes")
       IngressChannelParams(
         user = u,
         ingressId = i,
@@ -120,7 +120,7 @@ object InternalNoCParams {
       )
     }}
     val egressParams = nocParams.egresses.zipWithIndex.map { case (u,e) => {
-      require(u.srcId < nNodes)
+      require(u.srcId < nNodes, s"Egress $e: ${u.srcId} >= $nNodes")
       EgressChannelParams(
         user = u,
         egressId = e,
@@ -152,7 +152,6 @@ object InternalNoCParams {
         //println(s"Constellation: $nocName Checking connectivity from ingress $iIdx")
         iP.possibleFlows.map { flow =>
           val flowPossibleFlows = scala.collection.mutable.Set[ChannelRoutingInfo]()
-
           var unexplored: Seq[ChannelRoutingInfo] = iP.channelRoutingInfos
           while (unexplored.size != 0) {
             var stack: Seq[ChannelRoutingInfo] = Seq(unexplored.head)

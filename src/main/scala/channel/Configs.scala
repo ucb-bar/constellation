@@ -2,7 +2,7 @@ package constellation.channel
 
 import freechips.rocketchip.config.{Field, Parameters, Config}
 import constellation.noc.{NoCKey}
-import constellation.topology.{BidirectionalTree, TerminalPlane}
+import constellation.topology.{BidirectionalTree, TerminalPlane, HierarchicalTopology}
 
 import scala.math.{floor, log10, pow, max}
 
@@ -11,6 +11,13 @@ abstract class WithUniformChannels(f: UserChannelParams => UserChannelParams) ex
     f(up(NoCKey, site).channelParamGen(src, dst))
   })
 })
+
+class WithChannels(f: (Int, Int, UserChannelParams) => UserChannelParams) extends Config((site, here, up) => {
+  case NoCKey => up(NoCKey, site).copy(channelParamGen = (src: Int, dst: Int) => {
+    f(src, dst, up(NoCKey, site).channelParamGen(src, dst))
+  })
+})
+
 
 class WithUniformVirtualChannels(f: Seq[UserVirtualChannelParams] => Seq[UserVirtualChannelParams]) extends WithUniformChannels(p => {
   p.copy(virtualChannelParams = f(p.virtualChannelParams))
@@ -76,12 +83,11 @@ class WithFullyConnectedIngresses extends Config((site, here, up) => {
 })
 
 class WithIngresses(ingresses: Seq[Int]) extends Config((site, here, up) => {
-  case NoCKey => up(NoCKey, site).copy(ingresses = up(NoCKey, site).ingresses ++
-      ingresses.map(i => UserIngressParams(i)))
+  case NoCKey => up(NoCKey, site).copy(ingresses = ingresses.map(i => UserIngressParams(i)))
 })
 
 class WithEgresses(egresses: Seq[Int]) extends Config((site, here, up) => {
-  case NoCKey => up(NoCKey, site).copy(egresses = up(NoCKey, site).egresses ++ egresses.map(i => UserEgressParams(i)))
+  case NoCKey => up(NoCKey, site).copy(egresses = egresses.map(i => UserEgressParams(i)))
 })
 
 
@@ -98,14 +104,30 @@ class WithFatTreeChannels(mult: Int) extends Config((site, here, up) => {
   })
 })
 
-class WithTerminalPlaneIngressEgress extends Config((site, here, up) => {
+class WithTerminalPlaneIngressEgress(ingresses: Seq[Int], egresses: Seq[Int]) extends Config((site, here, up) => {
   case NoCKey => {
     val topo = up(NoCKey).topology.asInstanceOf[TerminalPlane]
     require(up(NoCKey).ingresses.map(_.destId).max < topo.base.nNodes)
     require(up(NoCKey).egresses .map(_.srcId ).max < topo.base.nNodes)
     up(NoCKey).copy(
-      ingresses = up(NoCKey).ingresses.map(i => i.copy(destId = i.destId + topo.base.nNodes)),
-      egresses  = up(NoCKey). egresses.map(i => i.copy( srcId =  i.srcId + topo.base.nNodes * 2))
+      ingresses = ingresses.map(i => UserIngressParams(destId = i + topo.base.nNodes)),
+      egresses  =  egresses.map(i =>  UserEgressParams( srcId = i + topo.base.nNodes * 2))
+    )
+  }
+})
+
+class WithHierarchicalIngressEgress(ingresses: Seq[(Option[Int], Int)], egresses: Seq[(Option[Int], Int)]) extends Config((site, here, up) => {
+  case NoCKey => {
+    val topo = up(NoCKey).topology.asInstanceOf[HierarchicalTopology]
+    up(NoCKey).copy(
+      ingresses = ingresses.map {
+        case (Some(childId), i) => UserIngressParams(i + topo.offsets(childId))
+        case (None         , i) => UserIngressParams(i)
+      },
+      egresses = egresses.map {
+        case (Some(childId), i) => UserEgressParams(i + topo.offsets(childId))
+        case (None         , i) => UserEgressParams(i)
+      }
     )
   }
 })

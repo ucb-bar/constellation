@@ -4,7 +4,7 @@ import scala.math.{min, max, pow}
 import scala.collection.mutable.HashMap
 import freechips.rocketchip.config.{Parameters}
 import scala.collection.immutable.ListMap
-import constellation.topology.{PhysicalTopology, Mesh2DLikePhysicalTopology}
+import constellation.topology.{PhysicalTopology, Mesh2DLikePhysicalTopology, HierarchicalTopology}
 
 /** Routing and channel allocation policy
  *
@@ -569,3 +569,74 @@ object BlockingVirtualSubnetworksRouting {
     }
   }
 }
+
+
+object HierarchicalRoutingRelation {
+  def apply(
+    baseRouting: PhysicalTopology => RoutingRelation,
+    childRouting: Seq[PhysicalTopology => RoutingRelation]
+  ) = (topo: PhysicalTopology) => topo match {
+    case topo: HierarchicalTopology => new RoutingRelation(topo) {
+      val base = baseRouting(topo)
+      val children = (childRouting zip topo.children).map { case (l,r) => l(r.topo) }
+      def copyChannel(c: ChannelRoutingInfo, o: Int) = {
+        val nSrc = if (c.src < topo.base.nNodes) -1 else c.src - o
+        val nDst = if (c.dst == -1) -1 else c.dst - o
+        assert(nSrc >= -1 && nDst >= -1)
+        c.copy(src=nSrc, dst=nDst)
+      }
+
+      def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+        val thisBase = topo.isBase(srcC.dst)
+        val flowBase = topo.isBase(flow.dst)
+        val nextBase = topo.isBase(nxtC.dst)
+        (thisBase, flowBase, nextBase) match {
+          case (true , true , true ) => base(srcC, nxtC, flow)
+          case (true , true , false) => false
+          case (true , false, true ) => base(srcC, nxtC, flow.copy(dst=topo.children(topo.childId(flow.dst)).src))
+          case (true , false, false) => topo.childId(nxtC.dst) == topo.childId(flow.dst)
+          case (false, true , true ) => true
+          case (false, true , false) => {
+            val id = topo.childId(srcC.dst)
+            children(id)(
+              srcC=copyChannel(srcC, topo.offsets(id)),
+              nxtC=copyChannel(nxtC, topo.offsets(id)),
+              flow=flow.copy(dst=topo.children(id).dst)
+            )
+          }
+          case (false, false, true ) => topo.childId(srcC.dst) != topo.childId(flow.dst)
+          case (false, false, false) => {
+            val fid = topo.childId(flow.dst)
+            val sid = topo.childId(srcC.dst)
+            val fdst = if (fid == sid) {
+              flow.dst - topo.offsets(sid)
+            } else {
+              topo.children(sid).dst
+            }
+            val at_exit = (fid != sid &&
+              (srcC.dst - topo.offsets(sid) == topo.children(sid).dst))
+            children(fid)(
+              srcC=copyChannel(srcC, topo.offsets(sid)),
+              nxtC=copyChannel(nxtC, topo.offsets(sid)),
+              flow=flow.copy(dst=fdst)
+            ) && !at_exit
+          }
+        }
+      }
+      override def isEscape(c: ChannelRoutingInfo, v: Int) = {
+        val srcBase = topo.isBase(c.src)
+        val dstBase = topo.isBase(c.dst)
+          (srcBase, dstBase) match {
+          case (true, true) => base.isEscape(c, v)
+          case (true, false) => true
+          case (false, true) => true
+          case (false, false) => {
+            val sid = topo.childId(c.dst)
+            children(sid).isEscape(copyChannel(c, topo.offsets(sid)), v)
+          }
+        }
+      }
+    }
+  }
+}
+
