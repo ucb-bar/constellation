@@ -107,8 +107,8 @@ class WithFatTreeChannels(mult: Int) extends Config((site, here, up) => {
 class WithTerminalPlaneIngressEgress(ingresses: Seq[Int], egresses: Seq[Int]) extends Config((site, here, up) => {
   case NoCKey => {
     val topo = up(NoCKey).topology.asInstanceOf[TerminalPlane]
-    require(up(NoCKey).ingresses.map(_.destId).max < topo.base.nNodes)
-    require(up(NoCKey).egresses .map(_.srcId ).max < topo.base.nNodes)
+    require(ingresses.max < topo.base.nNodes)
+    require(egresses .max < topo.base.nNodes)
     up(NoCKey).copy(
       ingresses = ingresses.map(i => UserIngressParams(destId = i + topo.base.nNodes)),
       egresses  =  egresses.map(i =>  UserEgressParams( srcId = i + topo.base.nNodes * 2))
