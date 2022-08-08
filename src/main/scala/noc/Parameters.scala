@@ -254,7 +254,7 @@ object InternalNoCParams {
     val acyclicPath = checkAcyclic(new RoutingRelation(nocParams.topology) {
       def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
         val escape = routingRelation.isEscape(nxtC, flow.vNetId)
-        nocParams.routingRelation(srcC, nxtC, flow) && escape
+        routingRelation(srcC, nxtC, flow) && escape
       }
     })
     require(acyclicPath.isEmpty, s"Cyclic path may cause deadlock: ${acyclicPath.get}")
