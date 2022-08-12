@@ -24,7 +24,16 @@ class EgressUnit(coupleSAVA: Boolean, inParams: Seq[ChannelParams], ingressParam
   q.io.enq.valid := io.in(0).valid
   q.io.enq.bits.head := io.in(0).bits.head
   q.io.enq.bits.tail := io.in(0).bits.tail
-  q.io.enq.bits.ingress_id := io.in(0).bits.flow.ingress_id
+  val flows = cParam.possibleFlows.toSeq
+  if (flows.size == 0) {
+    q.io.enq.bits.ingress_id := DontCare
+  } else {
+    q.io.enq.bits.ingress_id := Mux1H(
+      flows.map(f => (f.ingressNode.U === io.in(0).bits.flow.ingress_node &&
+        f.ingressNodeId.U === io.in(0).bits.flow.ingress_node_id)),
+      flows.map(f => f.ingressId.U)
+    )
+  }
   q.io.enq.bits.payload := io.in(0).bits.payload
   io.out <> q.io.deq
   assert(!(q.io.enq.valid && !q.io.enq.ready))
