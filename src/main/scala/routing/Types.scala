@@ -34,19 +34,27 @@ case class ChannelRoutingInfo(
   * @param dst packet's destination node ID
   */
 case class FlowRoutingInfo(
-  ingressId: Int, egressId: Int, vNet: Int, dst: Int
+  ingressId: Int, egressId: Int,
+  vNetId: Int,
+  ingressNode: Int,
+  ingressNodeId: Int,
+  egressNode: Int,
+  egressNodeId: Int
 ) {
-  def isFlow(f: FlowRoutingBundle) = {
-    f.ingress_id === ingressId.U && f.egress_id === egressId.U
+  def isFlow(f: FlowRoutingBundle): Bool = {
+    (f.ingress_node === ingressNode.U &&
+      f.egress_node === egressNode.U &&
+      f.ingress_node_id === ingressNodeId.U &&
+      f.egress_node_id === egressNodeId.U)
   }
 }
 
 class FlowRoutingBundle(implicit val p: Parameters) extends Bundle with HasNoCParams {
-  val ingress_id = UInt(ingressIdBits.W)
-  val egress_id = UInt(egressIdBits.W)
-  // egress_dst_id is the physical node of the egress
-  // it can be computed from egress_id, but to improve design of route decoders
-  // it is also computed at ingress and sent along with the packet
-  val egress_dst_id = UInt(log2Ceil(nNodes).W)
+  // Instead of tracking ingress/egress ID, track the physical destination id and the offset at the destination
+  // This simplifies the routing tables
+  val ingress_node = UInt(log2Ceil(nNodes).W)
+  val ingress_node_id = UInt(log2Ceil(maxIngressesAtNode).W)
+  val egress_node = UInt(log2Ceil(nNodes).W)
+  val egress_node_id = UInt(log2Ceil(maxEgressesAtNode).W)
 }
 

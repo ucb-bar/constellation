@@ -9,7 +9,7 @@ import freechips.rocketchip.util._
 import freechips.rocketchip.rocket.DecodeLogic
 
 import constellation.channel._
-import constellation.routing.{FlowRoutingBundle}
+import constellation.routing.{FlowRoutingBundle, FlowRoutingInfo}
 import constellation.noc.{HasNoCParams}
 
 class RouteComputerReq(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle
@@ -54,11 +54,12 @@ class RouteComputer(
       resp.bits.vc_sel := DontCare
     } else {
 
-      def tupleFlatten(t: (Int, Int, Int, Int)): UInt = {
-        val l2 = (BigInt(t._1) << ingressIdBits) | t._2
-        val l3 = (l2 << egressIdBits) | t._3
-        val width = req.bits.src_virt_id.getWidth + ingressIdBits + egressIdBits + log2Ceil(nNodes)
-        ((l3 << log2Ceil(nNodes)) | t._4).U(width.W)
+      def toUInt(t: (Int, FlowRoutingInfo)): UInt = {
+        val l2 = (BigInt(t._1) << req.bits.flow.ingress_node   .getWidth) | t._2.ingressNode
+        val l3 = (          l2 << req.bits.flow.ingress_node_id.getWidth) | t._2.ingressNodeId
+        val l4 = (          l3 << req.bits.flow.egress_node    .getWidth) | t._2.egressNode
+        val l5 = (          l4 << req.bits.flow.egress_node_id .getWidth) | t._2.egressNodeId
+        l5.U(req.bits.getWidth.W)
       }
 
       val flow = req.bits.flow
@@ -71,18 +72,14 @@ class RouteComputer(
               row = row + (if (routingRelation(cI, outParams(o).channelRoutingInfos(outVId), pI)) "1" else "0")
             }
           }
-          ((cI.vc, pI.ingressId, pI.egressId, pI.dst), row)
+          ((cI.vc, pI), row)
         }
       }.flatten
-      val addr = Cat(
-        req.bits.src_virt_id,
-        flow.ingress_id,
-        flow.egress_id,
-        flow.egress_dst_id)
+      val addr = req.bits.asUInt
       val width = outParams.map(_.nVirtualChannels).reduce(_+_)
       val decoded = if (table.size > 0) {
         val truthTable = TruthTable(
-          table.map { e => (BitPat(tupleFlatten(e._1)), BitPat(e._2)) },
+          table.map { e => (BitPat(toUInt(e._1)), BitPat(e._2)) },
           BitPat("b" + "?" * width)
         )
         Reverse(decoder(addr, truthTable))
