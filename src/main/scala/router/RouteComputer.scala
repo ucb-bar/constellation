@@ -2,7 +2,6 @@ package constellation.router
 
 import chisel3._
 import chisel3.util._
-import chisel3.util.experimental.decode.{TruthTable, decoder}
 
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.util._
@@ -64,17 +63,19 @@ class RouteComputer(
                   outParams(o).channelRoutingInfos(outVId),
                   pI
                 )
-                ((cI.vc, pI.ingressId, pI.egressId, pI.dst), v)
+                ((cI.vc, pI.ingressId, pI.egressId), v)
               }
             }.flatten
             val trues = table.filter(_._2).map(_._1)
             val falses = table.filter(!_._2).map(_._1)
+            val addr = (
+              req.bits.src_virt_id,
+              flow.ingress_id,
+              flow.egress_id
+            )
 
-            val vcWidth = req.bits.src_virt_id.getWidth
-            def tupleFlatten(t: (Int, Int, Int, Int)): UInt = {
-              val l2 = (BigInt(t._1) << ingressIdBits) | t._2
-              val l3 = (l2 << egressIdBits) | t._3
-              ((l3 << log2Ceil(nNodes)) | t._4).U
+            def eq(a: (Int, Int, Int), b: (UInt, UInt, UInt)): Bool = {
+              a._1.U === b._1 && a._2.U === b._2 && a._3.U === b._3
             }
 
             resp.bits.vc_sel(o)(outVId) := (if (falses.size == 0) {
@@ -82,17 +83,19 @@ class RouteComputer(
             } else if (trues.size == 0) {
               false.B
             } else {
-              val truthTable = TruthTable(
-                (trues.map  { t => (BitPat(tupleFlatten(t)), BitPat(true.B)) } ++
-                 falses.map { t => (BitPat(tupleFlatten(t)), BitPat(false.B)) }),
-                BitPat("b?")
-              )
-              val addr = Cat(
-                req.bits.src_virt_id,
-                flow.ingress_id,
-                flow.egress_id,
-                flow.egress_dst_id)
-              decoder(addr, truthTable)
+              // The Quine-McCluskey impl in rocketchip memory leaks sometimes here...
+              //if (trues.size + falses.size >= 100) {
+              if (trues.size > falses.size) {
+                falses.map(t => !eq(t, addr)).andR
+              } else {
+                trues.map(t => eq(t, addr)).orR
+              }
+              // } else {
+              //   println(s"DecodeLogic ${trues.size} ${falses.size}")
+              //   val r = DecodeLogic(addr, trues, falses)
+              //   println("Done DecodeLogic")
+              //   r
+              // }
             })
           }
         } else {
