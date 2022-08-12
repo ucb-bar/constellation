@@ -52,7 +52,6 @@ case class FlowRoutingInfo(
 class FlowRoutingBundle(implicit val p: Parameters) extends Bundle with HasNoCParams {
   // Instead of tracking ingress/egress ID, track the physical destination id and the offset at the destination
   // This simplifies the routing tables
-  val vnet_id = UInt(log2Ceil(nVirtualNetworks).W)
   val ingress_node = UInt(log2Ceil(nNodes).W)
   val ingress_node_id = UInt(log2Ceil(maxIngressesAtNode).W)
   val egress_node = UInt(log2Ceil(nNodes).W)

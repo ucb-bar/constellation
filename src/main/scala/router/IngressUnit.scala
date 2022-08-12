@@ -36,7 +36,7 @@ class IngressUnit(
   } else {
     route_buffer.io.enq.bits.flow.ingress_node    := cParam.destId.U
     route_buffer.io.enq.bits.flow.ingress_node_id := ingressNodeId.U
-    route_buffer.io.enq.bits.flow.vnet_id         := cParam.vNetId.U
+
     route_buffer.io.enq.bits.flow.egress_node    := Mux1H(
       flows.map(_.egressId.U === io.in.bits.egress_id),
       flows.map(_.egressNode.U)

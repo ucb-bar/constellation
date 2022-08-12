@@ -55,12 +55,11 @@ class RouteComputer(
     } else {
 
       def toUInt(t: (Int, FlowRoutingInfo)): UInt = {
-        val l2 = (BigInt(t._1) << req.bits.flow.vnet_id        .getWidth) | t._2.vNetId
-        val l3 = (          l2 << req.bits.flow.ingress_node   .getWidth) | t._2.ingressNode
-        val l4 = (          l3 << req.bits.flow.ingress_node_id.getWidth) | t._2.ingressNodeId
-        val l5 = (          l4 << req.bits.flow.egress_node    .getWidth) | t._2.egressNode
-        val l6 = (          l5 << req.bits.flow.egress_node_id .getWidth) | t._2.egressNodeId
-        l6.U(req.bits.getWidth.W)
+        val l2 = (BigInt(t._1) << req.bits.flow.ingress_node   .getWidth) | t._2.ingressNode
+        val l3 = (          l2 << req.bits.flow.ingress_node_id.getWidth) | t._2.ingressNodeId
+        val l4 = (          l3 << req.bits.flow.egress_node    .getWidth) | t._2.egressNode
+        val l5 = (          l4 << req.bits.flow.egress_node_id .getWidth) | t._2.egressNodeId
+        l5.U(req.bits.getWidth.W)
       }
 
       val flow = req.bits.flow
