@@ -20,9 +20,6 @@ jobs:
         java-version: 11
     - name: Compile
       run: |
-        mkdir -p .tools_cache
-        scripts/install-espresso.sh ${{ github.workspace }}/tools_cache
-
         git submodule update --init --recursive
         git clone https://github.com/chipsalliance/rocket-chip.git
         cd rocket-chip
@@ -39,11 +36,6 @@ jobs:
       with:
         path: .ivy2
         key: constellation-ivy2-${{ github.sha }}
-    - name: Cache tools install
-      uses: actions/cache@v3
-      with:
-        path: tools_cache
-        key: constellation-tools-${{ github.sha }}
 
   test:
     needs: [compile]
@@ -83,12 +75,6 @@ jobs:
         path: .ivy2
         key: constellation-ivy2-${{ github.sha }}
 
-    - name: Restore tools directory
-      uses: actions/cache@v3
-      with:
-        path: tools_cache
-        key: constellation-tools-${{ github.sha }}
-
     - name: Compile
       run: |
         git submodule update --init --recursive
@@ -96,4 +82,4 @@ jobs:
         sbt compile
 
     - name: Unit Tests
-      run: PATH=$PATH:${{ github.workspace }}/tools_cache/bin sbt "testOnly constellation.NoCTest${{ matrix.config }}"
+      run: sbt "testOnly constellation.NoCTest${{ matrix.config }}"

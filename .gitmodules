@@ -1,6 +1,3 @@
 [submodule "src/main/resources/csrc/netrace"]
 	path = src/main/resources/csrc/netrace
 	url = https://github.com/booksim/netrace.git
-[submodule "espresso"]
-	path = espresso
-	url = https://github.com/chipsalliance/espresso.git
