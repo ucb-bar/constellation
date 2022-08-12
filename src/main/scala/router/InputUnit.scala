@@ -63,6 +63,8 @@ abstract class AbstractInputUnit(
       }
     }
   }
+
+  def atDest(egress: UInt) = egressSrcIds.zipWithIndex.filter(_._1 == nodeId).map(_._2.U === egress).orR
 }
 
 class InputBuffer(cParam: ChannelParams)(implicit p: Parameters) extends Module {
@@ -185,11 +187,11 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
       val id = io.in.flit(i).bits.virt_channel_id
       assert(id < nVirtualChannels.U)
       assert(states(id).g === g_i)
-      val at_dest = io.in.flit(i).bits.flow.egress_node === nodeId.U
+      val at_dest = atDest(io.in.flit(i).bits.flow.egress_id)
       states(id).g := Mux(at_dest, g_v, g_r)
       states(id).vc_sel.foreach(_.foreach(_ := false.B))
       for (o <- 0 until nEgress) {
-        when (o.U === io.in.flit(i).bits.flow.egress_node_id) {
+        when (egressParams(o).egressId.U === io.in.flit(i).bits.flow.egress_id) {
           states(id).vc_sel(o+nOutputs)(0) := true.B
         }
       }

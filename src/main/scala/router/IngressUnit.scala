@@ -9,7 +9,6 @@ import freechips.rocketchip.util._
 import constellation.channel._
 
 class IngressUnit(
-  ingressNodeId: Int,
   cParam: IngressChannelParams,
   outParams: Seq[ChannelParams],
   egressParams: Seq[EgressChannelParams],
@@ -30,28 +29,19 @@ class IngressUnit(
 
   route_buffer.io.enq.bits.head := io.in.bits.head
   route_buffer.io.enq.bits.tail := io.in.bits.tail
+  route_buffer.io.enq.bits.flow.ingress_id := cParam.ingressId.U
+  route_buffer.io.enq.bits.flow.egress_id := io.in.bits.egress_id
   val flows = cParam.possibleFlows.toSeq
-  if (flows.size == 0) {
-    route_buffer.io.enq.bits.flow := DontCare
-  } else {
-    route_buffer.io.enq.bits.flow.ingress_node    := cParam.destId.U
-    route_buffer.io.enq.bits.flow.ingress_node_id := ingressNodeId.U
-
-    route_buffer.io.enq.bits.flow.egress_node    := Mux1H(
-      flows.map(_.egressId.U === io.in.bits.egress_id),
-      flows.map(_.egressNode.U)
-    )
-    route_buffer.io.enq.bits.flow.egress_node_id := Mux1H(
-      flows.map(_.egressId.U === io.in.bits.egress_id),
-      flows.map(_.egressNodeId.U)
-    )
-  }
+  route_buffer.io.enq.bits.flow.egress_dst_id := (if (flows.size == 0) 0.U else Mux1H(
+    flows.map(_.egressId.U === io.in.bits.egress_id),
+    flows.map(_.dst.U)
+  ))
   route_buffer.io.enq.bits.payload := io.in.bits.payload
   route_buffer.io.enq.bits.virt_channel_id := DontCare
   io.router_req.bits.src_virt_id := 0.U
   io.router_req.bits.flow := route_buffer.io.enq.bits.flow
 
-  val at_dest = route_buffer.io.enq.bits.flow.egress_node === nodeId.U
+  val at_dest = atDest(io.in.bits.egress_id)
   route_buffer.io.enq.valid := io.in.valid && (
     io.router_req.ready || !io.in.bits.head || (at_dest && !io.router_resp.valid))
   io.router_req.valid := io.in.valid && route_buffer.io.enq.ready && io.in.bits.head && !at_dest

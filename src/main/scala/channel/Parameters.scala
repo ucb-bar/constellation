@@ -139,18 +139,18 @@ case class IngressChannelParams(
 object IngressChannelParams {
   def apply(
     ingressId: Int,
-    flows: Seq[FlowRoutingInfo],
-    user: UserIngressParams
+    flows: Seq[FlowParams],
+    user: UserIngressParams,
+    egresses: Seq[UserEgressParams]
   ): IngressChannelParams = {
     val ourFlows = flows.filter(_.ingressId == ingressId)
-    val vNetIds = ourFlows.map(_.vNetId).toSet
-    require(vNetIds.size <= 1)
-    if (ourFlows.size > 0)
-      require(vNetIds.head == user.vNetId)
+    ourFlows.foreach(f => require(f.vNetId == user.vNetId && f.vNetId == egresses(f.egressId).vNetId))
     IngressChannelParams(
       ingressId = ingressId,
       destId = user.destId,
-      possibleFlows = ourFlows.toSet,
+      possibleFlows = ourFlows.map(f =>
+        FlowRoutingInfo(f.ingressId, f.egressId, user.vNetId, egresses(f.egressId).srcId)
+      ).toSet,
       vNetId = user.vNetId,
       payloadBits = user.payloadBits
     )
@@ -172,7 +172,7 @@ case class EgressChannelParams(
 object EgressChannelParams {
   def apply(
     egressId: Int,
-    flows: Seq[FlowRoutingInfo],
+    flows: Seq[FlowParams],
     user: UserEgressParams): EgressChannelParams = {
     val ourFlows = flows.filter(_.egressId == egressId)
     val vNetIds = ourFlows.map(_.vNetId).toSet
@@ -181,7 +181,9 @@ object EgressChannelParams {
       require(vNetIds.head == user.vNetId)
     EgressChannelParams(
       egressId = egressId,
-      possibleFlows = ourFlows.toSet,
+      possibleFlows = ourFlows.map(f =>
+        FlowRoutingInfo(f.ingressId, egressId, vNetIds.head, user.srcId)
+      ).toSet,
       srcId = user.srcId,
       payloadBits = user.payloadBits
     )

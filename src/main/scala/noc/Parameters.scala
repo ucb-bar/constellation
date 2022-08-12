@@ -59,9 +59,6 @@ trait HasNoCParams {
   val ingressIdBits = log2Up(nIngresses)
   val egressSrcIds = nocParams.egressParams.map(_.srcId)
   val routingRelation = nocParams.userParams.routingRelation
-  val maxIngressesAtNode = nocParams.routerParams.map(_.nIngress).max
-  val maxEgressesAtNode = nocParams.routerParams.map(_.nEgress).max
-
 }
 
 object InternalNoCParams {
@@ -98,25 +95,13 @@ object InternalNoCParams {
       }
     }
 
-    val flows = nocParams.flows.map { f =>
-      val ingressNode = nocParams.ingresses(f.ingressId).destId
-      val egressNode  = nocParams.egresses (f.egressId ).srcId
-      require(f.vNetId == nocParams.ingresses(f.ingressId).vNetId)
-      require(f.vNetId == nocParams.egresses(f.egressId).vNetId)
-      FlowRoutingInfo(
-        ingressId=f.ingressId, egressId=f.egressId, vNetId=f.vNetId,
-        ingressNode=ingressNode,
-        egressNode=egressNode,
-        ingressNodeId=nocParams.ingresses.take(f.ingressId).count(_.destId == ingressNode),
-        egressNodeId=nocParams.egresses.take(f.egressId).count(_.srcId == egressNode)
-      )
-    }
     val ingressParams = nocParams.ingresses.zipWithIndex.map { case (u,i) => {
       require(u.destId < nNodes)
       IngressChannelParams(
         user = u,
         ingressId = i,
-        flows = flows
+        flows = nocParams.flows,
+        egresses = nocParams.egresses
       )
     }}
     val egressParams = nocParams.egresses.zipWithIndex.map { case (u,e) => {
@@ -124,7 +109,7 @@ object InternalNoCParams {
       EgressChannelParams(
         user = u,
         egressId = e,
-        flows = flows
+        flows = nocParams.flows
       )
     }}
 
@@ -159,7 +144,7 @@ object InternalNoCParams {
             unexplored = unexplored.tail
             while (stack.size != 0) {
               val head = stack.head
-              val atDest = head.dst == flow.egressNode || flowPossibleFlows.contains(head)
+              val atDest = head.dst == flow.dst || flowPossibleFlows.contains(head)
               if (!atDest) {
                 val nexts = nextChannelParamMap(head.dst).map { nxtC =>
                   nxtC.channelRoutingInfos.map { cI =>
@@ -167,7 +152,7 @@ object InternalNoCParams {
                   }.flatten
                 }.flatten
                 require(nexts.size > 0,
-                  s"Failed to route from $iId to ${flow.egressNode} at $head for vnet $vNetId")
+                  s"Failed to route from $iId to ${flow.dst} at $head for vnet $vNetId")
                 require((nexts.toSet & stack.toSet).size == 0,
                   s"$nexts, $stack")
                 stack = Seq(nexts.head) ++ stack
@@ -195,7 +180,7 @@ object InternalNoCParams {
           .map(_.channelRoutingInfos)
           .flatten
           .filter(nI => possibleFlowMap(cI)
-            .filter(_.egressNode != cI.dst)
+            .filter(_.dst != cI.dst)
             .map(pI => routingRel(cI, nI, pI))
             .fold(false)(_||_)
           )
@@ -240,7 +225,7 @@ object InternalNoCParams {
           checkConnectivity(vNetId, new RoutingRelation {
             def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
               val base = nocParams.routingRelation(srcC, nxtC, flow)
-              val blocked = b.map { v => possibleFlowMap(nxtC).map(_.vNetId == v) }.flatten.fold(false)(_||_)
+              val blocked = b.map { v => possibleFlowMap(nxtC).map(_.vNet == v) }.flatten.fold(false)(_||_)
               base && !blocked
             }
           })
@@ -252,7 +237,7 @@ object InternalNoCParams {
     println(s"Constellation: $nocName Checking for possibility of deadlock")
     val acyclicPath = checkAcyclic(new RoutingRelation {
       def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-        val escape = nocParams.routingRelation.isEscape(nxtC, flow.vNetId)
+        val escape = nocParams.routingRelation.isEscape(nxtC, flow.vNet)
         nocParams.routingRelation(srcC, nxtC, flow) && escape
       }
     })
@@ -279,8 +264,6 @@ object InternalNoCParams {
     val routerParams = (0 until nNodes).map { i =>
       RouterParams(
         nodeId = i,
-        nIngress = ingressParams.count(_.destId == i),
-        nEgress = egressParams.count(_.srcId == i),
         user = nocParams.routerParams(i)
       )
     }

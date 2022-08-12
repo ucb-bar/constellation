@@ -26,8 +26,6 @@ case class UserRouterParams(
 
 case class RouterParams(
   nodeId: Int,
-  nIngress: Int,
-  nEgress: Int,
   user: UserRouterParams
 )
 
@@ -88,7 +86,6 @@ class Router(
   def egressParams = module.egressParams
 
   lazy val module = new LazyModuleImp(this) with HasRouterInputParams with HasRouterOutputParams {
-
     val (io_in, edgesIn) = destNodes.map(_.in(0)).unzip
     val (io_out, edgesOut) = sourceNodes.map(_.out(0)).unzip
     val (io_ingress, edgesIngress) = ingressNodes.map(_.in(0)).unzip
@@ -103,8 +100,7 @@ class Router(
     allOutParams.foreach(u => require(u.srcId == nodeId && u.payloadBits == routerParams.user.payloadBits))
     allInParams.foreach(u => require(u.destId == nodeId && u.payloadBits == routerParams.user.payloadBits))
 
-    require(nIngress == routerParams.nIngress)
-    require(nEgress == routerParams.nEgress)
+
     require(nAllInputs >= 1)
     require(nAllOutputs >= 1)
     require(nodeId < (1 << nodeIdBits))
@@ -114,7 +110,7 @@ class Router(
         routerParams.user.combineRCVA, routerParams.user.combineSAST, routerParams.user.earlyRC))
         .suggestName(s"input_unit_${i}_from_${u.srcId}") }
     val ingress_units = ingressParams.zipWithIndex.map { case (u,i) =>
-      Module(new IngressUnit(i, u, outParams, egressParams,
+      Module(new IngressUnit(u, outParams, egressParams,
         routerParams.user.combineRCVA, routerParams.user.combineSAST))
         .suggestName(s"ingress_unit_${i+nInputs}_from_${u.ingressId}") }
     val all_input_units = input_units ++ ingress_units
