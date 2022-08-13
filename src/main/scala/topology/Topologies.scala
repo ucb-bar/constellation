@@ -176,6 +176,7 @@ case class TerminalPlane(val base: PhysicalTopology) extends PhysicalTopology {
 case class HierarchicalSubTopology(src: Int, dst: Int, topo: PhysicalTopology)
 case class HierarchicalTopology(val base: PhysicalTopology, val children: Seq[HierarchicalSubTopology])
     extends PhysicalTopology {
+  children.foreach(c => require(c.src < base.nNodes && c.dst < c.topo.nNodes))
   val nNodes = base.nNodes + children.map(_.topo.nNodes).sum
   val offsets = children.map(_.topo.nNodes).scanLeft(base.nNodes)(_+_)
   def childId(node: Int): Int = offsets.drop(1).indexWhere(_ > node)
