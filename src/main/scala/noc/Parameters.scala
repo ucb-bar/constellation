@@ -168,7 +168,7 @@ object InternalNoCParams {
                 require(nexts.size > 0,
                   s"Failed to route from $iId to ${flow.egressNode} at $head for vnet $vNetId")
                 require((nexts.toSet & stack.toSet).size == 0,
-                  s"$nexts, $stack")
+                  s"$flow, $nexts, $stack")
                 stack = Seq(nexts.head) ++ stack
                 unexplored = nexts.tail.filter(n => !unexplored.contains(n)) ++ unexplored
               } else {
@@ -195,8 +195,7 @@ object InternalNoCParams {
           .flatten
           .filter(nI => possibleFlowMap(cI)
             .filter(_.egressNode != cI.dst)
-            .map(pI => routingRel(cI, nI, pI))
-            .fold(false)(_||_)
+            .foldLeft(false) { (b, pI) => b || routingRel(cI, nI, pI) }
           )
         neighbors.foreach { nI =>
           if (!visited.contains(nI)) {
