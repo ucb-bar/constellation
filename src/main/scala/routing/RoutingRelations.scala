@@ -577,7 +577,7 @@ object HierarchicalRoutingRelation {
     childRouting: Seq[PhysicalTopology => RoutingRelation]
   ) = (topo: PhysicalTopology) => topo match {
     case topo: HierarchicalTopology => new RoutingRelation(topo) {
-      val base = baseRouting(topo)
+      val base = baseRouting(topo.base)
       val children = (childRouting zip topo.children).map { case (l,r) => l(r.topo) }
       def copyChannel(c: ChannelRoutingInfo, o: Int) = {
         val nSrc = if (c.src < topo.base.nNodes) -1 else c.src - o
@@ -591,9 +591,20 @@ object HierarchicalRoutingRelation {
         val flowBase = topo.isBase(flow.egressNode)
         val nextBase = topo.isBase(nxtC.dst)
         (thisBase, flowBase, nextBase) match {
-          case (true , true , true ) => base(srcC, nxtC, flow)
+          case (true , true , true ) => base(
+            srcC.copy(src=if (srcC.src >= topo.base.nNodes) -1 else srcC.src),
+            nxtC, flow
+          )
           case (true , true , false) => false
-          case (true , false, true ) => base(srcC, nxtC, flow.copy(egressNode=topo.children(topo.childId(flow.egressNode)).src))
+          case (true , false, true ) => {
+            val src = topo.children(topo.childId(flow.egressNode)).src
+            val atDst = src == srcC.dst
+            !atDst && base(
+              srcC.copy(src=if (srcC.src >= topo.base.nNodes) -1 else srcC.src),
+              nxtC,
+              flow.copy(egressNode=src)
+            )
+          }
           case (true , false, false) => topo.childId(nxtC.dst) == topo.childId(flow.egressNode)
           case (false, true , true ) => true
           case (false, true , false) => {
@@ -602,7 +613,7 @@ object HierarchicalRoutingRelation {
               srcC=copyChannel(srcC, topo.offsets(id)),
               nxtC=copyChannel(nxtC, topo.offsets(id)),
               flow=flow.copy(egressNode=topo.children(id).dst)
-            )
+            ) && topo.children(id).dst != srcC.dst - topo.offsets(id)
           }
           case (false, false, true ) => topo.childId(srcC.dst) != topo.childId(flow.egressNode)
           case (false, false, false) => {
@@ -615,7 +626,7 @@ object HierarchicalRoutingRelation {
             }
             val at_exit = (fid != sid &&
               (srcC.dst - topo.offsets(sid) == topo.children(sid).dst))
-            children(fid)(
+            children(sid)(
               srcC=copyChannel(srcC, topo.offsets(sid)),
               nxtC=copyChannel(nxtC, topo.offsets(sid)),
               flow=flow.copy(egressNode=fdst)
