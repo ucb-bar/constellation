@@ -511,39 +511,43 @@ class TestConfig55 extends Config(
 class TestConfig56 extends Config(
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithTerminalPlaneIngressEgress(Seq(0, 1, 1), Seq(1, 1, 2)) ++
+  new constellation.channel.WithIngresses(Seq(0, 1, 1)) ++
+  new constellation.channel.WithEgresses(Seq(1, 1, 2)) ++
   new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(AllLegalRouting())) ++
   new constellation.topology.WithTopology(TerminalPlane(UnidirectionalLine(3))))
 class TestConfig57 extends Config(
   new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithTerminalPlaneIngressEgress(
-    Seq(1, 1, 2, 2), Seq(0, 0, 1, 1, 2, 2, 3, 3)) ++
+  new constellation.channel.WithIngresses(Seq(1, 1, 2, 2)) ++
+  new constellation.channel.WithEgresses(Seq(0, 0, 1, 1, 2, 2, 3, 3)) ++
   new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(BidirectionalLineRouting())) ++
   new constellation.topology.WithTopology(TerminalPlane(BidirectionalLine(4))))
 class TestConfig58 extends Config(
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithTerminalPlaneIngressEgress(0 until 6, 0 until 6) ++
+  new constellation.channel.WithIngresses(0 until 6) ++
+  new constellation.channel.WithEgresses(0 until 6) ++
   new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(UnidirectionalTorus1DDatelineRouting())) ++
   new constellation.topology.WithTopology(TerminalPlane(UnidirectionalTorus1D(6))))
 class TestConfig59 extends Config(
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithTerminalPlaneIngressEgress(
-    (0 until 6) ++ (0 until 6), (0 until 6) ++ (0 until 6)) ++
+  new constellation.channel.WithIngresses((0 until 6) ++ (0 until 6)) ++
+  new constellation.channel.WithEgresses((0 until 6) ++ (0 until 6)) ++
   new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(BidirectionalTorus1DShortestRouting())) ++
   new constellation.topology.WithTopology(TerminalPlane(BidirectionalTorus1D(6))))
 class TestConfig60 extends Config(
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithTerminalPlaneIngressEgress(0 until 25, 0 until 25) ++
+  new constellation.channel.WithIngresses(0 until 25) ++
+  new constellation.channel.WithEgresses(0 until 25) ++
   new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
   new constellation.topology.WithTopology(TerminalPlane(Mesh2D(5, 5))))
 class TestConfig61 extends Config(
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithTerminalPlaneIngressEgress(0 until 25, 0 until 25) ++
+  new constellation.channel.WithIngresses(0 until 25) ++
+  new constellation.channel.WithEgresses(0 until 25) ++
   new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
   new constellation.topology.WithTopology(TerminalPlane(Mesh2D(5, 5))))
 class TestConfig62 extends Config(
@@ -552,7 +556,8 @@ class TestConfig62 extends Config(
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithIngressVNets((i: Int) => i % 4) ++
   new constellation.channel.WithEgressVNets((i: Int) => (i + 1) % 4) ++
-  new constellation.channel.WithTerminalPlaneIngressEgress(0 until 16, 0 until 16) ++
+  new constellation.channel.WithIngresses(0 until 16) ++
+  new constellation.channel.WithEgresses(0 until 16) ++
   new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
   new constellation.topology.WithTopology(TerminalPlane(Mesh2D(4, 4))))
 class TestConfig63 extends Config(
@@ -560,7 +565,8 @@ class TestConfig63 extends Config(
   new constellation.router.WithSafeCoupleSAVA ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithTerminalPlaneIngressEgress(4 until 16, 0 until 4) ++
+  new constellation.channel.WithIngresses(4 until 16) ++
+  new constellation.channel.WithEgresses(0 until 4) ++
   new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
   new constellation.topology.WithTopology(TerminalPlane(Mesh2D(4, 4))))
 class TestConfig64 extends Config(
@@ -569,13 +575,15 @@ class TestConfig64 extends Config(
   new constellation.noc.WithCtrl ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithTerminalPlaneIngressEgress(4 until 16, 0 until 4) ++
+  new constellation.channel.WithIngresses(4 until 16) ++
+  new constellation.channel.WithEgresses(0 until 4) ++
   new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
   new constellation.topology.WithTopology(TerminalPlane(Mesh2D(4, 4))))
 class TestConfig65 extends Config(
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithTerminalPlaneIngressEgress(0 until 16, 0 until 16) ++
+  new constellation.channel.WithIngresses(0 until 16) ++
+  new constellation.channel.WithEgresses(0 until 16) ++
   new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
   new constellation.topology.WithTopology(TerminalPlane(Mesh2D(4, 4))))
 
