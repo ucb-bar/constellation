@@ -44,15 +44,13 @@ abstract class SingleVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) 
 
   // send allocation to inputunits
   for (i <- 0 until allInParams.size) {
-    io.resp(i).valid := in_arb_sel(i)
-    io.resp(i).bits.in_vc := in_vc
-    io.req(i).ready := io.resp(i).valid
+    io.req(i).ready := in_arb_sel(i)
     for (m <- 0 until allOutParams.size) {
       (0 until allOutParams(m).nVirtualChannels).map { n =>
-        io.resp(i).bits.vc_sel(m)(n) := in_alloc(m)(n)
+        io.resp(i).vc_sel(m)(n) := in_alloc(m)(n)
       }
     }
-    assert(PopCount(io.resp(i).bits.vc_sel.asUInt) <= 1.U)
+    assert(PopCount(io.resp(i).vc_sel.asUInt) <= 1.U)
   }
 
   // send allocation to output units

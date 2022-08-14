@@ -53,16 +53,15 @@ class IngressUnit(
 
   val at_dest = route_buffer.io.enq.bits.flow.egress_node === nodeId.U
   route_buffer.io.enq.valid := io.in.valid && (
-    io.router_req.ready || !io.in.bits.head || (at_dest && !io.router_resp.valid))
+    io.router_req.ready || !io.in.bits.head || at_dest)
   io.router_req.valid := io.in.valid && route_buffer.io.enq.ready && io.in.bits.head && !at_dest
   io.in.ready := route_buffer.io.enq.ready && (
-    io.router_req.ready || !io.in.bits.head || (at_dest && !io.router_resp.valid))
+    io.router_req.ready || !io.in.bits.head || at_dest)
 
-  route_q.io.enq.valid := io.router_resp.valid
-  route_q.io.enq.bits := io.router_resp.bits
+  route_q.io.enq.valid := io.router_req.fire()
+  route_q.io.enq.bits := io.router_resp
   when (io.in.fire() && io.in.bits.head && at_dest) {
     route_q.io.enq.valid := true.B
-    route_q.io.enq.bits.src_virt_id := 0.U
     route_q.io.enq.bits.vc_sel.foreach(_.foreach(_ := false.B))
     for (o <- 0 until nEgress) {
       when (egressParams(o).egressId.U === io.in.bits.egress_id) {
@@ -97,8 +96,8 @@ class IngressUnit(
   route_q.io.deq.ready := (route_buffer.io.deq.fire() && tail)
 
 
-  vcalloc_q.io.enq.valid := io.vcalloc_resp.valid
-  vcalloc_q.io.enq.bits := io.vcalloc_resp.bits
+  vcalloc_q.io.enq.valid := io.vcalloc_req.fire()
+  vcalloc_q.io.enq.bits := io.vcalloc_resp
   assert(!(vcalloc_q.io.enq.valid && !vcalloc_q.io.enq.ready))
 
   io.salloc_req(0).bits.vc_sel := vcalloc_q.io.deq.bits.vc_sel

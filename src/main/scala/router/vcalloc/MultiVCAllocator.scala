@@ -39,15 +39,13 @@ abstract class MultiVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) e
 
   // send allocation to inputunits
   for (i <- 0 until allInParams.size) {
-    io.resp(i).valid := out_allocs.map(_.map(_(i)).orR).orR
-    io.resp(i).bits.in_vc := io.req(i).bits.in_vc
-    io.req(i).ready := io.resp(i).valid
+    io.req(i).ready := out_allocs.map(_.map(_(i)).orR).orR
     for (m <- 0 until allOutParams.size) {
       (0 until allOutParams(m).nVirtualChannels).map { n =>
-        io.resp(i).bits.vc_sel(m)(n) := out_allocs(m)(n)(i)
+        io.resp(i).vc_sel(m)(n) := out_allocs(m)(n)(i)
       }
     }
-    assert(PopCount(io.resp(i).bits.vc_sel.asUInt) <= 1.U)
+    assert(PopCount(io.resp(i).vc_sel.asUInt) <= 1.U)
   }
 
   // send allocation to output units

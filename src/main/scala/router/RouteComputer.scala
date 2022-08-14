@@ -22,8 +22,6 @@ class RouteComputerResp(val cParam: BaseChannelParams,
   val outParams: Seq[ChannelParams],
   val egressParams: Seq[EgressChannelParams])(implicit val p: Parameters) extends Bundle
     with HasChannelParams with HasRouterOutputParams {
-
-  val src_virt_id = UInt(virtualChannelBits.W)
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
 }
 
@@ -42,16 +40,14 @@ class RouteComputer(
     with HasNoCParams {
   val io = IO(new Bundle {
     val req = MixedVec(allInParams.map { u => Flipped(Decoupled(new RouteComputerReq(u))) })
-    val resp = MixedVec(allInParams.map { u => Valid(new RouteComputerResp(u, outParams, egressParams)) })
+    val resp = MixedVec(allInParams.map { u => Output(new RouteComputerResp(u, outParams, egressParams)) })
   })
 
   (io.req zip io.resp).zipWithIndex.map { case ((req, resp), i) =>
     req.ready := true.B
-    resp.valid := req.valid
-    resp.bits.src_virt_id := req.bits.src_virt_id
     if (outParams.size == 0) {
       assert(!req.valid)
-      resp.bits.vc_sel := DontCare
+      resp.vc_sel := DontCare
     } else {
 
       def toUInt(t: (Int, FlowRoutingInfo)): UInt = {
@@ -92,11 +88,11 @@ class RouteComputer(
       (0 until nAllOutputs).foreach { o =>
         if (o < nOutputs) {
           (0 until outParams(o).nVirtualChannels).foreach { outVId =>
-            resp.bits.vc_sel(o)(outVId) := decoded(idx)
+            resp.vc_sel(o)(outVId) := decoded(idx)
             idx += 1
           }
         } else {
-          resp.bits.vc_sel(o)(0) := false.B
+          resp.vc_sel(o)(0) := false.B
         }
       }
     }
