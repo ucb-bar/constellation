@@ -166,7 +166,7 @@ object InternalNoCParams {
                   }.flatten
                 }.flatten
                 require(nexts.size > 0,
-                  s"Failed to route from $iId to ${flow.egressNode} at $head for vnet $vNetId")
+                  s"Failed to route from $iId to ${flow.egressNode} at $head for vnet $vNetId \n  $stack \n  ${nextChannelParamMap(head.dst)}")
                 require((nexts.toSet & stack.toSet).size == 0,
                   s"$flow, $nexts, $stack")
                 stack = Seq(nexts.head) ++ stack
