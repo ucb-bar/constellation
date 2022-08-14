@@ -179,7 +179,7 @@ class TestConfig15 extends Config(
   new constellation.routing.WithRoutingRelation(UnidirectionalTorus1DDatelineRouting()) ++
   new constellation.topology.WithTopology(UnidirectionalTorus1D(10)))
 class TestConfig16 extends Config(
-  new WithInputPacketStallProbability(0.8) ++
+  new WithInputPacketStallProbability(0.9) ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithIngresses(0 until 10) ++
@@ -660,8 +660,49 @@ class TestConfig67 extends Config(
   ))
 )
 
-// test configs for channel width adapters
 class TestConfig68 extends Config(
+  new WithInputPacketStallProbability(0.95) ++
+  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
+  new constellation.channel.WithFullyConnectedIngresses ++
+  new constellation.channel.WithHierarchicalIngressEgress(
+    ingresses = ((0 until 5).map { i => (None   , i) } ++
+                 (0 until 6).map { i => (Some(0), i) } ++
+                 (0 until 6).map { i => (Some(1), i) } ++
+                 (0 until 3).map { i => (Some(2), i) } ++
+                 (0 until 3).map { i => (Some(3), i) }),
+    egresses  = ((0 until 5).map { i => (None   , i) } ++
+                 (0 until 6).map { i => (Some(0), i) } ++
+                 (0 until 6).map { i => (Some(1), i) } ++
+                 (0 until 3).map { i => (Some(2), i) } ++
+                 (0 until 3).map { i => (Some(3), i) })
+  ) ++
+  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(
+    HierarchicalRoutingRelation(
+      baseRouting=UnidirectionalTorus1DDatelineRouting(),
+      childRouting=Seq(
+        Mesh2DEscapeRouting(),
+        Mesh2DDimensionOrderedRouting(),
+        BidirectionalLineRouting(),
+        BidirectionalLineRouting()
+      )
+    )
+  )) ++
+  new constellation.topology.WithTopology(TerminalPlane(
+    HierarchicalTopology(
+      base=UnidirectionalTorus1D(5),
+      children=Seq(
+        HierarchicalSubTopology(0, 1, Mesh2D(2, 3)),
+        HierarchicalSubTopology(2, 4, Mesh2D(3, 2)),
+        HierarchicalSubTopology(3, 2, BidirectionalLine(3)),
+        HierarchicalSubTopology(4, 1, BidirectionalLine(3))
+      )
+    )
+  ))
+)
+
+
+// test configs for channel width adapters
+class TestConfig69 extends Config(
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithIngresses(Seq(0)) ++
@@ -669,7 +710,7 @@ class TestConfig68 extends Config(
   new constellation.router.WithUniformPayloadBits(32) ++
   new constellation.routing.WithRoutingRelation(AllLegalRouting()) ++
   new constellation.topology.WithTopology(UnidirectionalLine(1)))
-class TestConfig69 extends Config(
+class TestConfig70 extends Config(
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithIngresses(0 until 16) ++
@@ -677,7 +718,7 @@ class TestConfig69 extends Config(
   new constellation.router.WithUniformPayloadBits(16) ++
   new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
   new constellation.topology.WithTopology(Mesh2D(4, 4)))
-class TestConfig70 extends Config(
+class TestConfig71 extends Config(
   new WithTotalTxs(10000) ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
@@ -692,7 +733,7 @@ class TestConfig70 extends Config(
   new constellation.router.WithPayloadBits(36, Seq(0)) ++
   new constellation.routing.WithRoutingRelation(AllLegalRouting()) ++
   new constellation.topology.WithTopology(UnidirectionalLine(5)))
-class TestConfig71 extends Config(
+class TestConfig72 extends Config(
   new WithInputPacketStallProbability(0.9) ++
   new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(4)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
