@@ -24,28 +24,30 @@ trait PhysicalTopology {
 case class UnidirectionalLine(n: Int, skips: Seq[(Int, Int)] = Nil) extends PhysicalTopology {
   val nNodes = n
   def topo(src: Int, dest: Int) = dest - src == 1 || ((dest > src) && skips.contains((src, dest)))
-  val plotter = new LinePlotter
+  val plotter = new LinePlotter(this)
 }
 
 /** A network where sequential nodes are connected bidirectionally */
 case class BidirectionalLine(n: Int) extends PhysicalTopology {
   val nNodes = n
   def topo(src: Int, dest: Int) = (dest - src).abs == 1
-  val plotter = new LinePlotter
+  val plotter = new LinePlotter(this)
+}
+
+trait Torus1DLikeTopology extends PhysicalTopology {
+  val plotter = new Torus1DPlotter(this)
 }
 
 /** An n-node network shaped like a torus, with clockwise channels */
-case class UnidirectionalTorus1D(n: Int) extends PhysicalTopology {
+case class UnidirectionalTorus1D(n: Int) extends Torus1DLikeTopology {
   val nNodes = n
   def topo(src: Int, dest: Int) = dest - src == 1 || (dest == 0 && src == nNodes - 1)
-  val plotter = new Torus1DPlotter(nNodes)
 }
 
 /** An n-node network shaped like a torus, with bidirectional channels */
-case class BidirectionalTorus1D(n: Int) extends PhysicalTopology {
+case class BidirectionalTorus1D(n: Int) extends Torus1DLikeTopology {
   val nNodes = n
   def topo(src: Int, dest: Int) = (dest + nNodes - src) % nNodes == 1 || (src + nNodes - dest) % nNodes == 1
-  val plotter = new Torus1DPlotter(nNodes)
 }
 
 /** A k-ary n-fly butterfly topology. This network has n stages of nodes; each node connects to k
@@ -77,7 +79,7 @@ case class Butterfly(kAry: Int, nFly: Int) extends PhysicalTopology {
       false
     }
   }
-  val plotter = new ButterflyPlotter(kAry, nFly)
+  val plotter = new ButterflyPlotter(this)
 }
 
 /** An dary**height tree topology.
@@ -94,14 +96,14 @@ case class BidirectionalTree(val height: Int, val dAry: Int = 2) extends Physica
     srcChildOfDst || dstChildOfSrc
   }
 
-  val plotter = new TreePlotter(height, dAry)
+  val plotter = new TreePlotter(this)
 }
 
 trait Mesh2DLikePhysicalTopology extends PhysicalTopology {
   val nX: Int
   val nY: Int
   val nNodes = nX * nY
-  val plotter = new Mesh2DPlotter(nX, nY)
+  val plotter = new Mesh2DPlotter(this)
 }
 
 /** A 2D mesh network with nX * nY nodes. Bidirectional channels exist between nodes that are a
@@ -148,28 +150,21 @@ case class BidirectionalTorus2D(nX: Int, nY: Int) extends Mesh2DLikePhysicalTopo
 }
 
 case class TerminalPlane(val base: PhysicalTopology) extends PhysicalTopology {
-  val nNodes = (3 * base.nNodes)
-  def topo(src: Int, dst: Int) = {
-    def isBase(n: Int) = n < base.nNodes
-    def isIngress(n: Int) = !isEgress(n) && !isBase(n)
-    def isEgress(n: Int) = n >= 2 * base.nNodes
+  val nNodes = (2 * base.nNodes)
+  def isBase(n: Int) = n >= base.nNodes
+  def isTerminal(n: Int) = n < base.nNodes
 
+  def topo(src: Int, dst: Int) = {
     if (isBase(src) && isBase(dst)) {
-      base.topo(src, dst)
+      base.topo(src - base.nNodes, dst - base.nNodes)
     } else {
-      def connected(lower: Int, upper: Int): Boolean = {
-        if (lower > upper) {
-          connected(upper, lower)
-        } else {
-          val toIngress = isIngress(upper) && upper - base.nNodes == lower
-          val toEgress  =  isEgress(upper) && upper - 2 * base.nNodes == lower
-          isBase(lower) && (toIngress || toEgress)
-        }
-      }
-      connected(src, dst)
+      val toIngress = isBase(dst) && isTerminal(src)
+      val toEgress  = isBase(src) && isTerminal(dst)
+      val same = (dst % base.nNodes == src % base.nNodes)
+      same && (toIngress || toEgress)
     }
   }
-  val plotter = new TerminalPlanePlotter(base.plotter, base.nNodes)
+  val plotter = new TerminalPlanePlotter(this)
 }
 
 // Hierarchical topologies add bidirection connections between a src in the base and a dst in the child
@@ -201,6 +196,6 @@ case class HierarchicalTopology(val base: PhysicalTopology, val children: Seq[Hi
     }
   }
   // TODO fix
-  val plotter = new LinePlotter
+  val plotter = new LinePlotter(this)
 }
 

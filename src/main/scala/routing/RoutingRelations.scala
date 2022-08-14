@@ -459,26 +459,31 @@ object TerminalPlaneRouting {
     case topo: constellation.topology.TerminalPlane => new RoutingRelation(topo) {
       val base = baseRouting(topo.base)
       def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-        if (srcC.isIngress && nxtC.dst < topo.base.nNodes) {
+        if (srcC.isIngress && topo.isBase(nxtC.dst)) {
           true
         } else if (nxtC.dst == flow.egressNode) {
           true
-        } else if (nxtC.src < topo.base.nNodes && nxtC.dst < topo.base.nNodes && nxtC.src != flow.egressNode - 2 * topo.base.nNodes) {
-          if (srcC.src >= topo.base.nNodes) {
-            base(srcC.copy(src=(-1), vc=0, n_vc=1),
-              nxtC,
-              flow.copy(egressNode=flow.egressNode-2*topo.base.nNodes))
+        } else if (topo.isBase(nxtC.src) &&
+                   topo.isBase(nxtC.dst) &&
+                   nxtC.src % topo.base.nNodes != flow.egressNode % topo.base.nNodes) {
+          if (topo.isTerminal(srcC.src)) {
+            base(
+              srcC.copy(src=(-1), dst=srcC.dst % topo.base.nNodes, vc=0, n_vc=1),
+              nxtC.copy(src=nxtC.src % topo.base.nNodes, dst=nxtC.dst % topo.base.nNodes),
+              flow.copy(egressNode=flow.egressNode % topo.base.nNodes))
           } else {
-            base(srcC,
-              nxtC,
-              flow.copy(egressNode=flow.egressNode-2*topo.base.nNodes))
+            base(
+              srcC.copy(src=srcC.src % topo.base.nNodes, dst=srcC.dst % topo.base.nNodes),
+              nxtC.copy(src=nxtC.src % topo.base.nNodes, dst=nxtC.dst % topo.base.nNodes),
+              flow.copy(egressNode=flow.egressNode % topo.base.nNodes))
           }
         } else {
           false
         }
       }
       override def isEscape(c: ChannelRoutingInfo, v: Int) = {
-        c.src >= topo.base.nNodes || c.dst >= topo.base.nNodes || base.isEscape(c, v)
+        !topo.isBase(c.src) || !topo.isBase(c.dst) || base.isEscape(
+          c.copy(src=c.src % topo.base.nNodes, dst=c.dst % topo.base.nNodes), v)
       }
     }
   }

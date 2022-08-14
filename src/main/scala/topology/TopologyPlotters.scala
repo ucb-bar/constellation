@@ -4,79 +4,81 @@ import scala.math.{pow, cos, sin, Pi, atan2, floor}
 
 abstract class PhysicalTopologyPlotter {
   /* Given a node ID, returns x, y position of a node. */
-  def node(nodeId: Int): (Double, Double) = node(nodeId.toDouble)
+  def node(nodeId: Int): (Double, Double)
   /* iID: index of ingress within number of ingresses for that node
    nI: number of ingresses into node
    nodeID: node these ingresses connect to*/
-  def ingress(iId: Int, nI: Int, nodeId: Int): (Double, Double) = ingress(iId.toDouble, nI.toDouble, nodeId.toDouble)
-  def egress (eId: Int, nE: Int, nodeId: Int): (Double, Double) =  egress(eId.toDouble, nE.toDouble, nodeId.toDouble)
-  def node(nodeId: Double): (Double, Double)
-  def ingress(iId: Double, nI: Double, nodeId: Double): (Double, Double)
-  def egress (eId: Double, nE: Double, nodeId: Double): (Double, Double)
+  def ingress(iId: Int, nI: Int, nodeId: Int): (Double, Double)
+  def egress (eId: Int, nE: Int, nodeId: Int): (Double, Double)
 }
 
 
-class LinePlotter extends PhysicalTopologyPlotter {
-  def node(n: Double) = (n, 0)
-  def ingress(t: Double, nT: Double, n: Double) = (n - 0.5 + (t + 1) / (nT + 1),  0.5)
-  def egress (t: Double, nT: Double, n: Double) = (n - 0.5 + (t + 1) / (nT + 1), -0.5)
+class LinePlotter(topo: PhysicalTopology) extends PhysicalTopologyPlotter {
+  def node(n: Int) = (n, 0)
+  def ingress(t: Int, nT: Int, n: Int) = (n - 0.5 + (t + 1).toDouble / (nT + 1).toDouble,  0.5)
+  def egress (t: Int, nT: Int, n: Int) = (n - 0.5 + (t + 1).toDouble / (nT + 1).toDouble, -0.5)
 }
 
-class Torus1DPlotter(nNodes: Int) extends PhysicalTopologyPlotter {
-  def node(n: Double) = {
-    val rad = n * 2 * Pi / nNodes
+class Torus1DPlotter(topo: Torus1DLikeTopology) extends PhysicalTopologyPlotter {
+  def node(n: Int) = {
+    val rad = n * 2 * Pi / topo.nNodes
     (cos(rad), sin(rad))
   }
-  def ingress(t: Double, nT: Double, n: Double) = {
-    val arc = 2 * Pi / nNodes
-    val rad = arc * (n - 0.5 + (t + 1) / (nT + 1))
+  def ingress(t: Int, nT: Int, n: Int) = {
+    val arc = 2 * Pi / topo.nNodes
+    val rad = arc * (n - 0.5 + (t + 1).toDouble / (nT + 1).toDouble)
     (cos(rad) * 1.2, sin(rad) * 1.2)
   }
-  def egress (t: Double, nT: Double, n: Double) = {
-    val arc = 2 * Pi / nNodes
-    val rad = arc * (n - 0.5 + (t + 1) / (nT + 1))
+  def egress (t: Int, nT: Int, n: Int) = {
+    val arc = 2 * Pi / topo.nNodes
+    val rad = arc * (n - 0.5 + (t + 1).toDouble / (nT + 1).toDouble)
     (cos(rad) * 0.8, sin(rad) * 0.8)
   }
 }
 
-class ButterflyPlotter(kAry: Int, nFly: Int) extends PhysicalTopologyPlotter {
-  val height = pow(kAry, nFly-1).toInt
-  def node(n: Double) = {
-    val x = n.toInt / height
-    val y = n.toInt % height
+class ButterflyPlotter(topo: Butterfly) extends PhysicalTopologyPlotter {
+  val height = topo.height
+  def node(n: Int) = {
+    val x = n / height
+    val y = n % height
     (x, y)
   }
-  def ingress(t: Double, nT: Double, n: Double) = (-1, n.toInt % height - 0.5 + (t + 1) / (nT + 1))
-  def egress (t: Double, nT: Double, n: Double) = (1 + n.toInt / height, n.toInt % height - 0.5 + (t + 1) / (nT + 1))
+  def ingress(t: Int, nT: Int, n: Int) = (-1,
+    n % height - 0.5 + (t + 1).toDouble / (nT + 1).toDouble)
+  def egress (t: Int, nT: Int, n: Int) = (
+    1 + n / height,
+    n % height - 0.5 + (t + 1).toDouble / (nT + 1).toDouble)
 }
 
-class Mesh2DPlotter(nX: Int, nY: Int) extends PhysicalTopologyPlotter {
-  def node(n: Double) = (n.toInt % nX, n.toInt / nX)
-  def ingress(t: Double, nT: Double, n: Double) = {
-    val rad =  2 * Pi * 0.25 * (t + 1) / (nT + 1)
-    (cos(rad) * 0.4 + n.toInt % nX, sin(rad) * 0.4 + n.toInt / nX)
+class Mesh2DPlotter(topo: Mesh2DLikePhysicalTopology) extends PhysicalTopologyPlotter {
+  def node(n: Int) = (n % topo.nX, n / topo.nX)
+  def ingress(t: Int, nT: Int, n: Int) = {
+    val rad =  2 * Pi * 0.25 * (t + 1).toDouble / (nT + 1).toDouble
+    (cos(rad) * 0.4 + n % topo.nX, sin(rad) * 0.4 + n / topo.nX)
   }
-  def egress(t: Double, nT: Double, n: Double) = {
-    val rad = -2 * Pi * 0.25 * (t + 1) / (nT + 1)
-    (cos(rad) * 0.4 + n.toInt % nX, sin(rad) * 0.4 + n.toInt / nX)
+  def egress(t: Int, nT: Int, n: Int) = {
+    val rad = -2 * Pi * 0.25 * (t + 1).toDouble / (nT + 1).toDouble
+    (cos(rad) * 0.4 + n % topo.nX, sin(rad) * 0.4 + n / topo.nX)
   }
 }
 
-class TreePlotter(val height: Int, val dAry: Int) extends PhysicalTopologyPlotter {
-  val nNodes = ((dAry * pow(dAry, height) - 1) / (dAry - 1)).toInt
-  def isLeaf(node: Double) = (node >= (nNodes - 1 - (pow(dAry, height) - 1))) && (node <= nNodes - 1)
+class TreePlotter(topo: BidirectionalTree) extends PhysicalTopologyPlotter {
+  val nNodes = topo.nNodes
+  val dAry = topo.dAry
+  val height = topo.height
+  def isLeaf(node: Int) = (node >= (nNodes - 1 - (pow(dAry, height) - 1))) && (node <= nNodes - 1)
 
   /* Returns the total number of nodes under NODE in the tree */
-  def nodesUnder(node: Double): Double = {
+  def nodesUnder(node: Int): Int = {
     if (isLeaf(node)) { 0 } else { dAry * (nodesUnder(dAry * node + 1)) + dAry }
   }
 
   /* Given a child node id, returns the parent node's id. */
-  def parent(node: Double): Option[Double] = {
-    if (node == 0) { None } else { Some( floor((node - 1) / dAry)) }
+  def parent(node: Int): Option[Int] = {
+    if (node == 0) { None } else { Some( (node - 1) / dAry) }
   }
 
-  def node(nodeId: Double) = {
+  def node(nodeId: Int) = {
     parent(nodeId) match {
       case None =>
         (0, 0)
@@ -88,27 +90,27 @@ class TreePlotter(val height: Int, val dAry: Int) extends PhysicalTopologyPlotte
     }
   }
 
-  def ingress(iId: Double, nI: Double, nodeId: Double) = {
+  def ingress(iId: Int, nI: Int, nodeId: Int) = {
     val nodeCoords = node(nodeId)
     (nodeCoords._1 - (iId + 1), nodeCoords._2)
   }
 
-  def egress (eId: Double, nE: Double, nodeId: Double) = {
+  def egress (eId: Int, nE: Int, nodeId: Int) = {
     val nodeCoords = node(nodeId)
     (nodeCoords._1 + (eId + 1), nodeCoords._2)
   }
 }
 
 
-class TerminalPlanePlotter(base: PhysicalTopologyPlotter, baseNodes: Int) extends PhysicalTopologyPlotter {
-  def node(n: Double) = {
-    if (n < baseNodes) {
+class TerminalPlanePlotter(topo: TerminalPlane) extends PhysicalTopologyPlotter {
+  val basePlotter = topo.base.plotter
+  def node(n: Int) = {
+    if (topo.isBase(n)) {
       // routing nodes
-      base.node(n)
-    } else if (n < baseNodes * 2) {
-      // ingress nodes
-      val b = base.node(n - baseNodes)
-      base match {
+      basePlotter.node(n % topo.base.nNodes)
+    } else {
+      val b = basePlotter.node(n % topo.base.nNodes)
+      basePlotter match {
         case _: LinePlotter => (b._1, b._2 + 0.25)
         case _: Torus1DPlotter => {
           val rad = atan2(b._2, b._1)
@@ -118,25 +120,12 @@ class TerminalPlanePlotter(base: PhysicalTopologyPlotter, baseNodes: Int) extend
         case _: Mesh2DPlotter => (b._1 + 0.15, b._2 + 0.15)
         case _ => require(false, "Unsupported"); (0.0, 0.0)
       }
-    } else {
-      // egress nodes
-      val b = base.node(n - 2 * baseNodes)
-      base match {
-        case _: LinePlotter => (b._1, b._2 - 0.25)
-        case _: Torus1DPlotter => {
-          val rad = atan2(b._2, b._1)
-          (cos(rad) * 0.9, sin(rad) * 0.9)
-        }
-        case _: ButterflyPlotter => (b._1 + 0.5, b._2)
-        case _: Mesh2DPlotter => (b._1 + 0.15, b._2 - 0.15)
-        case _ => require(false, "Unsupported"); (0.0, 0.0)
-      }
     }
   }
-  def ingress(t: Double, nT: Double, n: Double) = {
-    base.ingress(t, nT, n - baseNodes)
+  def ingress(t: Int, nT: Int, n: Int) = {
+    basePlotter.ingress(t, nT, n % topo.base.nNodes)
   }
-  def egress(t: Double, nT: Double, n: Double) = {
-    base.egress(t, nT, n - 2 * baseNodes)
+  def egress(t: Int, nT: Int, n: Int) = {
+    basePlotter.egress(t, nT, n % topo.base.nNodes)
   }
 }

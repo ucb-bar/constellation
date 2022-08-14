@@ -400,10 +400,6 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
     val noc = privateNoC.map { nocParams =>
       // If desired, create a private noc
       require(nocParams.nVirtualNetworks == 5)
-      val (ingressOffset, egressOffset) = nocParams.topology match {
-        case t: TerminalPlane => (t.base.nNodes, t.base.nNodes * 2)
-        case _ => (0, 0)
-      }
       val flowParams = (0 until in.size).map { i => (0 until out.size).map { o =>
         val inN = inNames(i)
         val outN = outNames(o)
@@ -424,14 +420,14 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
       val ingressParams = (inNodeMapping.values.map(i => Seq(i, i, i)) ++ outNodeMapping.values.map(i => Seq(i, i)))
         .toSeq
         .flatten.zipWithIndex.map { case (i,iId) => UserIngressParams(
-          destId = i + ingressOffset,
+          destId = i,
           vNetId = ingressVNets(iId),
           payloadBits = explicitPayloadWidth.map(e => e * ((actualPayloadWidth + e - 1) / e)).getOrElse(actualPayloadWidth)
         )}
       val egressParams = (inNodeMapping.values.map(i => Seq(i, i)) ++ outNodeMapping.values.map(i => Seq(i, i, i)))
         .toSeq
         .flatten.zipWithIndex.map { case (e,eId) => UserEgressParams(
-          srcId = e + egressOffset,
+          srcId = e,
           vNetId = egressVNets(eId),
           payloadBits = explicitPayloadWidth.map(e => e * ((actualPayloadWidth + e - 1) / e)).getOrElse(actualPayloadWidth)
         )}
