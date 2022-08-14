@@ -106,7 +106,10 @@ class WithFatTreeChannels(mult: Int) extends Config((site, here, up) => {
 
 class WithHierarchicalIngressEgress(ingresses: Seq[(Option[Int], Int)], egresses: Seq[(Option[Int], Int)]) extends Config((site, here, up) => {
   case NoCKey => {
-    val topo = up(NoCKey).topology.asInstanceOf[HierarchicalTopology]
+    val topo = up(NoCKey).topology match {
+      case t: HierarchicalTopology => t
+      case t: TerminalPlane => t.base.asInstanceOf[HierarchicalTopology]
+    }
     up(NoCKey).copy(
       ingresses = ingresses.map {
         case (Some(childId), i) => UserIngressParams(i + topo.offsets(childId))
