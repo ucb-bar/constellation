@@ -5,7 +5,7 @@ import chisel3.util._
 
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.diplomacy._
-import freechips.rocketchip.util.{PlusArg}
+import freechips.rocketchip.util._
 
 import constellation.channel._
 import constellation.routing.{RoutingRelation}
@@ -139,15 +139,10 @@ class Router(
     dontTouch(fires_count)
 
 
-    (io_in zip input_units).foreach {
-    case (i,u) => u.io.in <> i }
-    (io_ingress zip ingress_units).foreach {
-      case (i,u) => u.io.in <> i.flit }
-    (output_units zip io_out).foreach {
-      case (u,o) => o <> u.io.out }
-    (egress_units zip io_egress).foreach {
-      case (u,o) => o.flit <> u.io.out }
-
+    (io_in      zip input_units  ).foreach { case (i,u) => u.io.in <> i }
+    (io_ingress zip ingress_units).foreach { case (i,u) => u.io.in <> i.flit }
+    (output_units zip io_out   ).foreach { case (u,o) => o <> u.io.out }
+    (egress_units zip io_egress).foreach { case (u,o) => o.flit <> u.io.out }
     (route_computer.io.req zip all_input_units).foreach {
       case (i,u) => i <> u.io.router_req }
     (all_input_units zip route_computer.io.resp).foreach {

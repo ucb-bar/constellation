@@ -19,10 +19,10 @@ class AbstractInputUnitIO(
   val nodeId = cParam.destId
 
   val router_req = Decoupled(new RouteComputerReq(cParam))
-  val router_resp = Flipped(Valid(new RouteComputerResp(cParam, outParams, egressParams)))
+  val router_resp = Input(new RouteComputerResp(cParam, outParams, egressParams))
 
   val vcalloc_req = Decoupled(new VCAllocReq(cParam, outParams, egressParams))
-  val vcalloc_resp = Flipped(Valid(new VCAllocResp(cParam, outParams, egressParams)))
+  val vcalloc_resp = Input(new VCAllocResp(cParam, outParams, egressParams))
 
   val out_credit_available = Input(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) }))
 
@@ -154,7 +154,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   val io = IO(new AbstractInputUnitIO(cParam, outParams, egressParams) {
     val in = Flipped(new Channel(cParam.asInstanceOf[ChannelParams]))
   })
-  val g_i :: g_r :: g_r_stall :: g_v :: g_v_stall :: g_a :: g_c :: Nil = Enum(7)
+  val g_i :: g_r :: g_v :: g_a :: g_c :: Nil = Enum(5)
 
   class InputState extends Bundle {
     val g = UInt(3.W)
@@ -200,7 +200,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
           rreq.valid := true.B
           rreq.bits.flow := io.in.flit(i).bits.flow
           rreq.bits.src_virt_id := io.in.flit(i).bits.virt_channel_id
-          states(id).g := Mux(rreq.ready, g_r_stall, g_r)
+          states(id).g := Mux(rreq.ready, g_v, g_r)
         }
       }
     }
@@ -211,22 +211,22 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
       i.valid := s.g === g_r
       i.bits.flow := s.flow
       i.bits.src_virt_id := idx.U
-      when (i.fire()) { s.g := g_r_stall }
+      when (i.fire()) { s.g := g_v }
     } else {
       i.valid := false.B
       i.bits := DontCare
     }
   }
 
-  when (io.router_resp.fire()) {
-    val id = io.router_resp.bits.src_virt_id
-    assert(states(id).g.isOneOf(g_r, g_r_stall) || (
+  when (io.router_req.fire()) {
+    val id = io.router_req.bits.src_virt_id
+    assert(states(id).g === g_r || (
       earlyRC.B && io.in.flit.map(f => f.valid && f.bits.head && f.bits.virt_channel_id === id).reduce(_||_)
     ))
     states(id).g := g_v
     for (i <- 0 until nVirtualChannels) {
       when (i.U === id) {
-        states(i).vc_sel := io.router_resp.bits.vc_sel
+        states(i).vc_sel := io.router_resp.vc_sel
       }
     }
   }
@@ -237,8 +237,8 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   val vcalloc_filter = PriorityEncoderOH(Cat(vcalloc_vals.asUInt, vcalloc_vals.asUInt & ~mask))
   val vcalloc_sel = vcalloc_filter(nVirtualChannels-1,0) | (vcalloc_filter >> nVirtualChannels)
   // Prioritize incoming packetes
-  when (io.router_resp.valid) {
-    mask := (1.U << io.router_resp.bits.src_virt_id) - 1.U
+  when (io.router_req.fire()) {
+    mask := (1.U << io.router_req.bits.src_virt_id) - 1.U
   } .elsewhen (vcalloc_vals.orR) {
     mask := Mux1H(vcalloc_sel, (0 until nVirtualChannels).map { w => ~(0.U((w+1).W)) })
   }
@@ -251,11 +251,11 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
       vcalloc_reqs(idx).in_vc := idx.U
       vcalloc_reqs(idx).vc_sel := s.vc_sel
       vcalloc_reqs(idx).flow := s.flow
-      when (vcalloc_vals(idx) && vcalloc_sel(idx) && io.vcalloc_req.ready) { s.g := g_v_stall }
+      when (vcalloc_vals(idx) && vcalloc_sel(idx) && io.vcalloc_req.ready) { s.g := g_a }
       if (combineRCVA) {
-        when (io.router_resp.valid && io.router_resp.bits.src_virt_id === idx.U) {
+        when (route_arbiter.io.in(idx).fire()) {
           vcalloc_vals(idx) := true.B
-          vcalloc_reqs(idx).vc_sel := io.router_resp.bits.vc_sel
+          vcalloc_reqs(idx).vc_sel := io.router_resp.vc_sel
         }
       }
     } else {
@@ -266,13 +266,13 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
 
   io.debug.va_stall := PopCount(vcalloc_vals) - io.vcalloc_req.ready
 
-  when (io.vcalloc_resp.fire()) {
+  when (io.vcalloc_req.fire()) {
     for (i <- 0 until nVirtualChannels) {
-      when (io.vcalloc_resp.bits.in_vc === i.U) {
-        states(i).vc_sel := io.vcalloc_resp.bits.vc_sel
+      when (vcalloc_sel(i)) {
+        states(i).vc_sel := io.vcalloc_resp.vc_sel
         states(i).g := g_a
         if (!combineRCVA) {
-          assert(states(i).g.isOneOf(g_v, g_v_stall))
+          assert(states(i).g === g_v)
         }
       }
     }
