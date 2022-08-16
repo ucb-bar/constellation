@@ -9,7 +9,7 @@ import freechips.rocketchip.util._
 import constellation.channel.{ChannelParams, IngressChannelParams, EgressChannelParams, Flit}
 
 class SwitchBundle(val outParams: Seq[ChannelParams], val egressParams: Seq[EgressChannelParams])(implicit val p: Parameters) extends Bundle with HasRouterOutputParams{
-  val flit = new Flit(allOutParams(0))
+  val flit = new Flit(allOutParams(0).payloadBits)
   val out_virt_channel = UInt(log2Up(allOutParams.map(_.nVirtualChannels).max).W)
 }
 
@@ -28,7 +28,7 @@ class Switch(
     val in = MixedVec(allInParams.map { u => Vec(u.destMultiplier,
       Input(Valid(new SwitchBundle(outParams, egressParams)))) })
     val out = MixedVec(allOutParams.map { u => Vec(u.srcMultiplier,
-      Output(Valid(new Flit(u)))) })
+      Output(Valid(new Flit(u.payloadBits)))) })
     val sel = MixedVec(allOutParams.map { o => Vec(o.srcMultiplier,
       MixedVec(allInParams.map { i => Vec(i.destMultiplier, Input(Bool())) })) })
   })

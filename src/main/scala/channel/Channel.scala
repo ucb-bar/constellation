@@ -8,32 +8,21 @@ import freechips.rocketchip.diplomacy.{ClockCrossingType, NoCrossing}
 import constellation.routing.{ChannelRoutingInfo}
 import constellation.noc.{HasNoCParams}
 
-trait HasChannelParams {
-  val cParam: BaseChannelParams
-
-  val payloadBits = cParam.payloadBits
+class Channel(val cParam: ChannelParams)(implicit val p: Parameters) extends Bundle {
   val nVirtualChannels = cParam.nVirtualChannels
-  val virtualChannelBits = log2Up(nVirtualChannels)
-  def virtualChannelParams = cParam match {
-    case c: ChannelParams         => c.virtualChannelParams
-    case _ => require(false); Nil;
-  }
-  def maxBufferSize = virtualChannelParams.map(_.bufferSize).max
+  val flit = Vec(cParam.srcMultiplier, Valid(new Flit(cParam.payloadBits)))
+  val credit_return = Input(UInt(cParam.nVirtualChannels.W))
+  val vc_free = Input(UInt(cParam.nVirtualChannels.W))
 }
 
-
-class Channel(val cParam: ChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
-  val flit = Vec(cParam.srcMultiplier, Valid(new Flit(cParam)))
-  val credit_return = Input(UInt(nVirtualChannels.W))
-  val vc_free = Input(UInt(nVirtualChannels.W))
-}
-
-class IngressChannel(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
+class IngressChannel(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle {
+  val payloadBits = cParam.payloadBits
   require(cParam.isInstanceOf[IngressChannelParams])
-  val flit = Irrevocable(new IngressFlit(cParam))
+  val flit = Irrevocable(new IngressFlit(cParam.payloadBits))
 }
 
-class EgressChannel(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle with HasChannelParams {
+class EgressChannel(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle {
+  val payloadBits = cParam.payloadBits
   require(cParam.isInstanceOf[EgressChannelParams])
-  val flit = Irrevocable(new EgressFlit(cParam))
+  val flit = Irrevocable(new EgressFlit(cParam.payloadBits))
 }

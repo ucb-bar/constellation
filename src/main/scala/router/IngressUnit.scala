@@ -19,11 +19,11 @@ class IngressUnit(
   (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, egressParams)(p) {
 
   val io = IO(new AbstractInputUnitIO(cParam, outParams, egressParams) {
-    val in = Flipped(Decoupled(new IngressFlit(cParam)))
+    val in = Flipped(Decoupled(new IngressFlit(cParam.payloadBits)))
   })
 
-  val route_buffer = Module(new Queue(new Flit(cParam), 2))
-  val route_q = Module(new Queue(new RouteComputerResp(cParam, outParams, egressParams), 2,
+  val route_buffer = Module(new Queue(new Flit(cParam.payloadBits), 2))
+  val route_q = Module(new Queue(new RouteComputerResp(outParams, egressParams), 2,
     flow=combineRCVA))
 
   assert(!(io.in.valid && !cParam.possibleFlows.toSeq.map(_.egressId.U === io.in.bits.egress_id).orR))
@@ -71,8 +71,8 @@ class IngressUnit(
   }
   assert(!(route_q.io.enq.valid && !route_q.io.enq.ready))
 
-  val vcalloc_buffer = Module(new Queue(new Flit(cParam), 2))
-  val vcalloc_q = Module(new Queue(new VCAllocResp(cParam, outParams, egressParams),
+  val vcalloc_buffer = Module(new Queue(new Flit(cParam.payloadBits), 2))
+  val vcalloc_q = Module(new Queue(new VCAllocResp(outParams, egressParams),
     1, pipe=true))
 
   vcalloc_buffer.io.enq.bits := route_buffer.io.deq.bits

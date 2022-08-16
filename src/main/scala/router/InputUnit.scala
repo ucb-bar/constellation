@@ -14,15 +14,14 @@ class AbstractInputUnitIO(
   val cParam: BaseChannelParams,
   val outParams: Seq[ChannelParams],
   val egressParams: Seq[EgressChannelParams],
-)(implicit val p: Parameters) extends Bundle
-    with HasRouterOutputParams with HasChannelParams {
+)(implicit val p: Parameters) extends Bundle with HasRouterOutputParams {
   val nodeId = cParam.destId
 
-  val router_req = Decoupled(new RouteComputerReq(cParam))
-  val router_resp = Input(new RouteComputerResp(cParam, outParams, egressParams))
+  val router_req = Decoupled(new RouteComputerReq)
+  val router_resp = Input(new RouteComputerResp(outParams, egressParams))
 
   val vcalloc_req = Decoupled(new VCAllocReq(cParam, outParams, egressParams))
-  val vcalloc_resp = Input(new VCAllocResp(cParam, outParams, egressParams))
+  val vcalloc_resp = Input(new VCAllocResp(outParams, egressParams))
 
   val out_credit_available = Input(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) }))
 
@@ -30,8 +29,8 @@ class AbstractInputUnitIO(
 
   val out = Vec(cParam.destMultiplier, Valid(new SwitchBundle(outParams, egressParams)))
   val debug = Output(new Bundle {
-    val va_stall = UInt(log2Ceil(nVirtualChannels).W)
-    val sa_stall = UInt(log2Ceil(nVirtualChannels).W)
+    val va_stall = UInt(log2Ceil(cParam.nVirtualChannels).W)
+    val sa_stall = UInt(log2Ceil(cParam.nVirtualChannels).W)
   })
   val block = Input(Bool())
 }
@@ -40,43 +39,25 @@ abstract class AbstractInputUnit(
   val cParam: BaseChannelParams,
   val outParams: Seq[ChannelParams],
   val egressParams: Seq[EgressChannelParams]
-)(implicit val p: Parameters) extends Module with HasRouterOutputParams with HasChannelParams with HasNoCParams {
+)(implicit val p: Parameters) extends Module with HasRouterOutputParams with HasNoCParams {
   val nodeId = cParam.destId
 
   def io: AbstractInputUnitIO
 
-  def filterVCSel(sel: MixedVec[Vec[Bool]], srcV: Int) = {
-    if (virtualChannelParams(srcV).traversable) {
-      outParams.zipWithIndex.map { case (oP, oI) =>
-        (0 until oP.nVirtualChannels).map { oV =>
-          var allow = false
-          virtualChannelParams(srcV).possibleFlows.foreach { pI =>
-            allow = allow || routingRelation(
-              cParam.channelRoutingInfos(srcV),
-              oP.channelRoutingInfos(oV),
-              pI
-            )
-          }
-          if (!allow)
-            sel(oI)(oV) := false.B
-        }
-      }
-    }
-  }
 }
 
 class InputBuffer(cParam: ChannelParams)(implicit p: Parameters) extends Module {
   val nVirtualChannels = cParam.nVirtualChannels
   val io = IO(new Bundle {
-    val enq = Flipped(Vec(cParam.srcMultiplier, Valid(new Flit(cParam))))
-    val deq = Vec(cParam.nVirtualChannels, Decoupled(new BaseFlit(cParam)))
+    val enq = Flipped(Vec(cParam.srcMultiplier, Valid(new Flit(cParam.payloadBits))))
+    val deq = Vec(cParam.nVirtualChannels, Decoupled(new BaseFlit(cParam.payloadBits)))
   })
 
   val fullSize = cParam.virtualChannelParams.map(_.bufferSize).sum
 
   // Ugly case. Use multiple queues
   if (cParam.srcMultiplier > 1 || cParam.destMultiplier > 1 || fullSize <= 1) {
-    val qs = cParam.virtualChannelParams.map(v => Module(new Queue(new BaseFlit(cParam), v.bufferSize)))
+    val qs = cParam.virtualChannelParams.map(v => Module(new Queue(new BaseFlit(cParam.payloadBits), v.bufferSize)))
     qs.zipWithIndex.foreach { case (q,i) =>
       val sel = io.enq.map(f => f.valid && f.bits.virt_channel_id === i.U)
       q.io.enq.valid := sel.orR
@@ -91,17 +72,17 @@ class InputBuffer(cParam: ChannelParams)(implicit p: Parameters) extends Module 
     val starts = delims.dropRight(1)
     val ends = delims.tail
 
-    val mem = Mem(fullSize, new BaseFlit(cParam))
+    val mem = Mem(fullSize, new BaseFlit(cParam.payloadBits))
     val heads = RegInit(VecInit(starts.map(_.U(log2Ceil(fullSize).W))))
     val tails = RegInit(VecInit(starts.map(_.U(log2Ceil(fullSize).W))))
     val empty = (heads zip tails).map(t => t._1 === t._2)
 
-    val qs = Seq.fill(nVirtualChannels) { Module(new Queue(new BaseFlit(cParam), 2)) }
+    val qs = Seq.fill(nVirtualChannels) { Module(new Queue(new BaseFlit(cParam.payloadBits), 2)) }
     qs.foreach(_.io.enq.valid := false.B)
     qs.foreach(_.io.enq.bits := DontCare)
 
     val vc_sel = UIntToOH(io.enq(0).bits.virt_channel_id)
-    val flit = Wire(new BaseFlit(cParam))
+    val flit = Wire(new BaseFlit(cParam.payloadBits))
     val direct_to_q = Mux1H(vc_sel, qs.map(_.io.enq.ready)) && Mux1H(vc_sel, empty)
     flit.head := io.enq(0).bits.head
     flit.tail := io.enq(0).bits.tail
@@ -151,6 +132,9 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
 )
   (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, egressParams)(p) {
 
+  val nVirtualChannels = cParam.nVirtualChannels
+  val virtualChannelParams = cParam.virtualChannelParams
+
   val io = IO(new AbstractInputUnitIO(cParam, outParams, egressParams) {
     val in = Flipped(new Channel(cParam.asInstanceOf[ChannelParams]))
   })
@@ -169,10 +153,10 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   input_buffer.io.deq.foreach(_.ready := false.B)
 
   val route_arbiter = Module(new Arbiter(
-    new RouteComputerReq(cParam), nVirtualChannels
+    new RouteComputerReq, nVirtualChannels
   ))
   val early_route_arbiter = Module(new Arbiter(
-    new RouteComputerReq(cParam), 1 + cParam.srcMultiplier))
+    new RouteComputerReq, 1 + cParam.srcMultiplier))
   early_route_arbiter.io.in.foreach(_.valid := false.B)
   early_route_arbiter.io.in.foreach(_.bits := DontCare)
   early_route_arbiter.io.in(0) <> route_arbiter.io.out
@@ -310,7 +294,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     val valid = Bool()
     val vid = UInt(virtualChannelBits.W)
     val out_vid = UInt(log2Up(allOutParams.map(_.nVirtualChannels).max).W)
-    val flit = new Flit(cParam)
+    val flit = new Flit(cParam.payloadBits)
   }
 
   val salloc_outs = if (combineSAST) {
@@ -350,6 +334,25 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     io.out(i).valid := salloc_out.valid
     io.out(i).bits.flit := salloc_out.flit
     io.out(i).bits.out_virt_channel := salloc_out.out_vid
+  }
+
+  def filterVCSel(sel: MixedVec[Vec[Bool]], srcV: Int) = {
+    if (virtualChannelParams(srcV).traversable) {
+      outParams.zipWithIndex.map { case (oP, oI) =>
+        (0 until oP.nVirtualChannels).map { oV =>
+          var allow = false
+          virtualChannelParams(srcV).possibleFlows.foreach { pI =>
+            allow = allow || routingRelation(
+              cParam.channelRoutingInfos(srcV),
+              oP.channelRoutingInfos(oV),
+              pI
+            )
+          }
+          if (!allow)
+            sel(oI)(oV) := false.B
+        }
+      }
+    }
   }
 
   (0 until nVirtualChannels).map { i =>
