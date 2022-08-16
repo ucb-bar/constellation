@@ -377,7 +377,6 @@ class TestConfig40 extends Config(
   new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
   new constellation.topology.WithTopology(Mesh2D(3, 3)))
 class TestConfig41 extends Config(
-  new constellation.router.WithEarlyRC ++
   new constellation.channel.WithUniformNVirtualChannels(2, UserVirtualChannelParams(2)) ++
   new constellation.channel.WithFullyConnectedIngresses ++
   new constellation.channel.WithIngresses(0 until 9) ++
@@ -385,7 +384,6 @@ class TestConfig41 extends Config(
   new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
   new constellation.topology.WithTopology(Mesh2D(3, 3)))
 class TestConfig42 extends Config(
-  new constellation.router.WithEarlyRC ++
   new constellation.router.WithCombineRCVA ++
   new constellation.router.WithCombineSAST ++
   new constellation.channel.WithUniformNVirtualChannels(2, UserVirtualChannelParams(2)) ++

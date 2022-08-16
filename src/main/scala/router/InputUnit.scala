@@ -128,7 +128,7 @@ class InputBuffer(cParam: ChannelParams)(implicit p: Parameters) extends Module 
 
 class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   egressParams: Seq[EgressChannelParams],
-  combineRCVA: Boolean, combineSAST: Boolean, earlyRC: Boolean
+  combineRCVA: Boolean, combineSAST: Boolean
 )
   (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, egressParams)(p) {
 
@@ -155,12 +155,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   val route_arbiter = Module(new Arbiter(
     new RouteComputerReq, nVirtualChannels
   ))
-  val early_route_arbiter = Module(new Arbiter(
-    new RouteComputerReq, 1 + cParam.srcMultiplier))
-  early_route_arbiter.io.in.foreach(_.valid := false.B)
-  early_route_arbiter.io.in.foreach(_.bits := DontCare)
-  early_route_arbiter.io.in(0) <> route_arbiter.io.out
-  io.router_req <> early_route_arbiter.io.out
+  io.router_req <> route_arbiter.io.out
 
   val states = Reg(Vec(nVirtualChannels, new InputState))
 
@@ -178,15 +173,6 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
         }
       }
       states(id).flow := io.in.flit(i).bits.flow
-      if (earlyRC) {
-        val rreq = early_route_arbiter.io.in(i+1)
-        when (!at_dest) {
-          rreq.valid := true.B
-          rreq.bits.flow := io.in.flit(i).bits.flow
-          rreq.bits.src_virt_id := io.in.flit(i).bits.virt_channel_id
-          states(id).g := Mux(rreq.ready, g_v, g_r)
-        }
-      }
     }
   }
 
@@ -204,9 +190,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
 
   when (io.router_req.fire()) {
     val id = io.router_req.bits.src_virt_id
-    assert(states(id).g === g_r || (
-      earlyRC.B && io.in.flit.map(f => f.valid && f.bits.head && f.bits.virt_channel_id === id).reduce(_||_)
-    ))
+    assert(states(id).g === g_r)
     states(id).g := g_v
     for (i <- 0 until nVirtualChannels) {
       when (i.U === id) {
