@@ -20,7 +20,6 @@ case class UserRouterParams(
   combineRCVA: Boolean = false,
   // Adds combinational path from SA to VA
   coupleSAVA: Boolean = false,
-  earlyRC: Boolean = false,
   vcAllocator: VCAllocatorParams => Parameters => VCAllocator = (vP) => (p) => new RotatingSingleVCAllocator(vP)(p)
 )
 
@@ -111,7 +110,7 @@ class Router(
 
     val input_units = inParams.zipWithIndex.map { case (u,i) =>
       Module(new InputUnit(u, outParams, egressParams,
-        routerParams.user.combineRCVA, routerParams.user.combineSAST, routerParams.user.earlyRC))
+        routerParams.user.combineRCVA, routerParams.user.combineSAST))
         .suggestName(s"input_unit_${i}_from_${u.srcId}") }
     val ingress_units = ingressParams.zipWithIndex.map { case (u,i) =>
       Module(new IngressUnit(i, u, outParams, egressParams,
