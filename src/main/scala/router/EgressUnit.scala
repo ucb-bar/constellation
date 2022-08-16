@@ -12,15 +12,13 @@ import constellation.routing.{FlowRoutingBundle}
 class EgressUnit(coupleSAVA: Boolean, inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannelParams], cParam: EgressChannelParams)
   (implicit p: Parameters) extends AbstractOutputUnit(inParams, ingressParams, cParam)(p) {
 
-  require(nVirtualChannels == 1)
-
   val io = IO(new AbstractOutputUnitIO(inParams, ingressParams, cParam) {
-    val out = Decoupled(new EgressFlit(cParam))
+    val out = Decoupled(new EgressFlit(cParam.payloadBits))
   })
 
   val channel_empty = RegInit(true.B)
   val flow = Reg(new FlowRoutingBundle)
-  val q = Module(new Queue(new EgressFlit(cParam), 3, flow=true))
+  val q = Module(new Queue(new EgressFlit(cParam.payloadBits), 3, flow=true))
   q.io.enq.valid := io.in(0).valid
   q.io.enq.bits.head := io.in(0).bits.head
   q.io.enq.bits.tail := io.in(0).bits.tail

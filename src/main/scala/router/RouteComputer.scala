@@ -12,16 +12,15 @@ import constellation.channel._
 import constellation.routing.{FlowRoutingBundle, FlowRoutingInfo}
 import constellation.noc.{HasNoCParams}
 
-class RouteComputerReq(val cParam: BaseChannelParams)(implicit val p: Parameters) extends Bundle
-    with HasChannelParams {
+class RouteComputerReq(implicit val p: Parameters) extends Bundle with HasNoCParams {
   val src_virt_id = UInt(virtualChannelBits.W)
   val flow = new FlowRoutingBundle
 }
 
-class RouteComputerResp(val cParam: BaseChannelParams,
+class RouteComputerResp(
   val outParams: Seq[ChannelParams],
   val egressParams: Seq[EgressChannelParams])(implicit val p: Parameters) extends Bundle
-    with HasChannelParams with HasRouterOutputParams {
+    with HasRouterOutputParams {
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
 }
 
@@ -39,8 +38,8 @@ class RouteComputer(
     with HasRouterOutputParams
     with HasNoCParams {
   val io = IO(new Bundle {
-    val req = MixedVec(allInParams.map { u => Flipped(Decoupled(new RouteComputerReq(u))) })
-    val resp = MixedVec(allInParams.map { u => Output(new RouteComputerResp(u, outParams, egressParams)) })
+    val req = MixedVec(allInParams.map { u => Flipped(Decoupled(new RouteComputerReq)) })
+    val resp = MixedVec(allInParams.map { u => Output(new RouteComputerResp(outParams, egressParams)) })
   })
 
   (io.req zip io.resp).zipWithIndex.map { case ((req, resp), i) =>

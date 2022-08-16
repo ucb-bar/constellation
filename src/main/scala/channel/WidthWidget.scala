@@ -145,18 +145,18 @@ class ChannelWidthWidget(srcBits: Int)(implicit p: Parameters) extends LazyModul
         require(srcBits % destBits == 0)
 
         (in.flit zip out.flit) foreach { case (iF, oF) =>
-          val in_q = Module(new Queue(new Flit(in.cParam),
+          val in_q = Module(new Queue(new Flit(in.cParam.payloadBits),
             in.cParam.virtualChannelParams.map(_.bufferSize).sum, pipe=true, flow=true))
           in_q.io.enq.valid := iF.valid
           in_q.io.enq.bits := iF.bits
           assert(!(in_q.io.enq.valid && !in_q.io.enq.ready))
 
-          val in_flit = Wire(Irrevocable(new Flit(in.cParam)))
+          val in_flit = Wire(Irrevocable(new Flit(in.cParam.payloadBits)))
           in_flit.valid := in_q.io.deq.valid
           in_flit.bits := in_q.io.deq.bits
           in_q.io.deq.ready := in_flit.ready
 
-          val out_flit = Wire(Irrevocable(new Flit(out.cParam)))
+          val out_flit = Wire(Irrevocable(new Flit(out.cParam.payloadBits)))
           oF.valid := out_flit.valid
           oF.bits := out_flit.bits
           out_flit.ready := true.B
@@ -180,8 +180,8 @@ class ChannelWidthWidget(srcBits: Int)(implicit p: Parameters) extends LazyModul
       } else {
         require(destBits % srcBits == 0)
 
-        val in_flits = Wire(Vec(in.nVirtualChannels, Irrevocable(new Flit(in.cParam))))
-        val out_flits = Wire(Vec(in.nVirtualChannels, Irrevocable(new Flit(out.cParam))))
+        val in_flits = Wire(Vec(in.nVirtualChannels, Irrevocable(new Flit(in.cParam.payloadBits))))
+        val out_flits = Wire(Vec(in.nVirtualChannels, Irrevocable(new Flit(out.cParam.payloadBits))))
         for (i <- 0 until in.nVirtualChannels) {
           val sel = in.flit.map(f => f.valid && f.bits.virt_channel_id === i.U)
           in_flits(i).valid := sel.orR

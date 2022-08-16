@@ -8,12 +8,12 @@ import freechips.rocketchip.util._
 
 import constellation.noc.{HasNoCParams}
 
-class NoCMonitor(val cParam: ChannelParams)(implicit val p: Parameters) extends Module with HasChannelParams with HasNoCParams {
+class NoCMonitor(val cParam: ChannelParams)(implicit val p: Parameters) extends Module with HasNoCParams {
   val io = IO(new Bundle {
     val in = Input(new Channel(cParam))
   })
 
-  val in_flight = RegInit(VecInit(Seq.fill(nVirtualChannels) { false.B }))
+  val in_flight = RegInit(VecInit(Seq.fill(cParam.nVirtualChannels) { false.B }))
   for (i <- 0 until cParam.srcMultiplier) {
     val flit = io.in.flit(i)
     when (flit.valid) {

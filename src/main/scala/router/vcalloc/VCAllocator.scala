@@ -23,9 +23,7 @@ class VCAllocReq(
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
 }
 
-class VCAllocResp(val cParam: BaseChannelParams, val outParams: Seq[ChannelParams], val egressParams: Seq[EgressChannelParams])(implicit val p: Parameters) extends Bundle
-    with HasChannelParams
-    with HasRouterOutputParams {
+class VCAllocResp(val outParams: Seq[ChannelParams], val egressParams: Seq[EgressChannelParams])(implicit val p: Parameters) extends Bundle with HasRouterOutputParams {
   val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
 }
 
@@ -53,7 +51,7 @@ abstract class VCAllocator(val vP: VCAllocatorParams)(implicit val p: Parameters
       Flipped(Decoupled(new VCAllocReq(u, outParams, egressParams)))
     })
     val resp = MixedVec(allInParams.map { u =>
-      Output(new VCAllocResp(u, outParams, egressParams))
+      Output(new VCAllocResp(outParams, egressParams))
     })
 
     val channel_status = MixedVec(allOutParams.map { u =>

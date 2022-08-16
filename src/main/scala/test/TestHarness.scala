@@ -60,7 +60,7 @@ class InputGen(idx: Int, cParams: IngressChannelParams)
   val inputPacketStallProbability = p(NoCTesterKey).inputPacketStallProbability
   val flitIdBits = log2Ceil(maxFlits+1)
   val io = IO(new Bundle {
-    val out = Irrevocable(new IngressFlit(cParams))
+    val out = Irrevocable(new IngressFlit(cParams.payloadBits))
     val rob_ready = Input(Bool())
     val rob_idx = Input(UInt())
     val tsc = Input(UInt(32.W))

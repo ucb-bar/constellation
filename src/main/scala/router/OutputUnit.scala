@@ -28,10 +28,10 @@ class AbstractOutputUnitIO(
   val inParams: Seq[ChannelParams],
   val ingressParams: Seq[IngressChannelParams],
   val cParam: BaseChannelParams
-)(implicit val p: Parameters) extends Bundle with HasRouterInputParams with HasChannelParams {
+)(implicit val p: Parameters) extends Bundle with HasRouterInputParams {
   val nodeId = cParam.srcId
-
-  val in = Flipped(Vec(cParam.srcMultiplier, Valid(new Flit(cParam))))
+  val nVirtualChannels = cParam.nVirtualChannels
+  val in = Flipped(Vec(cParam.srcMultiplier, Valid(new Flit(cParam.payloadBits))))
   val credit_available = Output(Vec(nVirtualChannels, Bool()))
   val channel_status = Output(Vec(nVirtualChannels, new OutputChannelStatus))
   val allocs = Input(Vec(nVirtualChannels, new OutputChannelAlloc))
@@ -43,7 +43,7 @@ abstract class AbstractOutputUnit(
   val inParams: Seq[ChannelParams],
   val ingressParams: Seq[IngressChannelParams],
   val cParam: BaseChannelParams
-)(implicit val p: Parameters) extends Module with HasRouterInputParams with HasChannelParams with HasNoCParams {
+)(implicit val p: Parameters) extends Module with HasRouterInputParams with HasNoCParams {
   val nodeId = cParam.srcId
 
   def io: AbstractOutputUnitIO
@@ -62,14 +62,14 @@ class OutputUnit(inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannel
     val flow = new FlowRoutingBundle
   }
 
-  val states = Reg(MixedVec(virtualChannelParams.map { u => new OutputState(u.bufferSize) }))
+  val states = Reg(MixedVec(cParam.virtualChannelParams.map { u => new OutputState(u.bufferSize) }))
   (states zip io.channel_status).map { case (s,a) =>
     a.occupied := s.occupied
     a.flow := s.flow
   }
   io.out.flit := io.in
 
-  states.zipWithIndex.map { case (s,i) => if (virtualChannelParams(i).traversable) {
+  states.zipWithIndex.map { case (s,i) => if (cParam.virtualChannelParams(i).traversable) {
     when (io.out.vc_free(i)) {
       assert(s.occupied)
       s.occupied := false.B
@@ -78,7 +78,7 @@ class OutputUnit(inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannel
   } }
 
 
-  (states zip io.allocs).zipWithIndex.map { case ((s,a),i) => if (virtualChannelParams(i).traversable) {
+  (states zip io.allocs).zipWithIndex.map { case ((s,a),i) => if (cParam.virtualChannelParams(i).traversable) {
     when (a.alloc) {
       s.occupied := true.B
       s.flow := a.flow
@@ -92,7 +92,7 @@ class OutputUnit(inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannel
   states.zipWithIndex.map { case (s,i) =>
     val free = io.out.credit_return(i)
     val alloc = io.credit_alloc(i).alloc
-    if (virtualChannelParams(i).traversable) {
+    if (cParam.virtualChannelParams(i).traversable) {
       s.c := s.c +& free - alloc
     }
   }
