@@ -5,6 +5,14 @@ on:
 
 jobs:
 
+  docs:
+    name: "Try to compile the docs"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build docs
+        run: |
+          make -C docs html
+
   compile:
     name: "Try to compile the project"
     runs-on: self-hosted
