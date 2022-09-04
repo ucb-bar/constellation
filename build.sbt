@@ -34,5 +34,5 @@ Test / testGrouping := (Test / testGrouping).value.flatMap { group =>
       Group(test.name, Seq(test), SubProcess(ForkOptions()))
    }
 }
-concurrentRestrictions := Seq(Tags.limit(Tags.ForkedTestGroup, 16))
+concurrentRestrictions := Seq(Tags.limit(Tags.ForkedTestGroup, 72))
 

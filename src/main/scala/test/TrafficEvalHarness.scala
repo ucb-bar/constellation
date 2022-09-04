@@ -10,7 +10,7 @@ import freechips.rocketchip.config.{Field, Parameters, Config}
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.util._
 
-import constellation.noc.{NoCKey, HasNoCParams, NoC}
+import constellation.noc.{NoCParams, HasNoCParams, NoC}
 import constellation.channel._
 import constellation.rc.{TLNoC, TLNoCParams}
 import constellation.router.{HasRouterCtrlConsts}
@@ -69,11 +69,12 @@ class TrafficEvalEgress(egress_id: Int, config_str: String) extends BlackBox(Map
 
 
 case class NoCEvalParams(
+  nocParams: NoCParams = NoCParams(),
   warmupCycles: Int = 5000,
   measurementCycles: Int = 20000,
   drainTimeoutCycles: Int = 100000,
   flitsPerPacket: Int = 4,
-  flows: ListMap[(Int, Int), Double] = ListMap[(Int, Int), Double](),
+  flows: (Int, Int) => Double = (a: Int, b: Int) => 0.0,
   requiredThroughput: Double = 0.0,
   requiredMedianLatency: Int = 99999,
   requiredMaxLatency: Int = 99999,
@@ -94,15 +95,15 @@ netrace_enable          $netraceEnable
 netrace_trace           $netraceTrace
 netrace_region          $netraceRegion
 netrace_ignore_dependencies $netraceIgnoreDependencies
-""" + flows.map {
-    case ((ingress_id, egress_id), rate) => s"flow             $ingress_id $egress_id $rate"
+""" + nocParams.flows.map { f =>
+    s"flow             ${f.ingressId} ${f.egressId} ${flows(f.ingressId, f.egressId)}"
   }.mkString("\n")
 }
 
 case object NoCEvalKey extends Field[NoCEvalParams](NoCEvalParams())
 
 class EvalHarness(implicit val p: Parameters) extends Module with HasSuccessIO {
-  val lazyNoC = LazyModule(new NoC)
+  val lazyNoC = LazyModule(new NoC(p(NoCEvalKey).nocParams))
   val noc = Module(lazyNoC.module)
   noc.io.router_clocks.foreach(_.clock := clock)
   noc.io.router_clocks.foreach(_.reset := reset)

@@ -122,7 +122,7 @@ class Router(
       Module(new OutputUnit(inParams, ingressParams, u))
         .suggestName(s"output_unit_${i}_to_${u.destId}")}
     val egress_units = egressParams.zipWithIndex.map { case (u,i) =>
-      Module(new EgressUnit(routerParams.user.coupleSAVA, inParams, ingressParams, u))
+      Module(new EgressUnit(routerParams.user.coupleSAVA && all_input_units.size == 1, inParams, ingressParams, u))
         .suggestName(s"egress_unit_${i+nOutputs}_to_${u.egressId}")}
     val all_output_units = output_units ++ egress_units
 

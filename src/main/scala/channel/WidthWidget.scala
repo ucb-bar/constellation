@@ -142,7 +142,7 @@ class ChannelWidthWidget(srcBits: Int)(implicit p: Parameters) extends LazyModul
         in.credit_return := out.credit_return
         out.flit <> in.flit
       } else if (srcBits > destBits) {
-        require(srcBits % destBits == 0)
+        require(srcBits % destBits == 0, s"$srcBits, $destBits")
 
         (in.flit zip out.flit) foreach { case (iF, oF) =>
           val in_q = Module(new Queue(new Flit(in.cParam.payloadBits),

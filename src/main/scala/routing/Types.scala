@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import freechips.rocketchip.config.{Parameters}
 
-import constellation.noc.{NoCKey, HasNoCParams}
+import constellation.noc.{HasNoCParams}
 import constellation.channel.{Flit}
 
 /** A representation for 1 specific virtual channel in wormhole routing

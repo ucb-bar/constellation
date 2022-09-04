@@ -9,7 +9,7 @@ import freechips.rocketchip.util._
 import freechips.rocketchip.unittest._
 import freechips.rocketchip.amba.axi4._
 
-import constellation.noc.{NoC, NoCKey, NoCParams, NoCTerminalIO}
+import constellation.noc.{NoC, NoCParams, NoCTerminalIO}
 import constellation.channel._
 import constellation.topology.{TerminalPlane}
 
@@ -280,8 +280,6 @@ class AXI4NoC(params: AXI4NoCParams)(implicit p: Parameters) extends LazyModule 
     ).max
 
     val nocParams = params.privateNoC
-    require(nocParams.nVirtualNetworks == 5)
-
 
     def getIndex(nodeMapping: Seq[String], l: String) = {
       val matches = nodeMapping.map(k => l.contains(k))
@@ -325,27 +323,23 @@ class AXI4NoC(params: AXI4NoCParams)(implicit p: Parameters) extends LazyModule 
       .toSeq
       .flatten.zipWithIndex.map { case (i,iId) => UserIngressParams(
         destId = i,
-        vNetId = ingressVNets(iId),
         payloadBits = payloadWidth
       )}
     val egressParams = (inNodeMapping.values.map(i => Seq(i, i)) ++ outNodeMapping.values.map(i => Seq(i, i, i)))
       .toSeq
       .flatten.zipWithIndex.map { case (e,eId) => UserEgressParams(
         srcId = e,
-        vNetId = egressVNets(eId),
         payloadBits = payloadWidth
       )}
 
-    val noc = Module(LazyModule(new NoC()(p.alterPartial({
-      case NoCKey => nocParams.copy(
-        routerParams = (i: Int) => nocParams.routerParams(i).copy(payloadBits=payloadWidth),
-        ingresses = ingressParams,
-        egresses = egressParams,
-        flows = flowParams,
+    val noc = Module(LazyModule(new NoC(nocParams.copy(
+      routerParams = (i: Int) => nocParams.routerParams(i).copy(payloadBits=payloadWidth),
+      ingresses = ingressParams,
+      egresses = egressParams,
+      flows = flowParams,
         nocName = nocName,
-        hasCtrl = false
-      )
-    }))).module)
+      hasCtrl = false
+    ))).module)
 
     noc.io.router_clocks.foreach(_.clock := clock)
     noc.io.router_clocks.foreach(_.reset := reset)

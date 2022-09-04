@@ -9,18 +9,18 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.subsystem._
 import freechips.rocketchip.util._
 
-import constellation.noc.{NoCKey}
+import constellation.noc.NoCParams
 import scala.collection.immutable.{ListMap}
 
 // Use a noc based system bus. By default instantiates a private noc within the bus
-class WithSbusNoC extends Config((site, here, up) => {
+class WithSbusNoC(nocParams: Option[NoCParams]) extends Config((site, here, up) => {
   case TLNetworkTopologyLocated(InSubsystem) => {
     up(TLNetworkTopologyLocated(InSubsystem), site).map(topo => {
       topo match {
         case j: TLBusWrapperTopology => {
           new TLBusWrapperTopology(j.instantiations.map(inst => inst match {
             case (SBUS, sbus_params: SystemBusParams) =>
-              (SBUS, ConstellationSystemBusParams(sbus_params, Some(up(NoCKey))))
+              (SBUS, ConstellationSystemBusParams(sbus_params, nocParams))
             case a => a
           }), j.connections)
         }
@@ -28,18 +28,21 @@ class WithSbusNoC extends Config((site, here, up) => {
       }
     })
   }
+  case GlobalTLInterconnectKey => up(GlobalTLInterconnectKey).copy(
+    supportedBuses = up(GlobalTLInterconnectKey).supportedBuses ++ (if (nocParams.isDefined) Seq(SBUS) else Nil)
+  )
 })
 
 
 // Use a noc based memory bus. By default instantiates a private noc within the bus
-class WithMbusNoC extends Config((site, here, up) => {
+class WithMbusNoC(nocParams: Option[NoCParams]) extends Config((site, here, up) => {
   case TLNetworkTopologyLocated(InSubsystem) => {
     up(TLNetworkTopologyLocated(InSubsystem), site).map(topo => {
       topo match {
         case j: TLBusWrapperTopology => {
           new TLBusWrapperTopology(j.instantiations.map(inst => inst match {
             case (MBUS, mbus_params: MemoryBusParams) =>
-              (MBUS, ConstellationMemoryBusParams(mbus_params, Some(up(NoCKey))))
+              (MBUS, ConstellationMemoryBusParams(mbus_params, nocParams))
             case a => a
           }), j.connections)
         }
@@ -47,17 +50,21 @@ class WithMbusNoC extends Config((site, here, up) => {
       }
     })
   }
+  case GlobalTLInterconnectKey => up(GlobalTLInterconnectKey).copy(
+    supportedBuses = up(GlobalTLInterconnectKey).supportedBuses ++ (if (nocParams.isDefined) Seq(MBUS) else Nil)
+  )
+
 })
 
 // Use a noc based control bus. By default instantiates a private noc within the bus
-class WithCbusNoC(explicitWidth: Option[Int] = None) extends Config((site, here, up) => {
+class WithCbusNoC(nocParams: Option[NoCParams], explicitWidth: Option[Int] = None) extends Config((site, here, up) => {
   case TLNetworkTopologyLocated(InSubsystem) => {
     up(TLNetworkTopologyLocated(InSubsystem), site).map(topo => {
       topo match {
         case j: TLBusWrapperTopology => {
           new TLBusWrapperTopology(j.instantiations.map(inst => inst match {
             case (CBUS, cbus_params: PeripheryBusParams) =>
-              (CBUS, ConstellationPeripheryBusParams(cbus_params, Some(up(NoCKey)), explicitWidth))
+              (CBUS, ConstellationPeripheryBusParams(cbus_params, nocParams, explicitWidth))
             case a => a
           }), j.connections)
         }
@@ -65,6 +72,9 @@ class WithCbusNoC(explicitWidth: Option[Int] = None) extends Config((site, here,
       }
     })
   }
+  case GlobalTLInterconnectKey => up(GlobalTLInterconnectKey).copy(
+    supportedBuses = up(GlobalTLInterconnectKey).supportedBuses ++ (if (nocParams.isDefined) Seq(CBUS) else Nil)
+  )
 })
 
 // Config options for setting node mappings for each bus
@@ -109,50 +119,11 @@ class WithCBusNoCGlobalNoCCtrlMapping(f: Int => Int) extends Config((site, here,
 })
 
 
-
-// connect them to the global noc instead
-class WithSbusGlobalNoC extends Config((site, here, up) => {
+// Use a global shared noc
+class WithGlobalNoC(nocParams: NoCParams) extends Config((site, here, up) => {
   case GlobalTLInterconnectKey => up(GlobalTLInterconnectKey).copy(
-    supportedBuses = up(GlobalTLInterconnectKey).supportedBuses + SBUS,
-    nocParams = up(NoCKey)
+    nocParams=nocParams
   )
-  case TLNetworkTopologyLocated(InSubsystem) => {
-    up(TLNetworkTopologyLocated(InSubsystem), site).map(topo => {
-      topo match {
-        case j: TLBusWrapperTopology => {
-          new TLBusWrapperTopology(j.instantiations.map(inst => inst match {
-            case (SBUS, sbus_params: ConstellationSystemBusParams) => {
-              (SBUS, sbus_params.copy(privateNoC=None))
-            }
-            case a => a
-          }), j.connections)
-        }
-        case x => x
-      }
-    })
-  }
-})
-
-class WithMbusGlobalNoC extends Config((site, here, up) => {
-  case GlobalTLInterconnectKey => up(GlobalTLInterconnectKey).copy(
-    supportedBuses = up(GlobalTLInterconnectKey).supportedBuses + MBUS,
-    nocParams = up(NoCKey)
-  )
-  case TLNetworkTopologyLocated(InSubsystem) => {
-    up(TLNetworkTopologyLocated(InSubsystem), site).map(topo => {
-      topo match {
-        case j: TLBusWrapperTopology => {
-          new TLBusWrapperTopology(j.instantiations.map(inst => inst match {
-            case (MBUS, mbus_params: ConstellationMemoryBusParams) => {
-              (MBUS, mbus_params.copy(privateNoC=None))
-            }
-            case a => a
-          }), j.connections)
-        }
-        case x => x
-      }
-    })
-  }
 })
 
 class WithGlobalNoCWidth(w: Int) extends Config((site, here, up) => {

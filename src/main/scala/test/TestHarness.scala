@@ -9,7 +9,7 @@ import freechips.rocketchip.config.{Field, Parameters, Config}
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.util._
 
-import constellation.noc.{NoCKey, HasNoCParams, NoC}
+import constellation.noc.{NoCParams, HasNoCParams, NoC}
 import constellation.channel._
 import constellation.rc.{TLNoC, TLNoCParams}
 import constellation.router.{HasRouterCtrlConsts}
@@ -36,6 +36,7 @@ object SelectFirstNUInt
 }
 
 case class NoCTesterParams(
+  nocParams: NoCParams = NoCParams(),
   robSz: Int = 128,
   totalTxs: Int = 50000,
   inputFlitStallProbability: Double = 0.0,
@@ -233,7 +234,7 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
 
 
 class TestHarness(implicit val p: Parameters) extends Module with HasRouterCtrlConsts with HasSuccessIO {
-  val lazyNoC = LazyModule(new NoC)
+  val lazyNoC = LazyModule(new NoC(p(NoCTesterKey).nocParams))
   val noc = Module(lazyNoC.module)
   noc.io.router_clocks.foreach(_.clock := clock)
   noc.io.router_clocks.foreach(_.reset := reset)

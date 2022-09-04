@@ -21,17 +21,14 @@ class NoCTerminalIO(
   val egress = MixedVec(egressParams.map { u => new EgressChannel(u) })
 }
 
-class NoC(implicit p: Parameters) extends LazyModule {
-  val internalParams = InternalNoCParams(p(NoCKey))
+class NoC(nocParams: NoCParams)(implicit p: Parameters) extends LazyModule {
+  val internalParams = InternalNoCParams(nocParams)
   val allChannelParams = internalParams.channelParams
   val allIngressParams = internalParams.ingressParams
   val allEgressParams = internalParams.egressParams
   val allRouterParams = internalParams.routerParams
 
   val iP = p.alterPartial({ case InternalNoCKey => internalParams })
-
-  val nocParams = internalParams.userParams
-
   val nNodes = nocParams.topology.nNodes
   val nocName = nocParams.nocName
   val skipValidationChecks = nocParams.skipValidationChecks

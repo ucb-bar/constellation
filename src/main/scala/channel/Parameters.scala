@@ -6,7 +6,7 @@ import chisel3.util._
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.diplomacy.{ClockCrossingType, NoCrossing}
 import constellation.routing.{ChannelRoutingInfo, FlowRoutingInfo}
-import constellation.noc.{HasNoCParams, NoCKey}
+import constellation.noc.{HasNoCParams}
 
 
 case class FlowParams(
@@ -38,7 +38,6 @@ case class UserChannelParams(
  */
 case class UserIngressParams(
   destId: Int,
-  vNetId: Int = 0,
   payloadBits: Int = 64,
 )
 
@@ -50,7 +49,6 @@ case class UserIngressParams(
  */
 case class UserEgressParams(
   srcId: Int,
-  vNetId: Int = 0,
   payloadBits: Int = 64,
 )
 
@@ -145,13 +143,11 @@ object IngressChannelParams {
     val ourFlows = flows.filter(_.ingressId == ingressId)
     val vNetIds = ourFlows.map(_.vNetId).toSet
     require(vNetIds.size <= 1)
-    if (ourFlows.size > 0)
-      require(vNetIds.head == user.vNetId)
     IngressChannelParams(
       ingressId = ingressId,
+      vNetId = vNetIds.headOption.getOrElse(0),
       destId = user.destId,
       possibleFlows = ourFlows.toSet,
-      vNetId = user.vNetId,
       payloadBits = user.payloadBits
     )
   }
@@ -177,8 +173,6 @@ object EgressChannelParams {
     val ourFlows = flows.filter(_.egressId == egressId)
     val vNetIds = ourFlows.map(_.vNetId).toSet
     require(vNetIds.size <= 1)
-    if (ourFlows.size > 0)
-      require(vNetIds.head == user.vNetId)
     EgressChannelParams(
       egressId = egressId,
       possibleFlows = ourFlows.toSet,

@@ -9,7 +9,7 @@ import freechips.rocketchip.config.{Field, Parameters, Config}
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.util._
 
-import constellation.noc.{NoCKey, HasNoCParams, NoC}
+import constellation.noc.{NoCParams, HasNoCParams, NoC}
 import constellation.channel._
 import constellation.rc.{TLNoC, TLNoCParams, ConstellationDiplomaticNetworkNodeMapping}
 import constellation.router.{HasRouterCtrlConsts}
@@ -17,6 +17,7 @@ import constellation.router.{HasRouterCtrlConsts}
 import scala.collection.immutable.ListMap
 
 case class TLNoCTesterParams(
+  nocParams: NoCParams = NoCParams(),
   inNodeMapping: Seq[Int] = Nil,
   outNodeMapping: Seq[Int] = Nil,
   ctrlSourceNode: Int = 0,
@@ -26,10 +27,6 @@ case class TLNoCTesterParams(
 )
 
 case object TLNoCTesterKey extends Field[TLNoCTesterParams](TLNoCTesterParams())
-
-class WithTLNoCTesterParams(p: TLNoCTesterParams) extends Config((site, here, up) => {
-  case TLNoCTesterKey => p
-})
 
 class TLNoCTester(implicit p: Parameters) extends LazyModule {
   val tParams = p(TLNoCTesterKey)
@@ -41,7 +38,7 @@ class TLNoCTester(implicit p: Parameters) extends LazyModule {
     outNodeMapping)
   val nManagers = outNodeMapping.size
   val nClients = inNodeMapping.size
-  val noc = LazyModule(new TLNoC(TLNoCParams("test", nodeMapping, Some(p(NoCKey)), tParams.explicitPayloadWidth)))
+  val noc = LazyModule(new TLNoC(TLNoCParams("test", nodeMapping, Some(p(TLNoCTesterKey).nocParams), tParams.explicitPayloadWidth)))
 
   val fuzzers = (0 until nClients) map { n =>
     val fuzz = LazyModule(new TLFuzzer(txns))

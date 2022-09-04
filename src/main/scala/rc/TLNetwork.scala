@@ -9,7 +9,7 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.subsystem._
 import freechips.rocketchip.util._
 
-import constellation.noc.{NoC, NoCKey, NoCParams, NoCTerminalIO}
+import constellation.noc.{NoC, NoCParams, NoCTerminalIO}
 import constellation.channel._
 import constellation.topology.{TerminalPlane}
 
@@ -399,7 +399,6 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
 
     val noc = privateNoC.map { nocParams =>
       // If desired, create a private noc
-      require(nocParams.nVirtualNetworks == 5)
       val flowParams = (0 until in.size).map { i => (0 until out.size).map { o =>
         val inN = inNames(i)
         val outN = outNames(o)
@@ -421,27 +420,23 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLXbar {
         .toSeq
         .flatten.zipWithIndex.map { case (i,iId) => UserIngressParams(
           destId = i,
-          vNetId = ingressVNets(iId),
           payloadBits = explicitPayloadWidth.map(e => e * ((actualPayloadWidth + e - 1) / e)).getOrElse(actualPayloadWidth)
         )}
       val egressParams = (inNodeMapping.values.map(i => Seq(i, i)) ++ outNodeMapping.values.map(i => Seq(i, i, i)))
         .toSeq
         .flatten.zipWithIndex.map { case (e,eId) => UserEgressParams(
           srcId = e,
-          vNetId = egressVNets(eId),
           payloadBits = explicitPayloadWidth.map(e => e * ((actualPayloadWidth + e - 1) / e)).getOrElse(actualPayloadWidth)
         )}
 
-      Module(LazyModule(new NoC()(p.alterPartial({
-        case NoCKey => nocParams.copy(
-          routerParams = (i: Int) => nocParams.routerParams(i).copy(payloadBits = explicitPayloadWidth.getOrElse(actualPayloadWidth)),
-          ingresses = ingressParams,
-          egresses = egressParams,
-          flows = flowParams,
-          nocName = nocName,
-          hasCtrl = false
-        )
-      }))).module)
+      Module(LazyModule(new NoC(nocParams.copy(
+        routerParams = (i: Int) => nocParams.routerParams(i).copy(payloadBits = explicitPayloadWidth.getOrElse(actualPayloadWidth)),
+        ingresses = ingressParams,
+        egresses = egressParams,
+        flows = flowParams,
+        nocName = nocName,
+        hasCtrl = false
+      ))).module)
     }
     // If we have privateNoC
     noc.map { n =>

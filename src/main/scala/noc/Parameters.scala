@@ -13,29 +13,35 @@ import constellation.topology.{PhysicalTopology, UnidirectionalLine}
 
 
 case class NoCParams(
-  nVirtualNetworks: Int = 1,
-
+  // Physical specifications
   topology: PhysicalTopology = UnidirectionalLine(1),
   channelParamGen: (Int, Int) => UserChannelParams = (a: Int, b: Int) => UserChannelParams(),
   ingresses: Seq[UserIngressParams] = Nil,
   egresses: Seq[UserEgressParams] = Nil,
-  flows: Seq[FlowParams] = Nil,
-  routingRelation: PhysicalTopology => RoutingRelation = AllLegalRouting(),
   routerParams: Int => UserRouterParams = (i: Int) => UserRouterParams(),
+
+  // Flow specification
   // (blocker, blockee) => bool
   // If true, then blocker must be able to proceed when blockee is blocked
   vNetBlocking: (Int, Int) => Boolean = (_: Int, _: Int) => true,
+  flows: Seq[FlowParams] = Nil,
+
+  // Routing specification
+  routingRelation: PhysicalTopology => RoutingRelation = AllLegalRouting(),
+
+  // other
   nocName: String = "test",
   skipValidationChecks: Boolean = false,
   hasCtrl: Boolean = false,
 )
-case object NoCKey extends Field[NoCParams](NoCParams())
+//case object NoCKey extends Field[NoCParams](NoCParams())
 
 
 case object InternalNoCKey extends Field[InternalNoCParams]
 
 case class InternalNoCParams(
   userParams: NoCParams,
+  nVirtualNetworks: Int,
   routingRelation: RoutingRelation,
   channelParams: Seq[ChannelParams],
   ingressParams: Seq[IngressChannelParams],
@@ -47,28 +53,28 @@ trait HasNoCParams {
   implicit val p: Parameters
   val nocParams = p(InternalNoCKey)
 
-  val nNodes = nocParams.userParams.topology.nNodes
-  val nVirtualNetworks = nocParams.userParams.nVirtualNetworks
-  val nocName = nocParams.userParams.nocName
-  val hasCtrl = nocParams.userParams.hasCtrl
+  def nNodes = nocParams.userParams.topology.nNodes
+  def nVirtualNetworks = nocParams.nVirtualNetworks
+  def nocName = nocParams.userParams.nocName
+  def hasCtrl = nocParams.userParams.hasCtrl
 
-  val nodeIdBits = log2Ceil(nNodes)
-  val vNetBits = log2Up(nocParams.userParams.nVirtualNetworks)
-  val nEgresses = nocParams.egressParams.size
-  val nIngresses = nocParams.ingressParams.size
-  val egressIdBits = log2Up(nEgresses)
-  val ingressIdBits = log2Up(nIngresses)
-  val egressSrcIds = nocParams.egressParams.map(_.srcId)
-  val maxIngressesAtNode = nocParams.routerParams.map(_.nIngress).max
-  val maxEgressesAtNode = nocParams.routerParams.map(_.nEgress).max
-  val routingRelation = nocParams.routingRelation
-  val virtualChannelBits = log2Up(nocParams.channelParams.map(_.nVirtualChannels).max)
+  def nodeIdBits = log2Ceil(nNodes)
+  def vNetBits = log2Up(nVirtualNetworks)
+  def nEgresses = nocParams.egressParams.size
+  def nIngresses = nocParams.ingressParams.size
+  def egressIdBits = log2Up(nEgresses)
+  def ingressIdBits = log2Up(nIngresses)
+  def egressSrcIds = nocParams.egressParams.map(_.srcId)
+  def maxIngressesAtNode = nocParams.routerParams.map(_.nIngress).max
+  def maxEgressesAtNode = nocParams.routerParams.map(_.nEgress).max
+  def routingRelation = nocParams.routingRelation
+  def virtualChannelBits = log2Up(nocParams.channelParams.map(_.nVirtualChannels).max)
 }
 
 object InternalNoCParams {
   def apply(nocParams: NoCParams): InternalNoCParams = {
     val nNodes = nocParams.topology.nNodes
-    val nVirtualNetworks = nocParams.nVirtualNetworks
+    val nVirtualNetworks = nocParams.flows.map(_.vNetId).max + 1
     val nocName = nocParams.nocName
     val skipValidationChecks = nocParams.skipValidationChecks
 
@@ -90,7 +96,6 @@ object InternalNoCParams {
     nocParams.flows.foreach(f => {
       require(f.ingressId < nocParams.ingresses.size)
       require(f.egressId < nocParams.egresses.size)
-      require(f.vNetId < nocParams.nVirtualNetworks)
     })
 
     for (i <- 0 until nocParams.ingresses.size) {
@@ -102,8 +107,6 @@ object InternalNoCParams {
     val flows = nocParams.flows.map { f =>
       val ingressNode = nocParams.ingresses(f.ingressId).destId
       val egressNode  = nocParams.egresses (f.egressId ).srcId
-      require(f.vNetId == nocParams.ingresses(f.ingressId).vNetId)
-      require(f.vNetId == nocParams.egresses(f.egressId).vNetId)
       FlowRoutingInfo(
         ingressId=f.ingressId, egressId=f.egressId, vNetId=f.vNetId,
         ingressNode=ingressNode,
@@ -288,6 +291,7 @@ object InternalNoCParams {
 
     InternalNoCParams(
       userParams = nocParams,
+      nVirtualNetworks = nVirtualNetworks,
       routingRelation = routingRelation,
       channelParams = finalChannelParams,
       ingressParams = ingressParams,

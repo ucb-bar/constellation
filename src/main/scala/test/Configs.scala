@@ -3,922 +3,1018 @@ package constellation.test
 import freechips.rocketchip.config.{Field, Parameters, Config}
 import constellation.routing._
 import constellation.topology._
-import constellation.noc.{NoCKey}
-import constellation.channel.{UserVirtualChannelParams, UserChannelParams, FlowParams}
+import constellation.noc.{NoCParams}
+import constellation.channel._
+import constellation.router._
 import scala.collection.immutable.ListMap
+import scala.math.{floor, log10, pow, max}
 
-class WithConstPacketSize(sZ: Int = 9) extends Config((site, here, up) => {
-  case NoCTesterKey => up(NoCTesterKey).copy(constPacketSize = true, maxFlits = sZ)
+
+class NoCTesterConfig(p: NoCTesterParams) extends Config((site, here, up) => {
+  case NoCTesterKey => p
 })
 
-class WithInputFlitStallProbability(prob: Double) extends Config((site, here, up) => {
-  case NoCTesterKey => up(NoCTesterKey).copy(inputFlitStallProbability = prob)
+class TLNoCTesterConfig(p: TLNoCTesterParams) extends Config((site, here, up) => {
+  case TLNoCTesterKey => p
 })
 
-class WithInputPacketStallProbability(prob: Double) extends Config((site, here, up) => {
-  case NoCTesterKey => up(NoCTesterKey).copy(inputPacketStallProbability = prob)
+class AXI4NoCTesterConfig(p: AXI4NoCTesterParams) extends Config((site, here, up) => {
+  case AXI4NoCTesterKey => p
 })
 
-class WithTotalTxs(t: Int) extends Config((site, here, up) => {
-  case NoCTesterKey => up(NoCTesterKey).copy(totalTxs = t)
+class NoCEvalConfig(p: NoCEvalParams) extends Config((site, here, up) => {
+  case NoCEvalKey => p
 })
 
-class WithEvalFlow(ingress_id: Int, egress_id: Int, rate: Double) extends Config((site, here, up) => {
-  case NoCEvalKey => up(NoCEvalKey).copy(
-    flows = up(NoCEvalKey).flows + ((ingress_id, egress_id) -> rate)
-  )
-})
-class WithEvalUniformFlow(rate: Double) extends Config((site, here, up) => {
-  case NoCEvalKey => {
-    val flows = site(NoCKey).flows
-    val counts = (0 until site(NoCKey).ingresses.size).map { i =>
-      flows.filter(_.ingressId == i).size
+class TestConfig00 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = UnidirectionalLine(2),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(3) }),
+  ingresses       = Seq(0).map { i => UserIngressParams(i) },
+  egresses        = Seq(1).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(1, 1) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = UnidirectionalLineRouting()
+)))
+class TestConfig01 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = UnidirectionalLine(2),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(3) }),
+  ingresses       = Seq(0).map { i => UserIngressParams(i) },
+  egresses        = Seq(1, 1).map { i => UserEgressParams(1) },
+  flows           = Seq.tabulate(1, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = UnidirectionalLineRouting()
+)))
+class TestConfig02 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = UnidirectionalLine(2),
+  channelParamGen = (a, b) => UserChannelParams(
+    virtualChannelParams = Seq.fill(3) { UserVirtualChannelParams(3) },
+    channelGen = (u: Parameters) => {
+      implicit val p: Parameters = u
+      ChannelBuffer(2) := _
     }
-    up(NoCEvalKey).copy(
-      flows = ListMap(flows.map {
-        case FlowParams(i,e,_) => ((i, e) -> rate / counts(i))
-      }:_*)
+  ),
+  ingresses       = Seq(0, 0).map { i => UserIngressParams(i) },
+  egresses        = Seq(1, 1).map { i => UserEgressParams(1) },
+  flows           = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = UnidirectionalLineRouting()
+)))
+class TestConfig03 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = UnidirectionalLine(2),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(3) }),
+  ingresses       = Seq(0, 0).map { i => UserIngressParams(i) },
+  egresses        = Seq(0, 1, 1).map { i => UserEgressParams(1) },
+  flows           = Seq.tabulate(2, 3) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = UnidirectionalLineRouting()
+)))
+class TestConfig04 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = UnidirectionalLine(3, Seq((0, 2))),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(3) }),
+  ingresses       = Seq(0, 0).map { i => UserIngressParams(i) },
+  egresses        = Seq(0, 1, 1, 2, 2).map { i => UserEgressParams(1) },
+  flows           = Seq.tabulate(2, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = UnidirectionalLineRouting()
+)))
+class TestConfig05 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = UnidirectionalLine(3),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(3) }),
+  ingresses       = Seq(0, 1, 1).map { i => UserIngressParams(i) },
+  egresses        = Seq(1, 1, 2).map { i => UserEgressParams(1) },
+  flows           = Seq.tabulate(3, 3) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = UnidirectionalLineRouting()
+)))
+class TestConfig06 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = UnidirectionalLine(3),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+  routerParams    = (i) => UserRouterParams(coupleSAVA=true),
+  ingresses       = Seq(0).map { i => UserIngressParams(i) },
+  egresses        = Seq(1).map { i => UserEgressParams(1) },
+  flows           = Seq.tabulate(1, 1) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = UnidirectionalLineRouting()
+)))
+class TestConfig07 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = UnidirectionalLine(2),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+  routerParams    = (i) => UserRouterParams(coupleSAVA=true),
+  ingresses       = Seq(0).map { i => UserIngressParams(i) },
+  egresses        = Seq(1).map { i => UserEgressParams(1) },
+  flows           = Seq.tabulate(1, 1) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = UnidirectionalLineRouting(),
+  hasCtrl         = true
+)))
+class TestConfig08 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = UnidirectionalLine(7, Seq((0, 2), (2, 4), (4, 6))),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+  routerParams    = (i) => UserRouterParams(
+    vcAllocator = (vP) => (p) => new PrioritizingSingleVCAllocator(vP)(p),
+    coupleSAVA=true),
+  ingresses       = Seq(0).map { i => UserIngressParams(i) },
+  egresses        = Seq(1, 2, 3, 4, 5).map { i => UserEgressParams(1) },
+  flows           = Seq.tabulate(1, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = UnidirectionalLineRouting()
+)))
+class TestConfig09 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = BidirectionalLine(2),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(3) }),
+  ingresses       = (0 until 2).map { i => UserIngressParams(i) },
+  egresses        = (0 until 2).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = BidirectionalLineRouting()
+)))
+class TestConfig10 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = BidirectionalLine(3),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(3) }),
+  ingresses       = (0 until 2).map { i => UserIngressParams(i) },
+  egresses        = (0 until 3).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(2, 3) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = BidirectionalLineRouting()
+)))
+class TestConfig11 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = BidirectionalLine(4),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(3) }),
+  ingresses       = (1 until 3).map { i => UserIngressParams(i) },
+  egresses        = (0 until 4).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(2, 4) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = BidirectionalLineRouting()
+)))
+class TestConfig12 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = BidirectionalLine(4),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(3) }),
+  ingresses       = Seq(1, 1, 2, 2).map { i => UserIngressParams(i) },
+  egresses        = Seq(0, 0, 1, 1, 2, 2, 3, 3).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(4, 8) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = BidirectionalLineRouting()
+)))
+class TestConfig13 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = UnidirectionalTorus1D(2),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+  ingresses       = Seq(0).map { i => UserIngressParams(i) },
+  egresses        = Seq(1).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(1, 1) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = UnidirectionalTorus1DDatelineRouting()
+)))
+class TestConfig14 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = UnidirectionalTorus1D(4),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+  ingresses       = Seq(0, 2).map { i => UserIngressParams(i) },
+  egresses        = Seq(1, 3).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = UnidirectionalTorus1DDatelineRouting()
+)))
+class TestConfig15 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = UnidirectionalTorus1D(10),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+  ingresses       = (0 until 10 by 2).map { i => UserIngressParams(i) },
+  egresses        = (1 until 10 by 2).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = UnidirectionalTorus1DDatelineRouting()
+)))
+class TestConfig16 extends NoCTesterConfig(NoCTesterParams(
+  NoCParams(
+    topology        = UnidirectionalTorus1D(10),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+    ingresses       = (0 until 10).map { i => UserIngressParams(i) },
+    egresses        = (0 until 10).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(10, 10) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = UnidirectionalTorus1DDatelineRouting()
+  ),
+  inputPacketStallProbability = 0.9
+))
+class TestConfig17 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = BidirectionalTorus1D(2),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+  ingresses       = (0 until 2).map { i => UserIngressParams(i) },
+  egresses        = (0 until 2).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = BidirectionalTorus1DShortestRouting()
+)))
+class TestConfig18 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = BidirectionalTorus1D(4),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+  ingresses       = (0 until 4 by 2).map { i => UserIngressParams(i) },
+  egresses        = (1 until 4 by 2).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = BidirectionalTorus1DShortestRouting()
+)))
+class TestConfig19 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = BidirectionalTorus1D(10),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+  ingresses       = (0 until 10).map { i => UserIngressParams(i) },
+  egresses        = (0 until 10).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(10, 10) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = BidirectionalTorus1DShortestRouting()
+)))
+class TestConfig20 extends NoCTesterConfig(NoCTesterParams(
+  NoCParams(
+    topology        = BidirectionalTorus1D(10),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+    ingresses       = (0 until 10).map { i => UserIngressParams(i) },
+    egresses        = (0 until 10).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(10, 10) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = BidirectionalTorus1DRandomRouting()
+  ),
+  inputFlitStallProbability = 0.8
+))
+class TestConfig21 extends NoCTesterConfig(NoCTesterParams(
+  NoCParams(
+    topology        = BidirectionalTorus1D(10),
+    channelParamGen = (a, b) => UserChannelParams(
+      virtualChannelParams = Seq.fill(4) { UserVirtualChannelParams(5) },
+      srcMultiplier = 2,
+      destMultiplier = 2
+    ),
+    ingresses       = (0 until 20).map { i => UserIngressParams(i % 10) },
+    egresses        = (0 until 20).map { i => UserEgressParams(i % 10) },
+    flows           = Seq.tabulate(20, 20) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = BidirectionalTorus1DRandomRouting()
+  ),
+  inputPacketStallProbability = 0.9
+))
+class TestConfig22 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Butterfly(2, 2),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(1) { UserVirtualChannelParams(5) }),
+  ingresses       = (0 until 4).map { i => UserIngressParams(i % 2) },
+  egresses        = (0 until 4).map { i => UserEgressParams((i % 2) + 2 * 1) },
+  flows           = Seq.tabulate(4, 4) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = ButterflyRouting()
+)))
+class TestConfig23 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Butterfly(2, 3),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(1) { UserVirtualChannelParams(5) }),
+  ingresses       = (0 until 8).map { i => UserIngressParams(i % 4) },
+  egresses        = (0 until 8).map { i => UserEgressParams((i % 4) + 4 * 2) },
+  flows           = Seq.tabulate(8, 8) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = ButterflyRouting()
+)))
+class TestConfig24 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Butterfly(2, 4),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(1) { UserVirtualChannelParams(5) }),
+  ingresses       = (0 until 16).map { i => UserIngressParams(i % 8) },
+  egresses        = (0 until 16).map { i => UserEgressParams((i % 8) + 8 * 3) },
+  flows           = Seq.tabulate(16, 16) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = ButterflyRouting()
+)))
+class TestConfig25 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Butterfly(3, 2),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(1) { UserVirtualChannelParams(5) }),
+  ingresses       = (0 until 6).map { i => UserIngressParams(i % 3) },
+  egresses        = (0 until 6).map { i => UserEgressParams((i % 3) + 3 * 1) },
+  flows           = Seq.tabulate(6, 6) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = ButterflyRouting()
+)))
+class TestConfig26 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Butterfly(3, 3),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(1) { UserVirtualChannelParams(5) }),
+  ingresses       = (0 until 18).map { i => UserIngressParams(i % 9) },
+  egresses        = (0 until 18).map { i => UserEgressParams((i % 9) + 9 * 2) },
+  flows           = Seq.tabulate(18, 18) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = ButterflyRouting()
+)))
+class TestConfig27 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = BidirectionalTree(3, 2),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(1) { UserVirtualChannelParams(3) }),
+  ingresses       = (0 until 6 by 2).map { i => UserIngressParams(i) },
+  egresses        = (1 until 6 by 2).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(3, 3) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = BidirectionalTreeRouting()
+)))
+class TestConfig28 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = BidirectionalTree(3, 2),
+  channelParamGen = (a, b) => {
+    val height = 3
+    val dAry = 2
+    def level(i: Int) = floor(log10(i + 1) / log10(dAry))
+    val mult = pow(2, height - max(level(a), level(b))).toInt
+    UserChannelParams(
+      Seq.fill(mult) { UserVirtualChannelParams(3) },
+      srcMultiplier = mult,
+      destMultiplier = mult
     )
-  }
-})
-
-class WithEvalRequiredThroughput(t: Double) extends Config((site, here, up) => {
-  case NoCEvalKey => up(NoCEvalKey).copy(requiredThroughput=t)
-})
-
-class WithEvalRequiredMedianLatency(t: Int) extends Config((site, here, up) => {
-  case NoCEvalKey => up(NoCEvalKey).copy(requiredMedianLatency=t)
-})
-class WithEvalRequiredMaxLatency(t: Int) extends Config((site, here, up) => {
-  case NoCEvalKey => up(NoCEvalKey).copy(requiredMaxLatency=t)
-})
-
-
-// 1D mesh. Shared bus
-class TestConfig00 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(Seq(0)) ++
-  new constellation.channel.WithEgresses(Seq(1)) ++
-  new constellation.routing.WithRoutingRelation(UnidirectionalLineRouting()) ++
-  new constellation.topology.WithTopology(UnidirectionalLine(2)))
-class TestConfig01 extends Config(
-  new constellation.channel.WithUniformChannelDepth(1) ++
-  new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(Seq(0)) ++
-  new constellation.channel.WithEgresses(Seq(1, 1)) ++
-  new constellation.routing.WithRoutingRelation(UnidirectionalLineRouting()) ++
-  new constellation.topology.WithTopology(UnidirectionalLine(2)))
-class TestConfig02 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(Seq(0, 0)) ++
-  new constellation.channel.WithEgresses(Seq(1, 1)) ++
-  new constellation.routing.WithRoutingRelation(UnidirectionalLineRouting()) ++
-  new constellation.topology.WithTopology(UnidirectionalLine(2)))
-class TestConfig03 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(Seq(0, 0)) ++
-  new constellation.channel.WithEgresses (Seq(0, 1, 1)) ++
-  new constellation.routing.WithRoutingRelation(UnidirectionalLineRouting()) ++
-  new constellation.topology.WithTopology(UnidirectionalLine(2)))
-class TestConfig04 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(Seq(0, 0)) ++
-  new constellation.channel.WithEgresses(Seq(0, 1, 1, 2, 2)) ++
-  new constellation.routing.WithRoutingRelation(UnidirectionalLineRouting()) ++
-  new constellation.topology.WithTopology(UnidirectionalLine(3, Seq((0, 2)))))
-class TestConfig05 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(Seq(0, 1, 1)) ++
-  new constellation.channel.WithEgresses(Seq(1, 1, 2)) ++
-  new constellation.routing.WithRoutingRelation(UnidirectionalLineRouting()) ++
-  new constellation.topology.WithTopology(UnidirectionalLine(3)))
-class TestConfig06 extends Config(
-  new constellation.router.WithCoupleSAVA ++
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(Seq(0)) ++
-  new constellation.channel.WithEgresses(Seq(1)) ++
-  new constellation.routing.WithRoutingRelation(UnidirectionalLineRouting()) ++
-  new constellation.topology.WithTopology(UnidirectionalLine(2)))
-class TestConfig07 extends Config(
-  new constellation.noc.WithCtrl ++
-  new constellation.router.WithCoupleSAVA ++
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(Seq(0)) ++
-  new constellation.channel.WithEgresses(Seq(1)) ++
-  new constellation.routing.WithRoutingRelation(UnidirectionalLineRouting()) ++
-  new constellation.topology.WithTopology(UnidirectionalLine(2)))
-class TestConfig08 extends Config(
-  new constellation.router.WithPrioritizingSingleVCAllocator ++
-  new constellation.router.WithCoupleSAVA ++
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(Seq(0)) ++
-  new constellation.channel.WithEgresses(Seq(1, 2, 3, 4, 5)) ++
-  new constellation.routing.WithRoutingRelation(UnidirectionalLineRouting()) ++
-  new constellation.topology.WithTopology(UnidirectionalLine(7, Seq((0, 2), (2, 4), (4, 6)))))
-
-
-
-class TestConfig09 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 2) ++
-  new constellation.channel.WithEgresses(0 until 2) ++
-  new constellation.routing.WithRoutingRelation(BidirectionalLineRouting()) ++
-  new constellation.topology.WithTopology(BidirectionalLine(2)))
-class TestConfig10 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 2) ++
-  new constellation.channel.WithEgresses(0 until 3) ++
-  new constellation.routing.WithRoutingRelation(BidirectionalLineRouting()) ++
-  new constellation.topology.WithTopology(BidirectionalLine(3)))
-class TestConfig11 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(1 until 3) ++
-  new constellation.channel.WithEgresses(0 until 4) ++
-  new constellation.routing.WithRoutingRelation(BidirectionalLineRouting()) ++
-  new constellation.topology.WithTopology(BidirectionalLine(4)))
-class TestConfig12 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(Seq(1, 1, 2, 2)) ++
-  new constellation.channel.WithEgresses(Seq(0, 0, 1, 1, 2, 2, 3, 3)) ++
-  new constellation.routing.WithRoutingRelation(BidirectionalLineRouting()) ++
-  new constellation.topology.WithTopology(BidirectionalLine(4)))
-
-// 1D Torus
-class TestConfig13 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(Seq(0)) ++
-  new constellation.channel.WithEgresses(Seq(1)) ++
-  new constellation.routing.WithRoutingRelation(UnidirectionalTorus1DDatelineRouting()) ++
-  new constellation.topology.WithTopology(UnidirectionalTorus1D(2)))
-class TestConfig14 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(Seq(0, 2)) ++
-  new constellation.channel.WithEgresses(Seq(1, 3)) ++
-  new constellation.routing.WithRoutingRelation(UnidirectionalTorus1DDatelineRouting()) ++
-  new constellation.topology.WithTopology(UnidirectionalTorus1D(4)))
-class TestConfig15 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 10 by 2) ++
-  new constellation.channel.WithEgresses(1 until 10 by 2) ++
-  new constellation.routing.WithRoutingRelation(UnidirectionalTorus1DDatelineRouting()) ++
-  new constellation.topology.WithTopology(UnidirectionalTorus1D(10)))
-class TestConfig16 extends Config(
-  new WithInputPacketStallProbability(0.9) ++
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 10) ++
-  new constellation.channel.WithEgresses(0 until 10) ++
-  new constellation.routing.WithRoutingRelation(UnidirectionalTorus1DDatelineRouting()) ++
-  new constellation.topology.WithTopology(UnidirectionalTorus1D(10)))
-
-class TestConfig17 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 2) ++
-  new constellation.channel.WithEgresses(0 until 2) ++
-  new constellation.routing.WithRoutingRelation(BidirectionalTorus1DShortestRouting()) ++
-  new constellation.topology.WithTopology(BidirectionalTorus1D(2)))
-class TestConfig18 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 4 by 2) ++
-  new constellation.channel.WithEgresses(1 until 4 by 2) ++
-  new constellation.routing.WithRoutingRelation(BidirectionalTorus1DShortestRouting()) ++
-  new constellation.topology.WithTopology(BidirectionalTorus1D(4)))
-class TestConfig19 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 10) ++
-  new constellation.channel.WithEgresses(0 until 10) ++
-  new constellation.routing.WithRoutingRelation(BidirectionalTorus1DShortestRouting()) ++
-  new constellation.topology.WithTopology(BidirectionalTorus1D(10)))
-
-class TestConfig20 extends Config(
-  new WithInputFlitStallProbability(0.8) ++
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses((0 until 10)) ++
-  new constellation.channel.WithEgresses((0 until 10)) ++
-  new constellation.routing.WithRoutingRelation(BidirectionalTorus1DRandomRouting()) ++
-  new constellation.topology.WithTopology(BidirectionalTorus1D(10)))
-class TestConfig21 extends Config(
-  new WithInputPacketStallProbability(0.9) ++
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithUniformChannelSrcMultiplier(2) ++
-  new constellation.channel.WithUniformChannelDestMultiplier(2) ++
-  new constellation.channel.WithIngresses((0 until 10) ++ (0 until 10)) ++
-  new constellation.channel.WithEgresses((0 until 10) ++ (0 until 10)) ++
-  new constellation.routing.WithRoutingRelation(BidirectionalTorus1DRandomRouting()) ++
-  new constellation.topology.WithTopology(BidirectionalTorus1D(10)))
-
-// Butterfly
-class TestConfig22 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(1, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses((0 until 2) ++ (0 until 2)) ++
-  new constellation.channel.WithEgresses(((0 until 2) ++ (0 until 2)).map(_ + 2*1)) ++
-  new constellation.routing.WithRoutingRelation(ButterflyRouting()) ++
-  new constellation.topology.WithTopology(Butterfly(2, 2)))
-class TestConfig23 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(1, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses((0 until 4) ++ (0 until 4)) ++
-  new constellation.channel.WithEgresses(((0 until 4) ++ (0 until 4)).map(_ + 4*2)) ++
-  new constellation.routing.WithRoutingRelation(ButterflyRouting()) ++
-  new constellation.topology.WithTopology(Butterfly(2, 3)))
-class TestConfig24 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(1, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses((0 until 8) ++ (0 until 8)) ++
-  new constellation.channel.WithEgresses(((0 until 8) ++ (0 until 8)).map(_ + 8*3)) ++
-  new constellation.routing.WithRoutingRelation(ButterflyRouting()) ++
-  new constellation.topology.WithTopology(Butterfly(2, 4)))
-class TestConfig25 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(1, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses((0 until 3) ++ (0 until 3)) ++
-  new constellation.channel.WithEgresses(((0 until 3) ++ (0 until 3)).map(_ + 3*1)) ++
-  new constellation.routing.WithRoutingRelation(ButterflyRouting()) ++
-  new constellation.topology.WithTopology(Butterfly(3, 2)))
-class TestConfig26 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(1, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses((0 until 9) ++ (0 until 9)) ++
-  new constellation.channel.WithEgresses(((0 until 9) ++ (0 until 9)).map(_ + 9*2)) ++
-  new constellation.routing.WithRoutingRelation(ButterflyRouting()) ++
-  new constellation.topology.WithTopology(Butterfly(3, 3)))
-
-// Tree Topologies
-class TestConfig27 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(1, UserVirtualChannelParams(3)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 6 by 2) ++
-  new constellation.channel.WithEgresses(1 until 6 by 2) ++
-  new constellation.routing.WithRoutingRelation(BidirectionalTreeRouting()) ++
-  new constellation.topology.WithTopology(BidirectionalTree(3, 2)))
-class TestConfig28 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(1, UserVirtualChannelParams(3)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 6) ++
-  new constellation.channel.WithEgresses(0 until 6) ++
-  new constellation.channel.WithFatTreeChannels(1) ++
-  new constellation.routing.WithRoutingRelation(BidirectionalTreeRouting()) ++
-  new constellation.topology.WithTopology(BidirectionalTree(3, 2)))
-class TestConfig29 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(13 until 40) ++
-  new constellation.channel.WithEgresses(13 until 40) ++
-  new constellation.channel.WithFatTreeChannels(1) ++
-  new constellation.routing.WithRoutingRelation(BidirectionalTreeRouting()) ++
-  new constellation.topology.WithTopology(BidirectionalTree(3, 3)))
-
-// 2D Mesh
-class TestConfig30 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 9) ++
-  new constellation.channel.WithEgresses(0 until 9) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DDimensionOrderedRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(3, 3)))
-class TestConfig31 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 18) ++
-  new constellation.channel.WithEgresses(0 until 18) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DDimensionOrderedRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(3, 6)))
-class TestConfig32 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 25) ++
-  new constellation.channel.WithEgresses(0 until 25) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DDimensionOrderedRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(5, 5)))
-class TestConfig33 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 25) ++
-  new constellation.channel.WithEgresses(0 until 25) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DDimensionOrderedRouting(firstDim=1)) ++
-  new constellation.topology.WithTopology(Mesh2D(5, 5)))
-class TestConfig34 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 25) ++
-  new constellation.channel.WithEgresses(0 until 25) ++
-  new constellation.router.WithRotatingSingleVCAllocator ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(5, 5)))
-class TestConfig35 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 25) ++
-  new constellation.channel.WithEgresses(0 until 25) ++
-  new constellation.router.WithPrioritizingSingleVCAllocator ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(5, 5)))
-
-class TestConfig36 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(2, UserVirtualChannelParams(2)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 9) ++
-  new constellation.channel.WithEgresses(0 until 9) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(3, 3)))
-class TestConfig37 extends Config(
-  new constellation.router.WithCombineRCVA ++
-  new constellation.channel.WithUniformNVirtualChannels(2, UserVirtualChannelParams(2)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 9) ++
-  new constellation.channel.WithEgresses(0 until 9) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(3, 3)))
-class TestConfig38 extends Config(
-  new constellation.router.WithCombineSAST ++
-  new constellation.channel.WithUniformNVirtualChannels(2, UserVirtualChannelParams(2)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 9) ++
-  new constellation.channel.WithEgresses(0 until 9) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(3, 3)))
-class TestConfig39 extends Config(
-  new constellation.router.WithCombineSAST ++
-  new constellation.router.WithCombineRCVA ++
-  new constellation.channel.WithUniformNVirtualChannels(2, UserVirtualChannelParams(2)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 9) ++
-  new constellation.channel.WithEgresses(0 until 9) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(3, 3)))
-class TestConfig40 extends Config(
-  new constellation.router.WithISLIPMultiVCAllocator ++
-  new constellation.channel.WithUniformNVirtualChannels(2, UserVirtualChannelParams(2)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 9) ++
-  new constellation.channel.WithEgresses(0 until 9) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(3, 3)))
-class TestConfig41 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(2, UserVirtualChannelParams(2)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 9) ++
-  new constellation.channel.WithEgresses(0 until 9) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(3, 3)))
-class TestConfig42 extends Config(
-  new constellation.router.WithCombineRCVA ++
-  new constellation.router.WithCombineSAST ++
-  new constellation.channel.WithUniformNVirtualChannels(2, UserVirtualChannelParams(2)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 9) ++
-  new constellation.channel.WithEgresses(0 until 9) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(3, 3)))
-class TestConfig43 extends Config(
-  new constellation.channel.WithUniformChannelDestMultiplier(2) ++
-  new constellation.channel.WithUniformNVirtualChannels(2, UserVirtualChannelParams(2)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 9) ++
-  new constellation.channel.WithEgresses(0 until 9) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(3, 3)))
-class TestConfig44 extends Config(
-  new constellation.channel.WithUniformChannelSrcMultiplier(2) ++
-  new constellation.channel.WithUniformNVirtualChannels(2, UserVirtualChannelParams(2)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 9) ++
-  new constellation.channel.WithEgresses(0 until 9) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(3, 3)))
-class TestConfig45 extends Config(
-  new constellation.channel.WithUniformChannelSrcMultiplier(2) ++
-  new constellation.channel.WithUniformChannelDestMultiplier(2) ++
-  new constellation.channel.WithUniformNVirtualChannels(2, UserVirtualChannelParams(2)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 9) ++
-  new constellation.channel.WithEgresses(0 until 9) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(3, 3)))
-
-
-class TestConfig46 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(1, UserVirtualChannelParams(1)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 25) ++
-  new constellation.channel.WithEgresses(0 until 25) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DDimensionOrderedRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(5, 5)))
-class TestConfig47 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(1, UserVirtualChannelParams(1)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 25) ++
-  new constellation.channel.WithEgresses(0 until 25) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DWestFirstRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(5, 5)))
-class TestConfig48 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(1, UserVirtualChannelParams(1)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 25) ++
-  new constellation.channel.WithEgresses(0 until 25) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DNorthLastRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(5, 5)))
-
-class TestConfig49 extends Config(
-  new constellation.routing.WithNBlockingVirtualNetworks(4) ++
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(3)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngressVNets((i: Int) => i % 4) ++
-  new constellation.channel.WithEgressVNets ((i: Int) => (i + 2) % 4) ++
-  new constellation.channel.WithIngresses(0 until 9) ++
-  new constellation.channel.WithEgresses(0 until 9) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(3, 3)))
-
-class TestConfig50 extends Config(
-  new constellation.routing.WithNBlockingVirtualNetworks(4) ++
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(3)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngressVNets((i: Int) => i % 4) ++
-  new constellation.channel.WithEgressVNets ((i: Int) => (i + 2) % 4) ++
-  new constellation.channel.WithIngresses(0 until 9) ++
-  new constellation.channel.WithEgresses(0 until 9) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DDimensionOrderedRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(3, 3)))
-
-class TestConfig51 extends Config(
-  new constellation.routing.WithNNonblockingVirtualNetworks(4) ++
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(3)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngressVNets((i: Int) => i % 4) ++
-  new constellation.channel.WithEgressVNets ((i: Int) => (i + 2) % 4) ++
-  new constellation.channel.WithIngresses(0 until 9) ++
-  new constellation.channel.WithEgresses(0 until 9) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DNorthLastRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(3, 3)))
-
-// 2D Torus
-class TestConfig52 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(2, UserVirtualChannelParams(1)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 9) ++
-  new constellation.channel.WithEgresses(0 until 9) ++
-  new constellation.routing.WithRoutingRelation(DimensionOrderedUnidirectionalTorus2DDatelineRouting()) ++
-  new constellation.topology.WithTopology(UnidirectionalTorus2D(3, 3)))
-class TestConfig53 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 9) ++
-  new constellation.channel.WithEgresses(0 until 9) ++
-  new constellation.routing.WithRoutingRelation(DimensionOrderedUnidirectionalTorus2DDatelineRouting()) ++
-  new constellation.topology.WithTopology(UnidirectionalTorus2D(3, 3)))
-class TestConfig54 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(4)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 25) ++
-  new constellation.channel.WithEgresses(0 until 25) ++
-  new constellation.routing.WithRoutingRelation(DimensionOrderedUnidirectionalTorus2DDatelineRouting()) ++
-  new constellation.topology.WithTopology(UnidirectionalTorus2D(5, 5)))
-
-class TestConfig55 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(2, UserVirtualChannelParams(1)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 9) ++
-  new constellation.channel.WithEgresses(0 until 9) ++
-  new constellation.routing.WithRoutingRelation(DimensionOrderedBidirectionalTorus2DDatelineRouting()) ++
-  new constellation.topology.WithTopology(BidirectionalTorus2D(3, 3)))
-
-// topologies which put the ingress/egress points on a separate "plane" of nodes
-class TestConfig56 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(Seq(0, 1, 1)) ++
-  new constellation.channel.WithEgresses(Seq(1, 1, 2)) ++
-  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(AllLegalRouting())) ++
-  new constellation.topology.WithTopology(TerminalPlane(UnidirectionalLine(3))))
-class TestConfig57 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(Seq(1, 1, 2, 2)) ++
-  new constellation.channel.WithEgresses(Seq(0, 0, 1, 1, 2, 2, 3, 3)) ++
-  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(BidirectionalLineRouting())) ++
-  new constellation.topology.WithTopology(TerminalPlane(BidirectionalLine(4))))
-class TestConfig58 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 6) ++
-  new constellation.channel.WithEgresses(0 until 6) ++
-  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(UnidirectionalTorus1DDatelineRouting())) ++
-  new constellation.topology.WithTopology(TerminalPlane(UnidirectionalTorus1D(6))))
-class TestConfig59 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses((0 until 6) ++ (0 until 6)) ++
-  new constellation.channel.WithEgresses((0 until 6) ++ (0 until 6)) ++
-  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(BidirectionalTorus1DShortestRouting())) ++
-  new constellation.topology.WithTopology(TerminalPlane(BidirectionalTorus1D(6))))
-class TestConfig60 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 25) ++
-  new constellation.channel.WithEgresses(0 until 25) ++
-  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
-  new constellation.topology.WithTopology(TerminalPlane(Mesh2D(5, 5))))
-class TestConfig61 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 25) ++
-  new constellation.channel.WithEgresses(0 until 25) ++
-  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
-  new constellation.topology.WithTopology(TerminalPlane(Mesh2D(5, 5))))
-class TestConfig62 extends Config(
-  new constellation.routing.WithNBlockingVirtualNetworks(4) ++
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(3)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngressVNets((i: Int) => i % 4) ++
-  new constellation.channel.WithEgressVNets((i: Int) => (i + 1) % 4) ++
-  new constellation.channel.WithIngresses(0 until 16) ++
-  new constellation.channel.WithEgresses(0 until 16) ++
-  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
-  new constellation.topology.WithTopology(TerminalPlane(Mesh2D(4, 4))))
-class TestConfig63 extends Config(
-  new constellation.test.WithInputFlitStallProbability(0.9) ++
-  new constellation.router.WithSafeCoupleSAVA ++
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(4 until 16) ++
-  new constellation.channel.WithEgresses(0 until 4) ++
-  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
-  new constellation.topology.WithTopology(TerminalPlane(Mesh2D(4, 4))))
-class TestConfig64 extends Config(
-  new constellation.test.WithInputFlitStallProbability(0.9) ++
-  new constellation.router.WithSafeCoupleSAVA ++
-  new constellation.noc.WithCtrl ++
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(4 until 16) ++
-  new constellation.channel.WithEgresses(0 until 4) ++
-  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
-  new constellation.topology.WithTopology(TerminalPlane(Mesh2D(4, 4))))
-class TestConfig65 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 16) ++
-  new constellation.channel.WithEgresses(0 until 16) ++
-  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
-  new constellation.topology.WithTopology(TerminalPlane(Mesh2D(4, 4))))
-
-// hierarchical topologies
-class TestConfig66 extends Config(
-  new WithInputPacketStallProbability(0.9) ++
-  new constellation.channel.WithUniformNVirtualChannels(2, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithHierarchicalIngressEgress(
-    ingresses = ((0 until 4).map(i => (None, i)) ++
-                 (0 until 3).map(i => (Some(0), i)) ++
-                 (0 until 2).map(i => (Some(1), i)) ++
-                 (0 until 3).map(i => (Some(2), i)) ++
-                 (0 until 4).map(i => (Some(3), i))),
-    egresses = ((0 until 4).map(i => (None, i)) ++
-                 (0 until 3).map(i => (Some(0), i)) ++
-                 (0 until 2).map(i => (Some(1), i)) ++
-                 (0 until 3).map(i => (Some(2), i)) ++
-                 (0 until 4).map(i => (Some(3), i)))
-  ) ++
-  new constellation.routing.WithRoutingRelation(HierarchicalRoutingRelation(
-    baseRouting=BidirectionalLineRouting(),
-    childRouting=Seq(
-      BidirectionalLineRouting(),
-      BidirectionalLineRouting(),
-      BidirectionalLineRouting(),
-      BidirectionalLineRouting()
+  },
+  ingresses       = (0 until 6).map { i => UserIngressParams(i) },
+  egresses        = (0 until 6).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(6, 6) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = BidirectionalTreeRouting()
+)))
+class TestConfig29 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = BidirectionalTree(3, 3),
+  channelParamGen = (a, b) => {
+    val height = 3
+    val dAry = 3
+    def level(i: Int) = floor(log10(i + 1) / log10(dAry))
+    val mult = pow(2, height - max(level(a), level(b))).toInt
+    UserChannelParams(
+      Seq.fill(mult) { UserVirtualChannelParams(3) },
+      srcMultiplier = mult,
+      destMultiplier = mult
     )
-  )) ++
-  new constellation.topology.WithTopology(HierarchicalTopology(
-    base=BidirectionalLine(4),
-    children=Seq(
-      HierarchicalSubTopology(0, 1, BidirectionalLine(3)),
-      HierarchicalSubTopology(3, 0, BidirectionalLine(2)),
-      HierarchicalSubTopology(1, 1, BidirectionalLine(3)),
-      HierarchicalSubTopology(1, 2, BidirectionalLine(4))
+  },
+  ingresses       = (13 until 40).map { i => UserIngressParams(i) },
+  egresses        = (13 until 40).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(27, 27) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = BidirectionalTreeRouting()
+)))
+class TestConfig30 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Mesh2D(3, 3),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+  ingresses       = (0 until 9).map { i => UserIngressParams(i) },
+  egresses        = (0 until 9).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(9, 9) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = Mesh2DDimensionOrderedRouting()
+)))
+class TestConfig31 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Mesh2D(3, 6),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+  ingresses       = (0 until 18).map { i => UserIngressParams(i) },
+  egresses        = (0 until 18).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(18, 18) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = Mesh2DDimensionOrderedRouting()
+)))
+class TestConfig32 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Mesh2D(5, 5),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+  ingresses       = (0 until 25).map { i => UserIngressParams(i) },
+  egresses        = (0 until 25).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(25, 25) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = Mesh2DDimensionOrderedRouting()
+)))
+class TestConfig33 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Mesh2D(5, 5),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+  ingresses       = (0 until 25).map { i => UserIngressParams(i) },
+  egresses        = (0 until 25).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(25, 25) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = Mesh2DDimensionOrderedRouting(firstDim=1)
+)))
+class TestConfig34 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Mesh2D(5, 5),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+  routerParams    = (i) => UserRouterParams(
+    vcAllocator = (vP) => (p) => new PrioritizingSingleVCAllocator(vP)(p)
+  ),
+  ingresses       = (0 until 25).map { i => UserIngressParams(i) },
+  egresses        = (0 until 25).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(25, 25) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = Mesh2DEscapeRouting()
+)))
+class TestConfig35 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Mesh2D(5, 5),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+  routerParams    = (i) => UserRouterParams(
+    vcAllocator = (vP) => (p) => new PIMMultiVCAllocator(vP)(p)
+  ),
+  ingresses       = (0 until 25).map { i => UserIngressParams(i) },
+  egresses        = (0 until 25).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(25, 25) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = Mesh2DEscapeRouting()
+)))
+class TestConfig36 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Mesh2D(3, 3),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(2) }),
+  ingresses       = (0 until 9).map { i => UserIngressParams(i) },
+  egresses        = (0 until 9).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(9, 9) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = Mesh2DEscapeRouting()
+)))
+class TestConfig37 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Mesh2D(3, 3),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(2) }),
+  routerParams    = (i) => UserRouterParams(combineRCVA=true),
+  ingresses       = (0 until 9).map { i => UserIngressParams(i) },
+  egresses        = (0 until 9).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(9, 9) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = Mesh2DEscapeRouting()
+)))
+class TestConfig38 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Mesh2D(3, 3),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(2) }),
+  routerParams    = (i) => UserRouterParams(combineSAST=true),
+  ingresses       = (0 until 9).map { i => UserIngressParams(i) },
+  egresses        = (0 until 9).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(9, 9) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = Mesh2DEscapeRouting()
+)))
+class TestConfig39 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Mesh2D(3, 3),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(2) }),
+  routerParams    = (i) => UserRouterParams(combineSAST=true, combineRCVA=true),
+  ingresses       = (0 until 9).map { i => UserIngressParams(i) },
+  egresses        = (0 until 9).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(9, 9) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = Mesh2DEscapeRouting()
+)))
+class TestConfig40 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Mesh2D(3, 3),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(2) }),
+  routerParams    = (i) => UserRouterParams(
+    vcAllocator = (vP) => (p) => new ISLIPMultiVCAllocator(vP)(p)
+  ),
+  ingresses       = (0 until 9).map { i => UserIngressParams(i) },
+  egresses        = (0 until 9).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(9, 9) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = Mesh2DEscapeRouting()
+)))
+class TestConfig41 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Mesh2D(4, 4),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(2) }),
+  ingresses       = (0 until 16).map { i => UserIngressParams(i) },
+  egresses        = (0 until 16).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(16, 16) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = Mesh2DEscapeRouting()
+)))
+class TestConfig42 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Mesh2D(4, 4),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(2) }),
+  routerParams    = (i) => UserRouterParams(combineRCVA=true, combineSAST=true),
+  ingresses       = (0 until 16).map { i => UserIngressParams(i) },
+  egresses        = (0 until 16).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(16, 16) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = Mesh2DEscapeRouting()
+)))
+class TestConfig43 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Mesh2D(4, 4),
+  channelParamGen = (a, b) => UserChannelParams(
+    Seq.fill(2) { UserVirtualChannelParams(2) },
+    destMultiplier = 2
+  ),
+  ingresses       = (0 until 16).map { i => UserIngressParams(i) },
+  egresses        = (0 until 16).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(16, 16) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = Mesh2DEscapeRouting()
+)))
+class TestConfig44 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Mesh2D(4, 4),
+  channelParamGen = (a, b) => UserChannelParams(
+    Seq.fill(2) { UserVirtualChannelParams(2) },
+    srcMultiplier = 2
+  ),
+  ingresses       = (0 until 16).map { i => UserIngressParams(i) },
+  egresses        = (0 until 16).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(16, 16) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = Mesh2DEscapeRouting()
+)))
+class TestConfig45 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Mesh2D(4, 4),
+  channelParamGen = (a, b) => UserChannelParams(
+    Seq.fill(2) { UserVirtualChannelParams(2) },
+    srcMultiplier = 2,
+    destMultiplier = 2
+  ),
+  ingresses       = (0 until 16).map { i => UserIngressParams(i) },
+  egresses        = (0 until 16).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(16, 16) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = Mesh2DEscapeRouting()
+)))
+class TestConfig46 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Mesh2D(5, 5),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(1) { UserVirtualChannelParams(1) }),
+  ingresses       = (0 until 25).map { i => UserIngressParams(i) },
+  egresses        = (0 until 25).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(25, 25) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = Mesh2DDimensionOrderedRouting()
+)))
+class TestConfig47 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Mesh2D(5, 5),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(1) { UserVirtualChannelParams(1) }),
+  ingresses       = (0 until 25).map { i => UserIngressParams(i) },
+  egresses        = (0 until 25).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(25, 25) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = Mesh2DWestFirstRouting(),
+)))
+class TestConfig48 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Mesh2D(5, 5),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(1) { UserVirtualChannelParams(1) }),
+  ingresses       = (0 until 25).map { i => UserIngressParams(i) },
+  egresses        = (0 until 25).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(25, 25) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = Mesh2DNorthLastRouting()
+)))
+class TestConfig49 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Mesh2D(3, 3),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(3) }),
+  ingresses       = (0 until 9).map { i => UserIngressParams(i) },
+  egresses        = (0 until 9).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(9, 9) { (s, d) =>
+    if (s % 4 == (d + 2) % 4) Some(FlowParams(s, d, s % 4)) else None
+  }.flatten.flatten,
+  routingRelation = BlockingVirtualSubnetworksRouting(Mesh2DEscapeRouting(), 4, 1),
+  vNetBlocking    = (blocker, blockee) => blocker < blockee
+)))
+class TestConfig50 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Mesh2D(3, 3),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(3) }),
+  ingresses       = (0 until 9).map { i => UserIngressParams(i) },
+  egresses        = (0 until 9).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(9, 9) { (s, d) =>
+    if (s % 4 == (d + 2) % 4) Some(FlowParams(s, d, s % 4)) else None
+  }.flatten.flatten,
+  routingRelation = BlockingVirtualSubnetworksRouting(Mesh2DDimensionOrderedRouting(), 4, 1),
+  vNetBlocking    = (blocker, blockee) => blocker < blockee
+)))
+class TestConfig51 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Mesh2D(3, 3),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(3) }),
+  ingresses       = (0 until 9).map { i => UserIngressParams(i) },
+  egresses        = (0 until 9).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(9, 9) { (s, d) =>
+    if (s % 4 == (d + 2) % 4) Some(FlowParams(s, d, s % 4)) else None
+  }.flatten.flatten,
+  routingRelation = NonblockingVirtualSubnetworksRouting(Mesh2DEscapeRouting(), 4),
+  vNetBlocking    = (blocker, blockee) => true
+)))
+class TestConfig52 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = UnidirectionalTorus2D(3, 3),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(1) }),
+  ingresses       = (0 until 9).map { i => UserIngressParams(i) },
+  egresses        = (0 until 9).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(9, 9) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = DimensionOrderedUnidirectionalTorus2DDatelineRouting()
+)))
+class TestConfig53 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = UnidirectionalTorus2D(3, 3),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(4) }),
+  ingresses       = (0 until 9).map { i => UserIngressParams(i) },
+  egresses        = (0 until 9).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(9, 9) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = DimensionOrderedUnidirectionalTorus2DDatelineRouting()
+)))
+class TestConfig54 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = UnidirectionalTorus2D(5, 5),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(4) }),
+  ingresses       = (0 until 25).map { i => UserIngressParams(i) },
+  egresses        = (0 until 25).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(25, 25) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = DimensionOrderedUnidirectionalTorus2DDatelineRouting()
+)))
+class TestConfig55 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = BidirectionalTorus2D(3, 3),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(2) }),
+  ingresses       = (0 until 9).map { i => UserIngressParams(i) },
+  egresses        = (0 until 9).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(9, 9) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = DimensionOrderedBidirectionalTorus2DDatelineRouting()
+)))
+class TestConfig56 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = TerminalPlane(UnidirectionalLine(3)),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(4) }),
+  ingresses       = Seq(0, 1, 1).map { i => UserIngressParams(i) },
+  egresses        = Seq(1, 1, 2).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(3, 3) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = TerminalPlaneRouting(AllLegalRouting())
+)))
+class TestConfig57 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = TerminalPlane(BidirectionalLine(4)),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(3) }),
+  ingresses       = Seq(1, 1, 2, 2).map { i => UserIngressParams(i) },
+  egresses        = Seq(0, 0, 1, 1, 2, 2, 3, 3).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(4, 8) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = TerminalPlaneRouting(BidirectionalLineRouting())
+)))
+class TestConfig58 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = TerminalPlane(UnidirectionalTorus1D(6)),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+  ingresses       = (0 until 6).map { i => UserIngressParams(i) },
+  egresses        = (0 until 6).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(6, 6) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = TerminalPlaneRouting(UnidirectionalTorus1DDatelineRouting())
+)))
+class TestConfig59 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = TerminalPlane(BidirectionalTorus1D(6)),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+  ingresses       = (0 until 12).map { i => UserIngressParams(i % 6) },
+  egresses        = (0 until 12).map { i => UserEgressParams(i % 6) },
+  flows           = Seq.tabulate(12, 12) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = TerminalPlaneRouting(BidirectionalTorus1DShortestRouting())
+)))
+class TestConfig60 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = TerminalPlane(Mesh2D(5, 5)),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+  ingresses       = (0 until 25).map { i => UserIngressParams(i) },
+  egresses        = (0 until 25).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(25, 25) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = TerminalPlaneRouting(Mesh2DEscapeRouting())
+)))
+class TestConfig61 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = TerminalPlane(Mesh2D(5, 5)),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+  ingresses       = (0 until 25).map { i => UserIngressParams(i) },
+  egresses        = (0 until 25).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(25, 25) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = TerminalPlaneRouting(Mesh2DDimensionOrderedRouting())
+)))
+class TestConfig62 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = TerminalPlane(Mesh2D(4, 4)),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+  ingresses       = (0 until 16).map { i => UserIngressParams(i) },
+  egresses        = (0 until 16).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(16, 16) { (s, d) =>
+    if (s % 3 == ((d + 2) % 3)) Some(FlowParams(s, d, s % 3)) else None
+  }.flatten.flatten,
+  routingRelation = BlockingVirtualSubnetworksRouting(TerminalPlaneRouting(Mesh2DEscapeRouting()), 4),
+  vNetBlocking    = (blocker, blockee) => blocker < blockee
+)))
+class TestConfig63 extends NoCTesterConfig(NoCTesterParams(
+  NoCParams(
+    topology        = TerminalPlane(Mesh2D(4, 4)),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+    routerParams    = (i) => UserRouterParams(coupleSAVA=true),
+    ingresses       = (0 until 4).map { i => UserIngressParams(i) },
+    egresses        = (4 until 16).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(4, 12) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = TerminalPlaneRouting(Mesh2DEscapeRouting())
+  ),
+  inputFlitStallProbability = 0.9
+))
+class TestConfig64 extends NoCTesterConfig(NoCTesterParams(
+  NoCParams(
+    topology        = TerminalPlane(Mesh2D(4, 4)),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+    routerParams    = (i) => UserRouterParams(coupleSAVA=true),
+    ingresses       = (0 until 4).map { i => UserIngressParams(i) },
+    egresses        = (4 until 16).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(4, 12) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = TerminalPlaneRouting(Mesh2DEscapeRouting()),
+    hasCtrl         = true
+  ),
+  inputFlitStallProbability = 0.9
+))
+class TestConfig65 extends NoCTesterConfig(NoCTesterParams(
+  NoCParams(
+    topology        = TerminalPlane(Mesh2D(4, 4)),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+    routerParams    = (i) => UserRouterParams(coupleSAVA=true),
+    ingresses       = (0 until 16).map { i => UserIngressParams(i) },
+    egresses        = (0 until 16).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(16, 16) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = TerminalPlaneRouting(Mesh2DEscapeRouting()),
+    hasCtrl         = true
+  ),
+  inputFlitStallProbability = 0.9
+))
+class TestConfig66 extends NoCTesterConfig(NoCTesterParams(
+  NoCParams(
+    topology        = HierarchicalTopology(
+      base = BidirectionalLine(4),
+      children = Seq(
+        HierarchicalSubTopology(0, 1, BidirectionalLine(3)),
+        HierarchicalSubTopology(3, 0, BidirectionalLine(2)),
+        HierarchicalSubTopology(1, 1, BidirectionalLine(3)),
+        HierarchicalSubTopology(1, 2, BidirectionalLine(4))
+      )
+    ),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(5) }),
+    ingresses       = (0 until 16).map { i => UserIngressParams(i) },
+    egresses        = (0 until 16).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(16, 16) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = HierarchicalRoutingRelation(
+      baseRouting = BidirectionalLineRouting(),
+      childRouting = Seq.fill(4) { BidirectionalLineRouting() }
     )
-  ))
-)
-
-class TestConfig67 extends Config(
-  new WithInputPacketStallProbability(0.9) ++
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithHierarchicalIngressEgress(
-    ingresses = ((0 until 5).map { i => (None   , i) } ++
-                 (0 until 6).map { i => (Some(0), i) } ++
-                 (0 until 6).map { i => (Some(1), i) } ++
-                 (0 until 3).map { i => (Some(2), i) } ++
-                 (0 until 3).map { i => (Some(3), i) }),
-    egresses  = ((0 until 5).map { i => (None   , i) } ++
-                 (0 until 6).map { i => (Some(0), i) } ++
-                 (0 until 6).map { i => (Some(1), i) } ++
-                 (0 until 3).map { i => (Some(2), i) } ++
-                 (0 until 3).map { i => (Some(3), i) })
-  ) ++
-    new constellation.routing.WithRoutingRelation(HierarchicalRoutingRelation(
-    baseRouting=UnidirectionalTorus1DDatelineRouting(),
-    childRouting=Seq(
-      Mesh2DEscapeRouting(),
-      Mesh2DDimensionOrderedRouting(),
-      BidirectionalLineRouting(),
-      BidirectionalLineRouting()
-    )
-  )) ++
-  new constellation.topology.WithTopology(HierarchicalTopology(
-    base=UnidirectionalTorus1D(5),
-    children=Seq(
-      HierarchicalSubTopology(0, 1, Mesh2D(2, 3)),
-      HierarchicalSubTopology(2, 4, Mesh2D(3, 2)),
-      HierarchicalSubTopology(3, 2, BidirectionalLine(3)),
-      HierarchicalSubTopology(4, 1, BidirectionalLine(3))
-    )
-  ))
-)
-
-class TestConfig68 extends Config(
-  new WithInputPacketStallProbability(0.95) ++
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithHierarchicalIngressEgress(
-    ingresses = ((0 until 5).map { i => (None   , i) } ++
-                 (0 until 6).map { i => (Some(0), i) } ++
-                 (0 until 6).map { i => (Some(1), i) } ++
-                 (0 until 3).map { i => (Some(2), i) } ++
-                 (0 until 3).map { i => (Some(3), i) }),
-    egresses  = ((0 until 5).map { i => (None   , i) } ++
-                 (0 until 6).map { i => (Some(0), i) } ++
-                 (0 until 6).map { i => (Some(1), i) } ++
-                 (0 until 3).map { i => (Some(2), i) } ++
-                 (0 until 3).map { i => (Some(3), i) })
-  ) ++
-  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(
-    HierarchicalRoutingRelation(
-      baseRouting=UnidirectionalTorus1DDatelineRouting(),
-      childRouting=Seq(
+  ),
+  inputPacketStallProbability = 0.8
+))
+class TestConfig67 extends NoCTesterConfig(NoCTesterParams(
+  NoCParams(
+    topology        = HierarchicalTopology(
+      base = UnidirectionalTorus1D(5),
+      children = Seq(
+        HierarchicalSubTopology(0, 1, Mesh2D(2, 3)),
+        HierarchicalSubTopology(2, 4, Mesh2D(3, 2)),
+        HierarchicalSubTopology(3, 2, BidirectionalLine(3)),
+        HierarchicalSubTopology(4, 1, BidirectionalLine(3))
+      )
+    ),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+    ingresses       = (0 until 23).map { i => UserIngressParams(i) },
+    egresses        = (0 until 23).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(23, 23) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = HierarchicalRoutingRelation(
+      baseRouting = UnidirectionalTorus1DDatelineRouting(),
+      childRouting = Seq(
         Mesh2DEscapeRouting(),
         Mesh2DDimensionOrderedRouting(),
         BidirectionalLineRouting(),
         BidirectionalLineRouting()
       )
     )
-  )) ++
-  new constellation.topology.WithTopology(TerminalPlane(
-    HierarchicalTopology(
-      base=UnidirectionalTorus1D(5),
-      children=Seq(
+  ),
+  inputPacketStallProbability = 0.9
+))
+class TestConfig68 extends NoCTesterConfig(NoCTesterParams(
+  NoCParams(
+    topology        = TerminalPlane(HierarchicalTopology(
+      base = UnidirectionalTorus1D(5),
+      children = Seq(
         HierarchicalSubTopology(0, 1, Mesh2D(2, 3)),
         HierarchicalSubTopology(2, 4, Mesh2D(3, 2)),
         HierarchicalSubTopology(3, 2, BidirectionalLine(3)),
         HierarchicalSubTopology(4, 1, BidirectionalLine(3))
       )
-    )
-  ))
-)
+    )),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+    ingresses       = (0 until 23).map { i => UserIngressParams(i) },
+    egresses        = (0 until 23).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(23, 23) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = TerminalPlaneRouting(HierarchicalRoutingRelation(
+      baseRouting = UnidirectionalTorus1DDatelineRouting(),
+      childRouting = Seq(
+        Mesh2DEscapeRouting(),
+        Mesh2DDimensionOrderedRouting(),
+        BidirectionalLineRouting(),
+        BidirectionalLineRouting()
+      )
+    ))
+  ),
+  inputPacketStallProbability = 0.95
+))
+class TestConfig69 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = UnidirectionalLine(2),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+  routerParams    = (i) => UserRouterParams(payloadBits=32),
+  ingresses       = Seq(0).map { i => UserIngressParams(i) },
+  egresses        = Seq(1).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(1, 1) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = AllLegalRouting()
+)))
+class TestConfig70 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = Mesh2D(4, 4),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+  routerParams    = (i) => UserRouterParams(payloadBits=16),
+  ingresses       = (0 until 16).map { i => UserIngressParams(i) },
+  egresses        = (0 until 16).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(16, 16) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = Mesh2DEscapeRouting()
+)))
+class TestConfig71 extends NoCTesterConfig(NoCTesterParams(
+  NoCParams(
+    topology        = UnidirectionalLine(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+    routerParams    = (i) => UserRouterParams(payloadBits = i match {
+      case 0 | 4 => 36
+      case 1 | 3 => 12
+      case 2     => 24
+    }),
+    ingresses       = Seq(0).map { i => UserIngressParams(i, payloadBits=72) },
+    egresses        = Seq(4).map { i => UserEgressParams(i, payloadBits=72) },
+    flows           = Seq.tabulate(1, 1) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = AllLegalRouting()
+  ),
+  totalTxs = 10000
+))
+class TestConfig72 extends NoCTesterConfig(NoCTesterParams(
+  NoCParams(
+    topology        = Mesh2D(4, 4),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+    routerParams    = (i) => UserRouterParams(payloadBits = i match {
+      case 0 | 4 |  8 | 12 =>  8
+      case 1 | 5 |  9 | 13 => 16
+      case 2 | 6 | 10 | 14 => 32
+      case 3 | 7 | 11 | 15 => 64
+    }),
+    ingresses       = (0 until 16).map { i => UserIngressParams(i) },
+    egresses        = (0 until 16).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(16, 16) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = Mesh2DEscapeRouting()
+  ),
+  inputPacketStallProbability = 0.9
+))
+
+class TLTestConfig00 extends TLNoCTesterConfig(TLNoCTesterParams(
+  inNodeMapping = Seq(0),
+  outNodeMapping = Seq(1),
+  nocParams = NoCParams(
+    topology        = BidirectionalLine(2),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(1) }),
+    vNetBlocking    = (blocker, blockee) => true,
+    routingRelation = NonblockingVirtualSubnetworksRouting(BidirectionalLineRouting(), 5)
+  )
+))
+class TLTestConfig01 extends TLNoCTesterConfig(TLNoCTesterParams(
+  inNodeMapping = Seq(4, 0, 2, 5, 6, 9, 11),
+  outNodeMapping = Seq(7, 1, 3, 8, 10),
+  nocParams = NoCParams(
+    topology        = Mesh2D(4, 3),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(7) { UserVirtualChannelParams(3) }),
+    vNetBlocking    = (blocker, blockee) => true,
+    routingRelation = SharedNonblockingVirtualSubnetworksRouting(Mesh2DEscapeRouting(), 5, 2)
+  )
+))
+class TLTestConfig02 extends TLNoCTesterConfig(TLNoCTesterParams(
+  inNodeMapping = Seq(4, 0, 2, 5, 6, 9, 11),
+  outNodeMapping = Seq(7, 1, 3, 8, 10),
+  nocParams = NoCParams(
+    topology        = Mesh2D(4, 3),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(3) }),
+    vNetBlocking    = (blocker, blockee) => blocker < blockee,
+    routingRelation = BlockingVirtualSubnetworksRouting(Mesh2DEscapeRouting(), 5)
+  )
+))
+class TLTestConfig03 extends TLNoCTesterConfig(TLNoCTesterParams(
+  inNodeMapping = Seq(0, 1, 2),
+  outNodeMapping = Seq(3, 4, 5),
+  nocParams = NoCParams(
+    topology        = UnidirectionalTorus1D(6),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(10) { UserVirtualChannelParams(3) }),
+    vNetBlocking    = (blocker, blockee) => blocker < blockee,
+    routingRelation = NonblockingVirtualSubnetworksRouting(UnidirectionalTorus1DDatelineRouting(), 5)
+  )
+))
+class TLTestConfig04 extends TLNoCTesterConfig(TLNoCTesterParams(
+  inNodeMapping = Seq(4, 0, 2, 5, 6, 9, 11),
+  outNodeMapping = Seq(7, 1, 3, 8, 10),
+  nocParams = NoCParams(
+    topology        = TerminalPlane(Mesh2D(4, 3)),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(3) }),
+    vNetBlocking    = (blocker, blockee) => blocker < blockee,
+    routingRelation = BlockingVirtualSubnetworksRouting(TerminalPlaneRouting(Mesh2DEscapeRouting()), 5)
+  )
+))
+class TLTestConfig05 extends TLNoCTesterConfig(TLNoCTesterParams(
+  inNodeMapping = Seq(4, 0, 2, 5, 6, 9, 11),
+  outNodeMapping = Seq(7, 1, 3, 8, 10),
+  explicitPayloadWidth = Some(32),
+  nocParams = NoCParams(
+    topology        = TerminalPlane(Mesh2D(4, 3)),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(3) }),
+    vNetBlocking    = (blocker, blockee) => blocker < blockee,
+    routingRelation = BlockingVirtualSubnetworksRouting(TerminalPlaneRouting(Mesh2DEscapeRouting()), 5)
+  )
+))
+class TLTestConfig06 extends TLNoCTesterConfig(TLNoCTesterParams(
+  inNodeMapping = Seq(4, 0, 2, 5, 6, 9, 11),
+  outNodeMapping = Seq(7, 1, 3, 8, 10),
+  delay = 0.0,
+  nocParams = NoCParams(
+    topology        = TerminalPlane(Mesh2D(4, 3)),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(15) { UserVirtualChannelParams(7) }),
+    routerParams    = (i) => UserRouterParams(
+      vcAllocator = (vP) => (p) => new PrioritizingSingleVCAllocator(vP)(p)
+    ),
+    vNetBlocking    = (blocker, blockee) => blocker < blockee,
+    routingRelation = SharedNonblockingVirtualSubnetworksRouting(TerminalPlaneRouting(Mesh2DEscapeRouting()), 5, 10)
+  )
+))
 
 
-// test configs for channel width adapters
-class TestConfig69 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(Seq(0)) ++
-  new constellation.channel.WithEgresses(Seq(0)) ++
-  new constellation.router.WithUniformPayloadBits(32) ++
-  new constellation.routing.WithRoutingRelation(AllLegalRouting()) ++
-  new constellation.topology.WithTopology(UnidirectionalLine(1)))
-class TestConfig70 extends Config(
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 16) ++
-  new constellation.channel.WithEgresses(0 until 16) ++
-  new constellation.router.WithUniformPayloadBits(16) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(4, 4)))
-class TestConfig71 extends Config(
-  new WithTotalTxs(10000) ++
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngressPayloadBits(72) ++
-  new constellation.channel.WithEgressPayloadBits(72) ++
-  new constellation.channel.WithIngresses(Seq(0)) ++
-  new constellation.channel.WithEgresses(Seq(4)) ++
-  new constellation.router.WithPayloadBits(36, Seq(4)) ++
-  new constellation.router.WithPayloadBits(12, Seq(3)) ++
-  new constellation.router.WithPayloadBits(24, Seq(2)) ++
-  new constellation.router.WithPayloadBits(12, Seq(1)) ++
-  new constellation.router.WithPayloadBits(36, Seq(0)) ++
-  new constellation.routing.WithRoutingRelation(AllLegalRouting()) ++
-  new constellation.topology.WithTopology(UnidirectionalLine(5)))
-class TestConfig72 extends Config(
-  new WithInputPacketStallProbability(0.9) ++
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(4)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses((0 until 16)) ++
-  new constellation.channel.WithEgresses((0 until 16)) ++
-  new constellation.router.WithPrioritizingSingleVCAllocator ++
-  new constellation.router.WithPayloadBits(8,  (3 until 16 by 4)) ++
-  new constellation.router.WithPayloadBits(16, (2 until 16 by 4)) ++
-  new constellation.router.WithPayloadBits(32, (1 until 16 by 4)) ++
-  new constellation.router.WithPayloadBits(64, (0 until 16 by 4)) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(4, 4)))
+class AXI4TestConfig00 extends AXI4NoCTesterConfig(AXI4NoCTesterParams(
+  inNodeMapping = Seq(0),
+  outNodeMapping = Seq(1),
+  nocParams = NoCParams(
+    topology      = BidirectionalLine(2),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(1) }),
+    vNetBlocking    = (blocker, blockee) => true,
+    routingRelation = NonblockingVirtualSubnetworksRouting(BidirectionalLineRouting(), 5)
+  )
+))
+class AXI4TestConfig01 extends AXI4NoCTesterConfig(AXI4NoCTesterParams(
+  inNodeMapping = Seq(0, 2),
+  outNodeMapping = Seq(1),
+  nocParams = NoCParams(
+    topology      = TerminalPlane(BidirectionalLine(3)),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(1) }),
+    vNetBlocking    = (blocker, blockee) => true,
+    routingRelation = NonblockingVirtualSubnetworksRouting(TerminalPlaneRouting(BidirectionalLineRouting()), 5)
+  )
+))
+class AXI4TestConfig02 extends AXI4NoCTesterConfig(AXI4NoCTesterParams(
+  inNodeMapping = Seq(0, 1, 2, 3, 5, 6, 7, 8),
+  outNodeMapping = Seq(4),
+  nocParams = NoCParams(
+    topology      = TerminalPlane(Mesh2D(3, 3)),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(10) { UserVirtualChannelParams(1) }),
+    vNetBlocking    = (blocker, blockee) => true,
+    routingRelation = NonblockingVirtualSubnetworksRouting(TerminalPlaneRouting(Mesh2DEscapeRouting()), 5)
+  )
+))
+class AXI4TestConfig03 extends AXI4NoCTesterConfig(AXI4NoCTesterParams(
+  inNodeMapping = Seq(1, 3, 5, 7),
+  outNodeMapping = Seq(0, 2, 4, 6, 8),
+  nocParams = NoCParams(
+    topology      = TerminalPlane(Mesh2D(3, 3)),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(10) { UserVirtualChannelParams(1) }),
+    vNetBlocking    = (blocker, blockee) => true,
+    routingRelation = NonblockingVirtualSubnetworksRouting(TerminalPlaneRouting(Mesh2DEscapeRouting()), 5)
+  )
+))
 
-
-// test configs for TL network
-class TLTestConfig00 extends Config(
-  new WithTLNoCTesterParams(TLNoCTesterParams(Seq(0), Seq(1))) ++
-  new constellation.routing.WithNNonblockingVirtualNetworks(5) ++
-  new constellation.channel.WithUniformNVirtualChannels(5, UserVirtualChannelParams(1)) ++
-  new constellation.routing.WithRoutingRelation(BidirectionalLineRouting()) ++
-  new constellation.topology.WithTopology(BidirectionalLine(2)))
-
-class TLTestConfig01 extends Config(
-  new WithTLNoCTesterParams(TLNoCTesterParams(Seq(4, 0, 2, 5, 6, 9, 11), Seq(7, 1, 3, 8, 10))) ++
-  new constellation.routing.WithNNonblockingVirtualNetworksWithSharing(5, 2) ++
-  new constellation.channel.WithUniformNVirtualChannels(7, UserVirtualChannelParams(3)) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(4, 3)))
-
-class TLTestConfig02 extends Config(
-  new WithTLNoCTesterParams(TLNoCTesterParams(Seq(4, 0, 2, 5, 6, 9, 11), Seq(7, 1, 3, 8, 10))) ++
-  new constellation.routing.WithNBlockingVirtualNetworks(5) ++
-  new constellation.channel.WithUniformNVirtualChannels(5, UserVirtualChannelParams(3)) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(4, 3)))
-
-class TLTestConfig03 extends Config(
-  new WithTLNoCTesterParams(TLNoCTesterParams(Seq(0, 1, 2), Seq(3, 4, 5))) ++
-  new constellation.routing.WithNNonblockingVirtualNetworks(5) ++
-  new constellation.channel.WithUniformNVirtualChannels(10, UserVirtualChannelParams(3)) ++
-  new constellation.routing.WithRoutingRelation(UnidirectionalTorus1DDatelineRouting()) ++
-  new constellation.topology.WithTopology(UnidirectionalTorus1D(6)))
-
-class TLTestConfig04 extends Config(
-  new WithTLNoCTesterParams(TLNoCTesterParams(Seq(4, 0, 2, 5, 6, 9, 11), Seq(7, 1, 3, 8, 10))) ++
-  new constellation.routing.WithNBlockingVirtualNetworks(5) ++
-  new constellation.channel.WithUniformNVirtualChannels(5, UserVirtualChannelParams(3)) ++
-  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
-  new constellation.topology.WithTopology(TerminalPlane(Mesh2D(4, 3))))
-
-class TLTestConfig05 extends Config(
-  new WithTLNoCTesterParams(TLNoCTesterParams(Seq(4, 0, 2, 5, 6, 9, 11), Seq(7, 1, 3, 8, 10),
-    explicitPayloadWidth=Some(32))) ++
-  new constellation.routing.WithNBlockingVirtualNetworks(5) ++
-  new constellation.channel.WithUniformNVirtualChannels(5, UserVirtualChannelParams(3)) ++
-  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
-  new constellation.topology.WithTopology(TerminalPlane(Mesh2D(4, 3))))
-
-class TLTestConfig06 extends Config(
-  new WithTLNoCTesterParams(TLNoCTesterParams(Seq(4, 0, 2, 5, 6, 9, 11), Seq(7, 1, 3, 8, 10), delay=0.0)) ++
-  new constellation.router.WithPrioritizingSingleVCAllocator ++
-  new constellation.routing.WithNNonblockingVirtualNetworksWithSharing(5, 10) ++
-  new constellation.channel.WithUniformNVirtualChannels(15, UserVirtualChannelParams(7)) ++
-  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
-  new constellation.topology.WithTopology(TerminalPlane(Mesh2D(4, 3))))
-
-
-// test configs for AXI4 network
-class AXI4TestConfig00 extends Config(
-  new WithAXI4NoCTesterParams(AXI4NoCTesterParams(Seq(0), Seq(1))) ++
-  new constellation.routing.WithNNonblockingVirtualNetworks(5) ++
-  new constellation.channel.WithUniformNVirtualChannels(5, UserVirtualChannelParams(5)) ++
-  new constellation.routing.WithRoutingRelation(BidirectionalLineRouting()) ++
-  new constellation.topology.WithTopology(BidirectionalLine(2)))
-class AXI4TestConfig01 extends Config(
-  new WithAXI4NoCTesterParams(AXI4NoCTesterParams(Seq(0, 2), Seq(1))) ++
-  new constellation.routing.WithNNonblockingVirtualNetworks(5) ++
-  new constellation.channel.WithUniformNVirtualChannels(5, UserVirtualChannelParams(5)) ++
-  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(BidirectionalLineRouting())) ++
-  new constellation.topology.WithTopology(TerminalPlane(BidirectionalLine(3))))
-class AXI4TestConfig02 extends Config(
-  new WithAXI4NoCTesterParams(AXI4NoCTesterParams(Seq(0, 1, 2, 3, 5, 6, 7, 8), Seq(4))) ++
-  new constellation.routing.WithNNonblockingVirtualNetworks(5) ++
-  new constellation.channel.WithUniformNVirtualChannels(10, UserVirtualChannelParams(3)) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(3, 3)))
-class AXI4TestConfig03 extends Config(
-  new WithAXI4NoCTesterParams(AXI4NoCTesterParams(Seq(1, 3, 5, 7), Seq(0, 2, 4, 6, 8))) ++
-  new constellation.routing.WithNNonblockingVirtualNetworks(5) ++
-  new constellation.channel.WithUniformNVirtualChannels(10, UserVirtualChannelParams(3)) ++
-  new constellation.routing.WithRoutingRelation(TerminalPlaneRouting(Mesh2DEscapeRouting())) ++
-  new constellation.topology.WithTopology(TerminalPlane(Mesh2D(3, 3))))
-
-
-// Performance eval configs
-class EvalTestConfig00 extends Config(
-  new WithEvalRequiredThroughput(0.79) ++
-  new WithEvalFlow(0, 0, 1.0) ++
-  new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(Seq(0)) ++
-  new constellation.channel.WithEgresses(Seq(1)) ++
-  new constellation.routing.WithRoutingRelation(UnidirectionalLineRouting()) ++
-  new constellation.topology.WithTopology(UnidirectionalLine(2)))
-class EvalTestConfig01 extends Config(
-  new WithEvalRequiredThroughput(0.85) ++
-  new WithEvalUniformFlow(0.5) ++
-  new constellation.channel.WithUniformNVirtualChannels(3, UserVirtualChannelParams(3)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(Seq(0, 0)) ++
-  new constellation.channel.WithEgresses(Seq(1, 1)) ++
-  new constellation.routing.WithRoutingRelation(UnidirectionalLineRouting()) ++
-  new constellation.topology.WithTopology(UnidirectionalLine(2)))
-class EvalTestConfig02 extends Config(
-  new WithEvalRequiredMedianLatency(150) ++
-  new WithEvalRequiredMaxLatency(260) ++
-  new WithEvalRequiredThroughput(0.99) ++
-  new WithEvalUniformFlow(1.0) ++
-  new constellation.router.WithCoupleSAVA ++
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(Seq(0)) ++
-  new constellation.channel.WithEgresses(Seq(1)) ++
-  new constellation.routing.WithRoutingRelation(UnidirectionalLineRouting()) ++
-  new constellation.topology.WithTopology(UnidirectionalLine(2)))
-class EvalTestConfig03 extends Config(
-  new WithEvalRequiredMedianLatency(30) ++
-  new WithEvalRequiredMaxLatency(175) ++
-  new WithEvalRequiredThroughput(0.9) ++
-  new WithEvalUniformFlow(0.1) ++
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 10) ++
-  new constellation.channel.WithEgresses(0 until 10) ++
-  new constellation.routing.WithRoutingRelation(UnidirectionalTorus1DDatelineRouting()) ++
-  new constellation.topology.WithTopology(UnidirectionalTorus1D(10)))
-class EvalTestConfig04 extends Config(
-  new WithEvalRequiredThroughput(0.69) ++
-  new WithEvalUniformFlow(0.4) ++
-  new constellation.channel.WithUniformNVirtualChannels(1, UserVirtualChannelParams(5)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses((0 until 4) ++ (0 until 4)) ++
-  new constellation.channel.WithEgresses(((0 until 4) ++ (0 until 4)).map(_ + 4*2)) ++
-  new constellation.routing.WithRoutingRelation(ButterflyRouting()) ++
-  new constellation.topology.WithTopology(Butterfly(2, 3)))
-class EvalTestConfig05 extends Config(
-  new WithEvalRequiredMedianLatency(75) ++
-  new WithEvalRequiredMaxLatency(1500) ++
-  new WithEvalRequiredThroughput(0.90) ++
-  new WithEvalUniformFlow(0.5) ++
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(4)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 25) ++
-  new constellation.channel.WithEgresses(0 until 25) ++
-  new constellation.router.WithRotatingSingleVCAllocator ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(5, 5)))
-class EvalTestConfig06 extends Config(
-  new WithEvalRequiredMedianLatency(25) ++
-  new WithEvalRequiredMaxLatency(125) ++
-  new WithEvalRequiredThroughput(0.94) ++
-  new WithEvalUniformFlow(0.2) ++
-  new constellation.channel.WithUniformNVirtualChannels(1, UserVirtualChannelParams(4)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 16) ++
-  new constellation.channel.WithEgresses(0 until 16) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DDimensionOrderedRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(4, 4)))
-class EvalTestConfig07 extends Config(
-  new WithEvalRequiredMedianLatency(20) ++
-  new WithEvalRequiredMaxLatency(75) ++
-  new WithEvalRequiredThroughput(0.95) ++
-  new WithEvalUniformFlow(0.2) ++
-  new constellation.channel.WithUniformNVirtualChannels(2, UserVirtualChannelParams(4)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(0 until 16) ++
-  new constellation.channel.WithEgresses(0 until 16) ++
-  new constellation.routing.WithRoutingRelation(Mesh2DEscapeRouting()) ++
-  new constellation.topology.WithTopology(Mesh2D(4, 4)))
-class EvalTestConfig08 extends Config(
-  new WithEvalRequiredMedianLatency(35) ++
-  new WithEvalRequiredMaxLatency(250) ++
-  new WithEvalRequiredThroughput(0.95) ++
-  new WithEvalUniformFlow(0.5) ++
-  new constellation.channel.WithUniformNVirtualChannels(4, UserVirtualChannelParams(4)) ++
-  new constellation.channel.WithFullyConnectedIngresses ++
-  new constellation.channel.WithIngresses(Seq.fill(2) { 0 until 8 }.flatten) ++
-  new constellation.channel.WithEgresses((Seq.fill(2) { 0 until 8 }.flatten).map(_ + 8*3)) ++
-  new constellation.routing.WithRoutingRelation(ButterflyRouting()) ++
-  new constellation.topology.WithTopology(Butterfly(2, 4)))
+class EvalTestConfig00 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.79,
+  flows              = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology         = UnidirectionalLine(2),
+    channelParamGen  = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(4) }),
+    ingresses        = Seq(0).map { i => UserIngressParams(i) },
+    egresses         = Seq(1).map { i => UserEgressParams(i) },
+    flows            = Seq.tabulate(1, 1) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation  = UnidirectionalLineRouting()
+  )
+))
+class EvalTestConfig01 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.79,
+  flows              = (s, d) => 0.25,
+  nocParams = NoCParams(
+    topology         = UnidirectionalLine(2),
+    channelParamGen  = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(4) }),
+    ingresses        = Seq(0, 0).map { i => UserIngressParams(i) },
+    egresses         = Seq(1, 1).map { i => UserEgressParams(i) },
+    flows            = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation  = UnidirectionalLineRouting()
+  )
+))
+class EvalTestConfig02 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput    = 0.99,
+  requiredMedianLatency = 150,
+  requiredMaxLatency    = 260,
+  flows              = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology         = UnidirectionalLine(2),
+    channelParamGen  = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+    routerParams     = (i) => UserRouterParams(coupleSAVA=true),
+    ingresses        = Seq(0).map { i => UserIngressParams(i) },
+    egresses         = Seq(1).map { i => UserEgressParams(i) },
+    flows            = Seq.tabulate(1, 1) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation  = UnidirectionalLineRouting()
+  )
+))
+class EvalTestConfig03 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput    = 0.9,
+  requiredMedianLatency = 30,
+  requiredMaxLatency    = 175,
+  flows              = (s, d) => 0.1 / 10,
+  nocParams = NoCParams(
+    topology         = UnidirectionalTorus1D(10),
+    channelParamGen  = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+    ingresses        = (0 until 10).map { i => UserIngressParams(i) },
+    egresses         = (0 until 10).map { i => UserEgressParams(i) },
+    flows            = Seq.tabulate(10, 10) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation  = UnidirectionalTorus1DDatelineRouting()
+  )
+))
+class EvalTestConfig04 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput    = 0.69,
+  flows              = (s, d) => 0.05,
+  nocParams = NoCParams(
+    topology         = Butterfly(2, 3),
+    channelParamGen  = (a, b) => UserChannelParams(Seq.fill(1) { UserVirtualChannelParams(5) }),
+    ingresses        = (0 until 8).map { i => UserIngressParams(i % 4) },
+    egresses         = (0 until 8).map { i => UserEgressParams((i % 4) + 4 * 2) },
+    flows            = Seq.tabulate(8, 8) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation  = ButterflyRouting()
+  )
+))
+class EvalTestConfig05 extends NoCEvalConfig(NoCEvalParams(
+  requiredMedianLatency = 75,
+  requiredMaxLatency    = 1500,
+  requiredThroughput    = 0.90,
+  flows              = (s, d) => 0.5 / 25,
+  nocParams = NoCParams(
+    topology         = Mesh2D(5, 5),
+    channelParamGen  = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(4) }),
+    routerParams     = (i) => UserRouterParams(
+      vcAllocator = (vP) => (p) => new RotatingSingleVCAllocator(vP)(p)
+    ),
+    ingresses        = (0 until 25).map { i => UserIngressParams(i) },
+    egresses         = (0 until 25).map { i => UserEgressParams(i) },
+    flows            = Seq.tabulate(25, 25) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation  = Mesh2DEscapeRouting()
+  )
+))
+class EvalTestConfig06 extends NoCEvalConfig(NoCEvalParams(
+  requiredMedianLatency = 25,
+  requiredMaxLatency    = 125,
+  requiredThroughput    = 0.94,
+  flows              = (s, d) => 0.2 / 16,
+  nocParams = NoCParams(
+    topology         = Mesh2D(4, 4),
+    channelParamGen  = (a, b) => UserChannelParams(Seq.fill(1) { UserVirtualChannelParams(4) }),
+    ingresses        = (0 until 16).map { i => UserIngressParams(i) },
+    egresses         = (0 until 16).map { i => UserEgressParams(i) },
+    flows            = Seq.tabulate(16, 16) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation  = Mesh2DDimensionOrderedRouting()
+  )
+))
+class EvalTestConfig07 extends NoCEvalConfig(NoCEvalParams(
+  requiredMedianLatency = 20,
+  requiredMaxLatency    = 75,
+  requiredThroughput    = 0.95,
+  flows              = (s, d) => 0.2 / 16,
+  nocParams = NoCParams(
+    topology         = Mesh2D(4, 4),
+    channelParamGen  = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(4) }),
+    ingresses        = (0 until 16).map { i => UserIngressParams(i) },
+    egresses         = (0 until 16).map { i => UserEgressParams(i) },
+    flows            = Seq.tabulate(16, 16) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation  = Mesh2DEscapeRouting()
+  )
+))
+class EvalTestConfig08 extends NoCEvalConfig(NoCEvalParams(
+  requiredMedianLatency = 35,
+  requiredMaxLatency    = 250,
+  requiredThroughput    = 0.95,
+  flows              = (s, d) => 0.5 / 16,
+  nocParams = NoCParams(
+    topology         = Butterfly(2, 4),
+    channelParamGen  = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(4) }),
+    ingresses        = (0 until 16).map { i => UserIngressParams(i % 8) },
+    egresses         = (0 until 16).map { i => UserEgressParams((i % 8) + 8 * 3) },
+    flows            = Seq.tabulate(16, 16) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation  = ButterflyRouting()
+  )
+))
