@@ -68,7 +68,7 @@ trait HasNoCParams {
   def maxIngressesAtNode = nocParams.routerParams.map(_.nIngress).max
   def maxEgressesAtNode = nocParams.routerParams.map(_.nEgress).max
   def routingRelation = nocParams.routingRelation
-  def virtualChannelBits = log2Up(nocParams.channelParams.map(_.nVirtualChannels).max)
+  def virtualChannelBits = log2Up((nocParams.channelParams.map(_.nVirtualChannels) :+ 0).max)
 }
 
 object InternalNoCParams {
