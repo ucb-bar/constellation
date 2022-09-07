@@ -11,7 +11,6 @@ import freechips.rocketchip.util._
 
 import constellation.noc.{NoCParams, HasNoCParams, NoC}
 import constellation.channel._
-import constellation.rc.{TLNoC, TLNoCParams}
 import constellation.router.{HasRouterCtrlConsts}
 
 trait HasSuccessIO { this: Module =>

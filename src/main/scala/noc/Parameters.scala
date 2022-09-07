@@ -155,6 +155,7 @@ object InternalNoCParams {
         val iId = iP.destId
         //println(s"Constellation: $nocName Checking connectivity from ingress $iIdx")
         iP.possibleFlows.map { flow =>
+
           val flowPossibleFlows = scala.collection.mutable.Set[ChannelRoutingInfo]()
           var unexplored: Seq[ChannelRoutingInfo] = iP.channelRoutingInfos
           while (unexplored.size != 0) {
@@ -170,7 +171,7 @@ object InternalNoCParams {
                   }.flatten
                 }.flatten
                 require(nexts.size > 0,
-                  s"Failed to route from $iId to ${flow.egressNode} at $head for vnet $vNetId \n  $stack \n  ${nextChannelParamMap(head.dst)}")
+                  s"Failed to route $flow at $head \n  $stack \n  ${nextChannelParamMap(head.dst)}")
                 require((nexts.toSet & stack.toSet).size == 0,
                   s"$flow, $nexts, $stack")
                 stack = Seq(nexts.head) ++ stack
@@ -236,7 +237,11 @@ object InternalNoCParams {
       println(s"Constellation: $nocName Checking virtual subnet connectivity")
       for (vNetId <- 0 until nVirtualNetworks) {
         // blockees are vNets which the current vNet can block without affecting its own forwards progress
-        val blockees = (0 until nVirtualNetworks).filter(v => v != vNetId && nocParams.vNetBlocking(vNetId, v))
+        val blockees = (0 until nVirtualNetworks).filter(v =>
+          v != vNetId && nocParams.vNetBlocking(vNetId, v) && flows.exists(_.vNetId == v)
+        )
+        if (blockees.size > 0)
+          println(s"Constellation: $nocName Checking if $vNetId can proceed when blocked by ${blockees}")
         val blockeeSets = blockees.toSet.subsets.filter(_.size > 0)
         // For each subset of blockers for this virtual network, recheck connectivity assuming
         // every virtual channel accessible to each blocker is locked

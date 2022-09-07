@@ -120,7 +120,7 @@ object UnidirectionalTorus1DDatelineRouting {
   def apply() = (topo: PhysicalTopology) => new RoutingRelation(topo) {
     def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
       if (srcC.src == -1)  {
-        nxtC.vc == nxtC.n_vc - 1
+        nxtC.vc != 0
       } else if (srcC.vc == 0) {
         nxtC.vc == 0
       } else if (nxtC.src == topo.nNodes - 1) {
@@ -129,6 +129,13 @@ object UnidirectionalTorus1DDatelineRouting {
         nxtC.vc <= srcC.vc && (nxtC.vc != 0 || flow.egressNode > nxtC.src)
       }
     }
+    override def getNPrios(src: ChannelRoutingInfo) = 2
+    override def getPrio(src: ChannelRoutingInfo, nxt: ChannelRoutingInfo, flow: FlowRoutingInfo): Int = {
+      if (nxt.vc == 0 || nxt.vc == 1) 1 else 0
+    }
+    override def isEscape(c: ChannelRoutingInfo, v: Int) = {
+      c.isIngress || c.isEgress || c.vc < 2
+    }
   }
 }
 
@@ -136,7 +143,7 @@ object BidirectionalTorus1DDatelineRouting {
   def apply() = (topo: PhysicalTopology) => new RoutingRelation(topo) {
     def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
       if (srcC.src == -1)  {
-        nxtC.vc == nxtC.n_vc - 1
+        nxtC.vc != 0
       } else if (srcC.vc == 0) {
         nxtC.vc == 0
       } else if ((nxtC.dst + topo.nNodes - nxtC.src) % topo.nNodes == 1) {
@@ -346,7 +353,7 @@ object UnidirectionalTorus2DDatelineRouting {
 
         val turn = nxtX != srcX && nxtY != srcY
         if (srcC.src == -1 || turn) {
-          nxtC.vc == nxtC.n_vc - 1
+          nxtC.vc != 0
         } else if (srcX == nxtX) {
           baseY(
             srcC.copy(src=srcY, dst=nodeY),
@@ -362,6 +369,9 @@ object UnidirectionalTorus2DDatelineRouting {
         } else {
           false
         }
+      }
+      override def isEscape(c: ChannelRoutingInfo, v: Int) = {
+        c.isIngress || c.isEgress || c.vc < 2
       }
     }
   }
@@ -379,7 +389,7 @@ object BidirectionalTorus2DDatelineRouting {
         val (srcX, srcY)   = (srcC.src % topo.nX , srcC.src / topo.nX)
 
         if (srcC.src == -1) {
-          nxtC.vc == nxtC.n_vc - 1
+          nxtC.vc != 0
         } else if (nodeX == nxtX) {
           baseY(
             srcC.copy(src=srcY, dst=nodeY),
@@ -438,12 +448,12 @@ object DimensionOrderedBidirectionalTorus2DDatelineRouting {
           srcC.copy(src=(if (srcC.src == -1) -1 else srcX), dst=nodeX),
           nxtC.copy(src=nodeX, dst=nxtX),
           flow.copy(egressNode=dstX)
-        )
+        ) && nxtX != nodeX
         val ydir = baseY(
           srcC.copy(src=(if (srcC.src == -1) -1 else srcY), dst=nodeY),
           nxtC.copy(src=nodeY, dst=nxtY),
           flow.copy(egressNode=dstY)
-        )
+        ) && nxtY != nodeY
 
         val sel = if (dstX != nodeX) xdir else ydir
 
@@ -481,6 +491,31 @@ object TerminalPlaneRouting {
           false
         }
       }
+      override def getNPrios(c: ChannelRoutingInfo): Int = {
+        if (topo.isBase(c.dst) && topo.isBase(c.src)){
+          base.getNPrios(c.copy(src=c.src % topo.base.nNodes, dst=c.dst % topo.base.nNodes))
+        } else {
+          1
+        }
+      }
+      override def getPrio(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo): Int = {
+        if (topo.isBase(srcC.dst) && topo.isBase(nxtC.dst)) {
+          if (topo.isTerminal(srcC.src)) {
+            base.getPrio(
+              srcC.copy(src=(-1)                       , dst=srcC.dst % topo.base.nNodes, vc=0, n_vc=1),
+              nxtC.copy(src=nxtC.src % topo.base.nNodes, dst=nxtC.dst % topo.base.nNodes),
+              flow.copy(egressNode=flow.egressNode % topo.base.nNodes))
+          } else {
+            base.getPrio(
+              srcC.copy(src=srcC.src % topo.base.nNodes, dst=srcC.dst % topo.base.nNodes),
+              nxtC.copy(src=nxtC.src % topo.base.nNodes, dst=nxtC.dst % topo.base.nNodes),
+              flow.copy(egressNode=flow.egressNode % topo.base.nNodes))
+          }
+        } else {
+          0
+        }
+      }
+
       override def isEscape(c: ChannelRoutingInfo, v: Int) = {
         !topo.isBase(c.src) || !topo.isBase(c.dst) || base.isEscape(
           c.copy(src=c.src % topo.base.nNodes, dst=c.dst % topo.base.nNodes), v)
@@ -500,51 +535,23 @@ object TerminalPlaneRouting {
   * but virtual channels and buffers are not shared.
   */
 object NonblockingVirtualSubnetworksRouting {
-  def apply(f: PhysicalTopology => RoutingRelation, n: Int) = (topo: PhysicalTopology) => new RoutingRelation(topo) {
+  def apply(f: PhysicalTopology => RoutingRelation, n: Int, nDedicatedChannels: Int) = (topo: PhysicalTopology) => new RoutingRelation(topo) {
+    def trueVIdToVirtualVId(vId: Int) = if (vId < n * nDedicatedChannels) {
+      vId % nDedicatedChannels
+    } else {
+      nDedicatedChannels + vId - n * nDedicatedChannels
+    }
+    def lower(c: ChannelRoutingInfo) = c.copy(
+      vc = trueVIdToVirtualVId(c.vc),
+      n_vc = if (c.isIngress) 1 else c.n_vc - n * nDedicatedChannels + nDedicatedChannels
+    )
     val base = f(topo)
     def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-      if (srcC.isIngress) {
-        (nxtC.vc % n == flow.vNetId) && base(
-          srcC,
-          nxtC.copy(vc=nxtC.vc / n, n_vc=nxtC.n_vc / n),
-          flow.copy(vNetId=0)
-        )
-      } else {
-        // only allow a virtual subnet to use virtual channel is channelID % numnetworks = virtual network ID
-        (nxtC.vc % n == flow.vNetId) && base(
-          srcC.copy(vc=srcC.vc / n, n_vc=srcC.n_vc / n),
-          nxtC.copy(vc=nxtC.vc / n, n_vc=nxtC.n_vc / n),
-          flow.copy(vNetId=0)
-        )
-      }
+      val able = (nxtC.vc >= n * nDedicatedChannels) || ((nxtC.vc / nDedicatedChannels) == flow.vNetId)
+      able && base(lower(srcC), lower(nxtC), flow.copy(vNetId=0))
     }
     override def isEscape(c: ChannelRoutingInfo, v: Int) = {
-      base.isEscape(c.copy(vc=c.vc / n, n_vc=c.n_vc / n), 0)
-    }
-  }
-}
-
-// Virtual subnets with 1 dedicated virtual channel each, and some number of shared channels
-object SharedNonblockingVirtualSubnetworksRouting {
-  def apply(f: PhysicalTopology => RoutingRelation, n: Int, nSharedChannels: Int) = (topo: PhysicalTopology) => new RoutingRelation(topo) {
-    def trueVIdToVirtualVId(vId: Int) = if (vId < n) 0 else vId - n +1
-    val base = f(topo)
-    def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
-      if (nxtC.vc < n) {
-        nxtC.vc == flow.vNetId && base(
-          srcC.copy(vc=trueVIdToVirtualVId(srcC.vc), n_vc = 1 + nSharedChannels),
-          nxtC.copy(vc=0, n_vc = 1 + nSharedChannels),
-          flow.copy(vNetId=0)
-        )
-      } else {
-        base(srcC.copy(vc=trueVIdToVirtualVId(srcC.vc), n_vc = 1 + nSharedChannels),
-          nxtC.copy(vc=trueVIdToVirtualVId(nxtC.vc), n_vc = 1 + nSharedChannels),
-          flow.copy(vNetId=0)
-        )
-      }
-    }
-    override def isEscape(c: ChannelRoutingInfo, v: Int) = {
-      base.isEscape(c.copy(vc=trueVIdToVirtualVId(c.vc), n_vc = 1 + nSharedChannels), 0)
+      base.isEscape(lower(c), 0)
     }
   }
 }
@@ -555,7 +562,7 @@ object BlockingVirtualSubnetworksRouting {
     def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
       val lNxtV = nxtC.vc - flow.vNetId * nDedicated
       val lSrcV = srcC.vc - flow.vNetId * nDedicated
-      if (srcC.isIngress && lNxtV >= 0) {
+      val r = if (srcC.isIngress && lNxtV >= 0) {
         base(srcC,
           nxtC.copy(n_vc = nxtC.n_vc - flow.vNetId * nDedicated, vc = lNxtV),
           flow.copy(vNetId=0)
@@ -568,15 +575,16 @@ object BlockingVirtualSubnetworksRouting {
           flow.copy(vNetId=0)
         )
       }
+      r
     }
     override def isEscape(c: ChannelRoutingInfo, v: Int) = {
-      c.vc >= v && base.isEscape(c.copy(vc=c.vc - v * nDedicated, n_vc=c.n_vc - v * nDedicated), 0)
+      c.vc >= v * nDedicated && base.isEscape(c.copy(vc=c.vc - v * nDedicated, n_vc=c.n_vc - v * nDedicated), 0)
     }
   }
 }
 
 
-object HierarchicalRoutingRelation {
+object HierarchicalRouting {
   def apply(
     baseRouting: PhysicalTopology => RoutingRelation,
     childRouting: Seq[PhysicalTopology => RoutingRelation]
@@ -587,7 +595,7 @@ object HierarchicalRoutingRelation {
       def copyChannel(c: ChannelRoutingInfo, o: Int) = {
         val nSrc = if (c.src < topo.base.nNodes) -1 else c.src - o
         val nDst = if (c.dst == -1) -1 else c.dst - o
-        assert(nSrc >= -1 && nDst >= -1)
+        assert(nSrc >= -1 && nDst >= -1, s"$c $o")
         c.copy(src=nSrc, dst=nDst)
       }
 
@@ -639,6 +647,39 @@ object HierarchicalRoutingRelation {
           }
         }
       }
+      override def getNPrios(c: ChannelRoutingInfo): Int = {
+        if (topo.isBase(c.dst) && topo.isBase(c.src)){
+          base.getNPrios(c)
+        } else if (topo.childId(c.src) == topo.childId(c.dst) && !c.isEgress) {
+          children(topo.childId(c.src)).getNPrios(c.copy(
+            src=if (c.src >= topo.base.nNodes) -1 else c.src))
+        } else {
+          1
+        }
+      }
+      override def getPrio(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo): Int = {
+        val thisBase = topo.isBase(srcC.dst)
+        val nextBase = topo.isBase(nxtC.dst)
+        val id = topo.childId(srcC.dst)
+        (thisBase, nextBase) match {
+          case (true, true) => base.getPrio(
+            srcC.copy(src=if (srcC.src >= topo.base.nNodes) -1 else srcC.src),
+            nxtC,
+            flow.copy(egressNode=topo.children(topo.childId(flow.egressNode)).src))
+          case (false, false) => {
+            if (topo.childId(srcC.dst) == topo.childId(nxtC.dst)) {
+              children(id).getPrio(
+                copyChannel(srcC, topo.offsets(id)),
+                copyChannel(nxtC, topo.offsets(id)),
+                flow.copy(egressNode=topo.children(id).dst))
+            } else {
+              0
+            }
+          }
+          case _ => 0
+        }
+      }
+
       override def isEscape(c: ChannelRoutingInfo, v: Int) = {
         val srcBase = topo.isBase(c.src)
         val dstBase = topo.isBase(c.dst)
