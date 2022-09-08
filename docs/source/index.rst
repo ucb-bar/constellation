@@ -8,8 +8,10 @@ Welcome to Constellation's Documentation!
 
 Constellation is a Chisel NoC RTL generator framework designed from the ground up to support integration in a heterogeneous SoC and evaluation of highly irregular NoC architectures.
 
+Constellation generates wormhole-routed networks with virtual channels, a common architecture for on-chip interconnects.
+
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 4
    :caption: Contents:
 
    Introduction/index

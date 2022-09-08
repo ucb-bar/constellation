@@ -564,106 +564,106 @@ class TestConfig55 extends NoCTesterConfig(NoCTesterParams(NoCParams(
   routingRelation = DimensionOrderedBidirectionalTorus2DDatelineRouting()
 )))
 class TestConfig56 extends NoCTesterConfig(NoCTesterParams(NoCParams(
-  topology        = TerminalPlane(UnidirectionalLine(3)),
+  topology        = TerminalRouter(UnidirectionalLine(3)),
   channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(4) }),
   ingresses       = Seq(0, 1, 1).map { i => UserIngressParams(i) },
   egresses        = Seq(1, 1, 2).map { i => UserEgressParams(i) },
   flows           = Seq.tabulate(3, 3) { (s, d) => FlowParams(s, d, 0) }.flatten,
-  routingRelation = TerminalPlaneRouting(AllLegalRouting())
+  routingRelation = TerminalRouterRouting(AllLegalRouting())
 )))
 class TestConfig57 extends NoCTesterConfig(NoCTesterParams(NoCParams(
-  topology        = TerminalPlane(BidirectionalLine(4)),
+  topology        = TerminalRouter(BidirectionalLine(4)),
   channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(3) }),
   ingresses       = Seq(1, 1, 2, 2).map { i => UserIngressParams(i) },
   egresses        = Seq(0, 0, 1, 1, 2, 2, 3, 3).map { i => UserEgressParams(i) },
   flows           = Seq.tabulate(4, 8) { (s, d) => FlowParams(s, d, 0) }.flatten,
-  routingRelation = TerminalPlaneRouting(BidirectionalLineRouting())
+  routingRelation = TerminalRouterRouting(BidirectionalLineRouting())
 )))
 class TestConfig58 extends NoCTesterConfig(NoCTesterParams(
   NoCParams(
-    topology        = TerminalPlane(UnidirectionalTorus1D(6)),
+    topology        = TerminalRouter(UnidirectionalTorus1D(6)),
     channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
     routerParams    = (i) => UserRouterParams(
       vcAllocator   = (vP) => (p) => new PrioritizingSingleVCAllocator(vP)(p)),
     ingresses       = (0 until 6).map { i => UserIngressParams(i) },
     egresses        = (0 until 6).map { i => UserEgressParams(i) },
     flows           = Seq.tabulate(6, 6) { (s, d) => FlowParams(s, d, 0) }.flatten,
-    routingRelation = TerminalPlaneRouting(UnidirectionalTorus1DDatelineRouting())
+    routingRelation = TerminalRouterRouting(UnidirectionalTorus1DDatelineRouting())
   ),
   inputPacketStallProbability = 0.9,
 ))
 class TestConfig59 extends NoCTesterConfig(NoCTesterParams(
   NoCParams(
-    topology        = TerminalPlane(BidirectionalTorus1D(6)),
+    topology        = TerminalRouter(BidirectionalTorus1D(6)),
     channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
     ingresses       = (0 until 12).map { i => UserIngressParams(i % 6) },
     egresses        = (0 until 12).map { i => UserEgressParams(i % 6) },
     flows           = Seq.tabulate(12, 12) { (s, d) => FlowParams(s, d, 0) }.flatten,
-    routingRelation = TerminalPlaneRouting(BidirectionalTorus1DShortestRouting())
+    routingRelation = TerminalRouterRouting(BidirectionalTorus1DShortestRouting())
   ),
   inputPacketStallProbability = 0.90
 ))
 class TestConfig60 extends NoCTesterConfig(NoCTesterParams(NoCParams(
-  topology        = TerminalPlane(Mesh2D(5, 5)),
+  topology        = TerminalRouter(Mesh2D(5, 5)),
   channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
   ingresses       = (0 until 25).map { i => UserIngressParams(i) },
   egresses        = (0 until 25).map { i => UserEgressParams(i) },
   flows           = Seq.tabulate(25, 25) { (s, d) => FlowParams(s, d, 0) }.flatten,
-  routingRelation = TerminalPlaneRouting(Mesh2DEscapeRouting())
+  routingRelation = TerminalRouterRouting(Mesh2DEscapeRouting())
 )))
 class TestConfig61 extends NoCTesterConfig(NoCTesterParams(NoCParams(
-  topology        = TerminalPlane(Mesh2D(5, 5)),
+  topology        = TerminalRouter(Mesh2D(5, 5)),
   channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
   ingresses       = (0 until 25).map { i => UserIngressParams(i) },
   egresses        = (0 until 25).map { i => UserEgressParams(i) },
   flows           = Seq.tabulate(25, 25) { (s, d) => FlowParams(s, d, 0) }.flatten,
-  routingRelation = TerminalPlaneRouting(Mesh2DDimensionOrderedRouting())
+  routingRelation = TerminalRouterRouting(Mesh2DDimensionOrderedRouting())
 )))
 class TestConfig62 extends NoCTesterConfig(NoCTesterParams(NoCParams(
-  topology        = TerminalPlane(Mesh2D(4, 4)),
+  topology        = TerminalRouter(Mesh2D(4, 4)),
   channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
   ingresses       = (0 until 16).map { i => UserIngressParams(i) },
   egresses        = (0 until 16).map { i => UserEgressParams(i) },
   flows           = Seq.tabulate(16, 16) { (s, d) =>
     if (s % 3 == ((d + 2) % 3)) Some(FlowParams(s, d, s % 3)) else None
   }.flatten.flatten,
-  routingRelation = BlockingVirtualSubnetworksRouting(TerminalPlaneRouting(Mesh2DEscapeRouting()), 4),
+  routingRelation = BlockingVirtualSubnetworksRouting(TerminalRouterRouting(Mesh2DEscapeRouting()), 4),
   vNetBlocking    = (blocker, blockee) => blocker < blockee
 )))
 class TestConfig63 extends NoCTesterConfig(NoCTesterParams(
   NoCParams(
-    topology        = TerminalPlane(Mesh2D(4, 4)),
+    topology        = TerminalRouter(Mesh2D(4, 4)),
     channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
     routerParams    = (i) => UserRouterParams(coupleSAVA=true),
     ingresses       = (0 until 4).map { i => UserIngressParams(i) },
     egresses        = (4 until 16).map { i => UserEgressParams(i) },
     flows           = Seq.tabulate(4, 12) { (s, d) => FlowParams(s, d, 0) }.flatten,
-    routingRelation = TerminalPlaneRouting(Mesh2DEscapeRouting())
+    routingRelation = TerminalRouterRouting(Mesh2DEscapeRouting())
   ),
   inputFlitStallProbability = 0.9
 ))
 class TestConfig64 extends NoCTesterConfig(NoCTesterParams(
   NoCParams(
-    topology        = TerminalPlane(Mesh2D(4, 4)),
+    topology        = TerminalRouter(Mesh2D(4, 4)),
     channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
     routerParams    = (i) => UserRouterParams(coupleSAVA=true),
     ingresses       = (0 until 4).map { i => UserIngressParams(i) },
     egresses        = (4 until 16).map { i => UserEgressParams(i) },
     flows           = Seq.tabulate(4, 12) { (s, d) => FlowParams(s, d, 0) }.flatten,
-    routingRelation = TerminalPlaneRouting(Mesh2DEscapeRouting()),
+    routingRelation = TerminalRouterRouting(Mesh2DEscapeRouting()),
     hasCtrl         = true
   ),
   inputFlitStallProbability = 0.9
 ))
 class TestConfig65 extends NoCTesterConfig(NoCTesterParams(
   NoCParams(
-    topology        = TerminalPlane(Mesh2D(4, 4)),
+    topology        = TerminalRouter(Mesh2D(4, 4)),
     channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
     routerParams    = (i) => UserRouterParams(coupleSAVA=true),
     ingresses       = (0 until 16).map { i => UserIngressParams(i) },
     egresses        = (0 until 16).map { i => UserEgressParams(i) },
     flows           = Seq.tabulate(16, 16) { (s, d) => FlowParams(s, d, 0) }.flatten,
-    routingRelation = TerminalPlaneRouting(Mesh2DEscapeRouting()),
+    routingRelation = TerminalRouterRouting(Mesh2DEscapeRouting()),
     hasCtrl         = true
   ),
   inputFlitStallProbability = 0.9
@@ -721,7 +721,7 @@ class TestConfig67 extends NoCTesterConfig(NoCTesterParams(
 ))
 class TestConfig68 extends NoCTesterConfig(NoCTesterParams(
   NoCParams(
-    topology        = TerminalPlane(HierarchicalTopology(
+    topology        = TerminalRouter(HierarchicalTopology(
       base = UnidirectionalTorus1D(5),
       children = Seq(
         HierarchicalSubTopology(0, 1, Mesh2D(2, 3)),
@@ -737,7 +737,7 @@ class TestConfig68 extends NoCTesterConfig(NoCTesterParams(
     ingresses       = (0 until 23).map { i => UserIngressParams(i) },
     egresses        = (0 until 23).map { i => UserEgressParams(i) },
     flows           = Seq.tabulate(23, 23) { (s, d) => FlowParams(s, d, 0) }.flatten,
-    routingRelation = TerminalPlaneRouting(HierarchicalRouting(
+    routingRelation = TerminalRouterRouting(HierarchicalRouting(
       baseRouting = UnidirectionalTorus1DDatelineRouting(),
       childRouting = Seq(
         Mesh2DEscapeRouting(),
@@ -845,20 +845,20 @@ class TLTestConfig04 extends TLNoCTesterConfig(TLNoCTesterParams(
   inNodeMapping = Seq(4, 0, 2, 5, 6, 9, 11),
   outNodeMapping = Seq(7, 1, 3, 8, 10),
   nocParams = NoCParams(
-    topology        = TerminalPlane(Mesh2D(4, 3)),
+    topology        = TerminalRouter(Mesh2D(4, 3)),
     channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(3) }),
     vNetBlocking    = (blocker, blockee) => blocker < blockee,
-    routingRelation = BlockingVirtualSubnetworksRouting(TerminalPlaneRouting(Mesh2DEscapeRouting()), 5)
+    routingRelation = BlockingVirtualSubnetworksRouting(TerminalRouterRouting(Mesh2DEscapeRouting()), 5)
   )
 ))
 class TLTestConfig05 extends TLNoCTesterConfig(TLNoCTesterParams(
   inNodeMapping = Seq(4, 0, 2, 5, 6, 9, 11),
   outNodeMapping = Seq(7, 1, 3, 8, 10),
   nocParams = NoCParams(
-    topology        = TerminalPlane(BidirectionalTorus2D(3, 4)),
+    topology        = TerminalRouter(BidirectionalTorus2D(3, 4)),
     channelParamGen = (a, b) => UserChannelParams(Seq.fill(10) { UserVirtualChannelParams(3) }),
     vNetBlocking    = (blocker, blockee) => blocker < blockee,
-    routingRelation = BlockingVirtualSubnetworksRouting(TerminalPlaneRouting(DimensionOrderedBidirectionalTorus2DDatelineRouting()), 5, 2)
+    routingRelation = BlockingVirtualSubnetworksRouting(TerminalRouterRouting(DimensionOrderedBidirectionalTorus2DDatelineRouting()), 5, 2)
   )
 ))
 class TLTestConfig06 extends TLNoCTesterConfig(TLNoCTesterParams(
@@ -866,13 +866,13 @@ class TLTestConfig06 extends TLNoCTesterConfig(TLNoCTesterParams(
   outNodeMapping = Seq(7, 1, 3, 8, 10),
   delay = 0.0,
   nocParams = NoCParams(
-    topology        = TerminalPlane(Mesh2D(4, 3)),
+    topology        = TerminalRouter(Mesh2D(4, 3)),
     channelParamGen = (a, b) => UserChannelParams(Seq.fill(8) { UserVirtualChannelParams(7) }),
     routerParams    = (i) => UserRouterParams(
       vcAllocator = (vP) => (p) => new PrioritizingSingleVCAllocator(vP)(p)
     ),
     vNetBlocking    = (blocker, blockee) => blocker < blockee,
-    routingRelation = NonblockingVirtualSubnetworksRouting(TerminalPlaneRouting(Mesh2DEscapeRouting()), 5, 1)
+    routingRelation = NonblockingVirtualSubnetworksRouting(TerminalRouterRouting(Mesh2DEscapeRouting()), 5, 1)
   )
 ))
 
@@ -891,30 +891,30 @@ class AXI4TestConfig01 extends AXI4NoCTesterConfig(AXI4NoCTesterParams(
   inNodeMapping = Seq(0, 2),
   outNodeMapping = Seq(1),
   nocParams = NoCParams(
-    topology      = TerminalPlane(BidirectionalLine(3)),
+    topology      = TerminalRouter(BidirectionalLine(3)),
     channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(1) }),
     vNetBlocking    = (blocker, blockee) => true,
-    routingRelation = NonblockingVirtualSubnetworksRouting(TerminalPlaneRouting(BidirectionalLineRouting()), 5, 1)
+    routingRelation = NonblockingVirtualSubnetworksRouting(TerminalRouterRouting(BidirectionalLineRouting()), 5, 1)
   )
 ))
 class AXI4TestConfig02 extends AXI4NoCTesterConfig(AXI4NoCTesterParams(
   inNodeMapping = Seq(0, 1, 2, 3, 5, 6, 7, 8),
   outNodeMapping = Seq(4),
   nocParams = NoCParams(
-    topology      = TerminalPlane(Mesh2D(3, 3)),
+    topology      = TerminalRouter(Mesh2D(3, 3)),
     channelParamGen = (a, b) => UserChannelParams(Seq.fill(10) { UserVirtualChannelParams(1) }),
     vNetBlocking    = (blocker, blockee) => true,
-    routingRelation = NonblockingVirtualSubnetworksRouting(TerminalPlaneRouting(Mesh2DEscapeRouting()), 5, 2)
+    routingRelation = NonblockingVirtualSubnetworksRouting(TerminalRouterRouting(Mesh2DEscapeRouting()), 5, 2)
   )
 ))
 class AXI4TestConfig03 extends AXI4NoCTesterConfig(AXI4NoCTesterParams(
   inNodeMapping = Seq(1, 3, 5, 7),
   outNodeMapping = Seq(0, 2, 4, 6, 8),
   nocParams = NoCParams(
-    topology      = TerminalPlane(Mesh2D(3, 3)),
+    topology      = TerminalRouter(Mesh2D(3, 3)),
     channelParamGen = (a, b) => UserChannelParams(Seq.fill(10) { UserVirtualChannelParams(1) }),
     vNetBlocking    = (blocker, blockee) => true,
-    routingRelation = NonblockingVirtualSubnetworksRouting(TerminalPlaneRouting(Mesh2DEscapeRouting()), 5, 2)
+    routingRelation = NonblockingVirtualSubnetworksRouting(TerminalRouterRouting(Mesh2DEscapeRouting()), 5, 2)
   )
 ))
 

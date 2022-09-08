@@ -15,20 +15,24 @@ case class FlowParams(
   vNetId: Int
 )
 
-// User-facing params, for adjusting config options
-case class UserVirtualChannelParams(
-  bufferSize: Int = 1
-)
-
+// BEGIN: ChannelParams
 case class UserChannelParams(
-  virtualChannelParams: Seq[UserVirtualChannelParams] = Seq(UserVirtualChannelParams()),
-  channelGen: Parameters => ChannelOutwardNode => ChannelOutwardNode = { p => u => u },
+  virtualChannelParams: Seq[UserVirtualChannelParams] =
+    Seq(UserVirtualChannelParams()),
+  channelGen: Parameters => ChannelOutwardNode => ChannelOutwardNode =
+    p => u => u,
   crossingType: ClockCrossingType = NoCrossing,
   srcMultiplier: Int = 1,
   destMultiplier: Int = 1
 ) {
   val nVirtualChannels = virtualChannelParams.size
 }
+
+case class UserVirtualChannelParams(
+  bufferSize: Int = 1
+)
+
+// END: ChannelParams
 
 /** Represents an ingress into the network
  *

@@ -46,7 +46,7 @@ exclude_patterns = []
 #
 html_theme = 'alabaster'
 html_theme_options = {
-    "sidebar_width" : "250px",
+    "sidebar_width" : "300px",
     "page_width" : "1300px"
 }
 

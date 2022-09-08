@@ -464,9 +464,9 @@ object DimensionOrderedBidirectionalTorus2DDatelineRouting {
 }
 
 
-object TerminalPlaneRouting {
+object TerminalRouterRouting {
   def apply(baseRouting: PhysicalTopology => RoutingRelation) = (topo: PhysicalTopology) => topo match {
-    case topo: constellation.topology.TerminalPlane => new RoutingRelation(topo) {
+    case topo: constellation.topology.TerminalRouter => new RoutingRelation(topo) {
       val base = baseRouting(topo.base)
       def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
         if (srcC.isIngress && topo.isBase(nxtC.dst)) {

@@ -11,11 +11,11 @@ import constellation.channel._
 import constellation.routing._
 import constellation.topology.{PhysicalTopology, UnidirectionalLine}
 
-
+// BEGIN: NoC Parameters
 case class NoCParams(
   // Physical specifications
   topology: PhysicalTopology = UnidirectionalLine(1),
-  channelParamGen: (Int, Int) => UserChannelParams = (a: Int, b: Int) => UserChannelParams(),
+  channelParamGen: (Int, Int) => UserChannelParams = (_, _) => UserChannelParams(),
   ingresses: Seq[UserIngressParams] = Nil,
   egresses: Seq[UserEgressParams] = Nil,
   routerParams: Int => UserRouterParams = (i: Int) => UserRouterParams(),
@@ -34,7 +34,7 @@ case class NoCParams(
   skipValidationChecks: Boolean = false,
   hasCtrl: Boolean = false,
 )
-//case object NoCKey extends Field[NoCParams](NoCParams())
+// END: NoC Parameters
 
 
 case object InternalNoCKey extends Field[InternalNoCParams]
