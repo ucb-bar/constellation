@@ -16,6 +16,7 @@ Constellation generates wormhole-routed networks with virtual channels, a common
 
    Introduction/index
    Configuration/index
+   Evaluation Frameworks/index
 
 .. Introduction
    _standalone
