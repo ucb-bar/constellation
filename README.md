@@ -9,6 +9,8 @@ Constellation is a Chisel NoC RTL generator framework designed from the ground u
  - Constellation supports drop-in **integration in Chipyard/Rocketchip SoCs**
  - Constellation is **rigorously tested**, with almost 100 different tests across as many network configurations
 
+![Constellation SoC](docs/source/diagrams/bigsoc.svg?raw=true)
+
 Documentation
 ----------------
 
