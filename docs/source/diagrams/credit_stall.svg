@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xl="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" viewBox="1221.752 1123 526.748 148.58527" width="526.748" height="148.58527">
+  <defs/>
+  <g id="Canvas_14" stroke-opacity="1" fill="none" fill-opacity="1" stroke-dasharray="none" stroke="none">
+    <title>Canvas 14</title>
+    <g id="Canvas_14_Layer_1">
+      <title>Layer 1</title>
+      <g id="Graphic_114">
+        <rect x="1440" y="1155.5853" width="38.5" height="38.5" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-width="1"/>
+        <text transform="translate(1445 1165.6113)" fill="black">
+          <tspan font-family="Helvetica Neue" font-size="16" fill="black" x="2.994" y="15">RC</tspan>
+        </text>
+      </g>
+      <g id="Graphic_113">
+        <rect x="1594" y="1155.5853" width="38.5" height="38.5" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-width="1"/>
+        <text transform="translate(1599 1165.6113)" fill="black">
+          <tspan font-family="Helvetica Neue" font-size="16" fill="black" x="4.546" y="15">VA</tspan>
+        </text>
+      </g>
+      <g id="Graphic_112">
+        <rect x="1632.5" y="1155.5853" width="38.5" height="38.5" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-width="1"/>
+        <text transform="translate(1637.5 1165.6113)" fill="black">
+          <tspan font-family="Helvetica Neue" font-size="16" fill="black" x="3.882" y="15">SA</tspan>
+        </text>
+      </g>
+      <g id="Graphic_111">
+        <rect x="1671" y="1155.5853" width="38.5" height="38.5" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-width="1"/>
+        <text transform="translate(1676 1165.6113)" fill="black">
+          <tspan font-family="Helvetica Neue" font-size="16" fill="black" x="4.474" y="15">ST</tspan>
+        </text>
+      </g>
+      <g id="Graphic_110">
+        <rect x="1555.5" y="1194.0853" width="38.5" height="38.5" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-width="1"/>
+        <text transform="translate(1560.5 1204.1113)" fill="black">
+          <tspan font-family="Helvetica Neue" font-size="16" fill="black" x="3.882" y="15">SA</tspan>
+        </text>
+      </g>
+      <g id="Graphic_109">
+        <rect x="1594" y="1194.0853" width="38.5" height="38.5" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-width="1"/>
+        <text transform="translate(1599 1204.1113)" fill="black">
+          <tspan font-family="Helvetica Neue" font-size="16" fill="black" x="4.474" y="15">ST</tspan>
+        </text>
+      </g>
+      <g id="Graphic_108">
+        <rect x="1671" y="1232.5853" width="38.5" height="38.5" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-width="1"/>
+        <text transform="translate(1676 1242.6113)" fill="black">
+          <tspan font-family="Helvetica Neue" font-size="16" fill="black" x="3.882" y="15">SA</tspan>
+        </text>
+      </g>
+      <g id="Graphic_107">
+        <rect x="1709.5" y="1232.5853" width="38.5" height="38.5" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-width="1"/>
+        <text transform="translate(1714.5 1242.6113)" fill="black">
+          <tspan font-family="Helvetica Neue" font-size="16" fill="black" x="4.474" y="15">ST</tspan>
+        </text>
+      </g>
+      <g id="Graphic_106">
+        <text transform="translate(1292.24 1165.6113)" fill="black">
+          <tspan font-family="Helvetica Neue" font-size="16" fill="black" x="0" y="15">Head flit (packet A)</tspan>
+        </text>
+      </g>
+      <g id="Graphic_105">
+        <text transform="translate(1292.832 1247.6373)" fill="black">
+          <tspan font-family="Helvetica Neue" font-size="16" fill="black" x="26147973e-19" y="15">Body flit (packet A)</tspan>
+        </text>
+      </g>
+      <g id="Graphic_104">
+        <rect x="1517" y="1194.0853" width="38.5" height="38.5" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-width="1"/>
+      </g>
+      <g id="Graphic_103">
+        <rect x="1478.5" y="1194.0853" width="38.5" height="38.5" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-width="1"/>
+      </g>
+      <g id="Graphic_102">
+        <text transform="translate(1454.802 1128)" fill="black">
+          <tspan font-family="Helvetica Neue" font-size="16" fill="black" x="31974423e-20" y="15">0</tspan>
+        </text>
+      </g>
+      <g id="Graphic_101">
+        <text transform="translate(1493.302 1128)" fill="black">
+          <tspan font-family="Helvetica Neue" font-size="16" fill="black" x="31974423e-20" y="15">1</tspan>
+        </text>
+      </g>
+      <g id="Graphic_100">
+        <text transform="translate(1531.802 1128)" fill="black">
+          <tspan font-family="Helvetica Neue" font-size="16" fill="black" x="31974423e-20" y="15">2</tspan>
+        </text>
+      </g>
+      <g id="Graphic_99">
+        <text transform="translate(1570.302 1128)" fill="black">
+          <tspan font-family="Helvetica Neue" font-size="16" fill="black" x="31974423e-20" y="15">3</tspan>
+        </text>
+      </g>
+      <g id="Graphic_98">
+        <text transform="translate(1608.802 1128)" fill="black">
+          <tspan font-family="Helvetica Neue" font-size="16" fill="black" x="31974423e-20" y="15">4</tspan>
+        </text>
+      </g>
+      <g id="Graphic_97">
+        <text transform="translate(1647.302 1128)" fill="black">
+          <tspan font-family="Helvetica Neue" font-size="16" fill="black" x="31974423e-20" y="15">5</tspan>
+        </text>
+      </g>
+      <g id="Graphic_96">
+        <text transform="translate(1685.802 1128)" fill="black">
+          <tspan font-family="Helvetica Neue" font-size="16" fill="black" x="31974423e-20" y="15">6</tspan>
+        </text>
+      </g>
+      <g id="Graphic_95">
+        <rect x="1555.5" y="1232.5853" width="38.5" height="38.5" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-width="1"/>
+      </g>
+      <g id="Graphic_94">
+        <rect x="1517" y="1232.5853" width="38.5" height="38.5" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-width="1"/>
+      </g>
+      <g id="Graphic_115">
+        <text transform="translate(1226.752 1206.6243)" fill="black">
+          <tspan font-family="Helvetica Neue" font-size="16" fill="black" x="0" y="15">Tail flit (packet B - holds VC)</tspan>
+        </text>
+      </g>
+      <g id="Line_117">
+        <line x1="1478.5" y1="1174.8353" x2="1594" y2="1174.8353" stroke="#7f8080" stroke-linecap="butt" stroke-linejoin="round" stroke-width="8"/>
+      </g>
+      <g id="Line_118">
+        <line x1="1594" y1="1251.8353" x2="1671" y2="1251.8353" stroke="#7f8080" stroke-linecap="butt" stroke-linejoin="round" stroke-width="8"/>
+      </g>
+      <g id="Graphic_143">
+        <text transform="translate(1724.302 1128)" fill="black">
+          <tspan font-family="Helvetica Neue" font-size="16" fill="black" x="31974423e-20" y="15">7</tspan>
+        </text>
+      </g>
+    </g>
+  </g>
+</svg>
