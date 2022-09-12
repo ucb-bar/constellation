@@ -1,7 +1,9 @@
 The Constellation NoC Generator
 =======================================================
 
-Constellation is a Chisel NoC RTL generator framework designed from the ground up to support integration in a heterogeneous SoC and evaluation of highly irregular NoC architectures.
+**Documentation**: [constellation.readthedocs.io](http://constellation.readthedocs.io).
+
+Constellation is a Chisel NoC RTL generator framework designed to provide the core interconnect fabric for heterogeneous many-core, many-accelerator SoCs.
 
  - Constellation generates **packet-switched wormhole-routed networks with virtual networks and credit-based flow control**
  - Constellation supports **arbitrary directed graph network topologies**, including **irregular** and **hierarchical** network topologies
@@ -12,7 +14,7 @@ Constellation is a Chisel NoC RTL generator framework designed from the ground u
 
 ![Constellation SoC](docs/source/diagrams/bigsoc.svg?raw=true)
 
-Documentation
-----------------
 
-Documentation for Constellation is available at [constellation.readthedocs.io](http://constellation.readthedocs.io).
+Acknowledgements
+------------------
+Research was partially funded by SLICE Lab industrial sponsors and affiliates Amazon, Apple, Google, Intel, Qualcomm, and Western Digital. The views and opinions of authors expressed herein do not necessarily state or reflect those of the United States Government or any agency thereof.
