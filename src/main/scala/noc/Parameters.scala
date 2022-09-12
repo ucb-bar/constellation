@@ -23,7 +23,7 @@ case class NoCParams(
   // Flow specification
   // (blocker, blockee) => bool
   // If true, then blocker must be able to proceed when blockee is blocked
-  vNetBlocking: (Int, Int) => Boolean = (_: Int, _: Int) => true,
+  vNetBlocking: (Int, Int) => Boolean = (_, _) => true,
   flows: Seq[FlowParams] = Nil,
 
   // Routing specification

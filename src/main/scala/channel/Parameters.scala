@@ -8,12 +8,13 @@ import freechips.rocketchip.diplomacy.{ClockCrossingType, NoCrossing}
 import constellation.routing.{ChannelRoutingInfo, FlowRoutingInfo}
 import constellation.noc.{HasNoCParams}
 
-
+// BEGIN: FlowParams
 case class FlowParams(
   ingressId: Int,
   egressId: Int,
   vNetId: Int
 )
+// END: FlowParams
 
 // BEGIN: ChannelParams
 case class UserChannelParams(
@@ -22,8 +23,8 @@ case class UserChannelParams(
   channelGen: Parameters => ChannelOutwardNode => ChannelOutwardNode =
     p => u => u,
   crossingType: ClockCrossingType = NoCrossing,
-  srcMultiplier: Int = 1,
-  destMultiplier: Int = 1
+  srcSpeedup: Int = 1,
+  destSpeedup: Int = 1
 ) {
   val nVirtualChannels = virtualChannelParams.size
 }
@@ -77,15 +78,15 @@ trait BaseChannelParams {
   def nVirtualChannels: Int
   def channelRoutingInfos: Seq[ChannelRoutingInfo]
   def payloadBits: Int
-  def srcMultiplier: Int
-  def destMultiplier: Int
+  def srcSpeedup: Int
+  def destSpeedup: Int
   def traversable: Boolean = possibleFlows.size > 0
 }
 
 trait TerminalChannelParams extends BaseChannelParams {
   def nVirtualChannels = 1
-  def srcMultiplier = 1
-  def destMultiplier = 1
+  def srcSpeedup = 1
+  def destSpeedup = 1
 }
 
 
@@ -94,8 +95,8 @@ case class ChannelParams(
   destId: Int,
   payloadBits: Int,
   virtualChannelParams: Seq[VirtualChannelParams],
-  srcMultiplier: Int,
-  destMultiplier: Int,
+  srcSpeedup: Int,
+  destSpeedup: Int,
   channelGen: Parameters => ChannelOutwardNode => ChannelOutwardNode = { p => u => u }
 ) extends BaseChannelParams {
   val nVirtualChannels = virtualChannelParams.size
@@ -103,7 +104,11 @@ case class ChannelParams(
 
   val possibleFlows = virtualChannelParams.map(_.possibleFlows).reduce(_++_)
 
-  val channelRoutingInfos = (0 until nVirtualChannels).map(i => ChannelRoutingInfo(srcId, i, destId, nVirtualChannels))
+  val channelRoutingInfos = (0 until nVirtualChannels).map(i => ChannelRoutingInfo(
+    src=srcId,
+    vc=i,
+    dst=destId,
+    n_vc=nVirtualChannels))
 }
 
 object ChannelParams {
@@ -117,8 +122,8 @@ object ChannelParams {
       srcId = srcId,
       destId = destId,
       payloadBits = payloadBits,
-      srcMultiplier = user.srcMultiplier,
-      destMultiplier = user.destMultiplier,
+      srcSpeedup = user.srcSpeedup,
+      destSpeedup = user.destSpeedup,
       channelGen = user.channelGen,
       virtualChannelParams = user.virtualChannelParams.zipWithIndex.map { case (vP, vc) =>
         VirtualChannelParams(srcId, destId, vc, vP.bufferSize, Set[FlowRoutingInfo]())
@@ -135,7 +140,7 @@ case class IngressChannelParams(
   payloadBits: Int
 ) extends TerminalChannelParams {
   val srcId = -1
-  val channelRoutingInfos = Seq(ChannelRoutingInfo(-1, 0, destId, 1))
+  val channelRoutingInfos = Seq(ChannelRoutingInfo(src=(-1), vc=0, dst=destId, n_vc=1))
 }
 
 object IngressChannelParams {
@@ -166,7 +171,7 @@ case class EgressChannelParams(
   payloadBits: Int
 ) extends TerminalChannelParams {
   val destId = -1
-  val channelRoutingInfos = Seq(ChannelRoutingInfo(srcId, 0, -1, 1))
+  val channelRoutingInfos = Seq(ChannelRoutingInfo(src=srcId, vc=0, dst=(-1), n_vc=1))
 }
 
 object EgressChannelParams {
@@ -185,3 +190,4 @@ object EgressChannelParams {
     )
   }
 }
+

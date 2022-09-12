@@ -267,6 +267,7 @@ class AXI4InterconnectInterface(edgesIn: Seq[AXI4EdgeParameters], edgesOut: Seq[
 }
 
 
+// BEGIN: AXI4ProtocolParams
 case class AXI4ProtocolParams(
   edgesIn: Seq[AXI4EdgeParameters],
   edgesOut: Seq[AXI4EdgeParameters],
@@ -274,8 +275,8 @@ case class AXI4ProtocolParams(
   edgeOutNodes: Seq[Int],
   awQueueDepth: Int
 ) extends ProtocolParams {
+  // END: AXI4ProtocolParams
   val wideBundle = AXI4BundleParameters.union(edgesIn.map(_.bundle) ++ edgesOut.map(_.bundle))
-  val nProtocolTerminals = edgesIn.size + edgesOut.size
   val inputIdRanges = AXI4Xbar.mapInputIds(edgesIn.map(_.master))
   val minPayloadWidth = {
     val b = new AXI4Bundle(wideBundle)
@@ -387,12 +388,14 @@ abstract class AXI4NoCModuleImp(outer: LazyModule) extends LazyModuleImp(outer) 
 }
 
 // private AXI4 NoC
+// BEGIN: AXI4NoCParams
 case class AXI4NoCParams(
   nodeMappings: DiplomaticNetworkNodeMapping,
   nocParams: NoCParams,
   awQueueDepth: Int = 2
 )
 class AXI4NoC(params: AXI4NoCParams)(implicit p: Parameters) extends LazyModule {
+  // END: AXI4NoCParams
   val node = new AXI4NoCNode
   lazy val module = new AXI4NoCModuleImp(this) {
     val (io_in, edgesIn) = node.in.unzip

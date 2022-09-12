@@ -13,10 +13,12 @@ import freechips.rocketchip.subsystem._
 
 import scala.collection.immutable.{ListMap}
 
+// BEGIN: NodeMapping
 case class DiplomaticNetworkNodeMapping(
   inNodeMapping: ListMap[String, Int] = ListMap[String, Int](),
   outNodeMapping: ListMap[String, Int] = ListMap[String, Int]()
 ) {
+  // END: NodeMapping
   def genUniqueName(all: Seq[Seq[String]]) = {
     all.zipWithIndex.map { case (strs, i) =>
       val matches = all.take(i).map(_.mkString).count(_ == strs.mkString)
@@ -35,9 +37,8 @@ case class DiplomaticNetworkNodeMapping(
 
 }
 
-
+// BEGIN: ProtocolParams
 trait ProtocolParams {
-  val nProtocolTerminals: Int
   val minPayloadWidth: Int
   val ingressNodes: Seq[Int]
   val egressNodes: Seq[Int]
@@ -45,14 +46,25 @@ trait ProtocolParams {
   val vNetBlocking: (Int, Int) => Boolean
   val flows: Seq[FlowParams]
   def genIO()(implicit p: Parameters): Data
-  def interface(terminals: NoCTerminalIO, ingressOffset: Int, egressOffset: Int, protocol: Data)(implicit p: Parameters)
+  def interface(
+    terminals: NoCTerminalIO,
+    ingressOffset: Int,
+    egressOffset: Int,
+    protocol: Data)(implicit p: Parameters)
 }
+// END: ProtocolParams
 
+// BEGIN: ProtocolNoC
 case class ProtocolNoCParams(
   nocParams: NoCParams,
   protocolParams: Seq[ProtocolParams]
 )
 class ProtocolNoC(params: ProtocolNoCParams)(implicit p: Parameters) extends Module {
+  val io = IO(new Bundle {
+    val ctrl = if (params.nocParams.hasCtrl) Vec(params.nocParams.topology.nNodes, new RouterCtrlBundle) else Nil
+    val protocol = MixedVec(params.protocolParams.map { u => u.genIO() })
+  })
+  // END: ProtocolNoC
   val protocolParams  = params.protocolParams
   val minPayloadWidth = protocolParams.map(_.minPayloadWidth).max
   val ingressOffsets  = protocolParams.map(_.ingressNodes.size).scanLeft(0)(_+_)
@@ -84,10 +96,6 @@ class ProtocolNoC(params: ProtocolNoCParams)(implicit p: Parameters) extends Mod
       ))
     }.flatten
   )
-  val io = IO(new Bundle {
-    val ctrl = if (nocParams.hasCtrl) Vec(nocParams.topology.nNodes, new RouterCtrlBundle) else Nil
-    val protocol = MixedVec(protocolParams.map { u => u.genIO() })
-  })
   val noc = Module(LazyModule(new NoC(nocParams)).module)
   noc.io.router_clocks.foreach(_.clock := clock)
   noc.io.router_clocks.foreach(_.reset := reset)
