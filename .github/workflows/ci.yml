@@ -9,6 +9,7 @@ jobs:
     name: "Try to compile the docs"
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v2
       - name: Build docs
         run: |
           make -C docs html
