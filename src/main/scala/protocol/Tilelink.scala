@@ -286,17 +286,18 @@ class TileLinkInterconnectInterface(edgesIn: Seq[TLEdge], edgesOut: Seq[TLEdge])
   val out = MixedVec(edgesOut.map { e => new TLBundle(e.bundle) })
 }
 
+// BEGIN: TileLinkProtocolParams
 case class TileLinkProtocolParams(
   edgesIn: Seq[TLEdge],
   edgesOut: Seq[TLEdge],
   edgeInNodes: Seq[Int],
   edgeOutNodes: Seq[Int]
 ) extends ProtocolParams with TLFieldHelper {
+  // END: TileLinkProtocolParams
   val wideBundle = TLBundleParameters.union(edgesIn.map(_.bundle) ++ edgesOut.map(_.bundle))
   val inputIdRanges = TLXbar.mapInputIds(edgesIn.map(_.client))
   val outputIdRanges = TLXbar.mapOutputIds(edgesOut.map(_.manager))
 
-  val nProtocolTerminals = edgesIn.size + edgesOut.size
   val minPayloadWidth = minTLPayloadWidth(new TLBundle(wideBundle))
   val ingressNodes = (edgeInNodes.map(u => Seq.fill(3) (u)) ++ edgeOutNodes.map(u => Seq.fill (2) {u})).flatten
   val egressNodes = (edgeInNodes.map(u => Seq.fill(2) (u)) ++ edgeOutNodes.map(u => Seq.fill (3) {u})).flatten
@@ -416,11 +417,13 @@ abstract class TLNoCModuleImp(outer: LazyModule) extends LazyModuleImp(outer) {
 }
 
 // Instantiates a private TLNoC. Replaces the TLXbar
+// BEGIN: TLNoCParams
 case class TLNoCParams(
   nodeMappings: DiplomaticNetworkNodeMapping,
   nocParams: NoCParams = NoCParams()
 )
 class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLNoCLike {
+  // END: TLNoCParams
   lazy val module = new TLNoCModuleImp(this) {
     val (io_in, edgesIn) = node.in.unzip
     val (io_out, edgesOut) = node.out.unzip

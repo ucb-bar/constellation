@@ -9,8 +9,10 @@ jobs:
     name: "Try to compile the docs"
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v2
       - name: Build docs
         run: |
+          python3 -m pip install sphinx
           make -C docs html
 
   compile:

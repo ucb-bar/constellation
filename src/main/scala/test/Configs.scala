@@ -223,8 +223,8 @@ class TestConfig21 extends NoCTesterConfig(NoCTesterParams(
     topology        = BidirectionalTorus1D(10),
     channelParamGen = (a, b) => UserChannelParams(
       virtualChannelParams = Seq.fill(4) { UserVirtualChannelParams(5) },
-      srcMultiplier = 2,
-      destMultiplier = 2
+      srcSpeedup = 2,
+      destSpeedup = 2
     ),
     ingresses       = (0 until 20).map { i => UserIngressParams(i % 10) },
     egresses        = (0 until 20).map { i => UserEgressParams(i % 10) },
@@ -290,8 +290,8 @@ class TestConfig28 extends NoCTesterConfig(NoCTesterParams(NoCParams(
     val mult = pow(2, height - max(level(a), level(b))).toInt
     UserChannelParams(
       Seq.fill(mult) { UserVirtualChannelParams(3) },
-      srcMultiplier = mult,
-      destMultiplier = mult
+      srcSpeedup = mult,
+      destSpeedup = mult
     )
   },
   ingresses       = (0 until 6).map { i => UserIngressParams(i) },
@@ -308,8 +308,8 @@ class TestConfig29 extends NoCTesterConfig(NoCTesterParams(NoCParams(
     val mult = pow(2, height - max(level(a), level(b))).toInt
     UserChannelParams(
       Seq.fill(mult) { UserVirtualChannelParams(3) },
-      srcMultiplier = mult,
-      destMultiplier = mult
+      srcSpeedup = mult,
+      destSpeedup = mult
     )
   },
   ingresses       = (13 until 40).map { i => UserIngressParams(i) },
@@ -438,7 +438,7 @@ class TestConfig43 extends NoCTesterConfig(NoCTesterParams(NoCParams(
   topology        = Mesh2D(4, 4),
   channelParamGen = (a, b) => UserChannelParams(
     Seq.fill(2) { UserVirtualChannelParams(2) },
-    destMultiplier = 2
+    destSpeedup = 2
   ),
   ingresses       = (0 until 16).map { i => UserIngressParams(i) },
   egresses        = (0 until 16).map { i => UserEgressParams(i) },
@@ -449,7 +449,7 @@ class TestConfig44 extends NoCTesterConfig(NoCTesterParams(NoCParams(
   topology        = Mesh2D(4, 4),
   channelParamGen = (a, b) => UserChannelParams(
     Seq.fill(2) { UserVirtualChannelParams(2) },
-    srcMultiplier = 2
+    srcSpeedup = 2
   ),
   ingresses       = (0 until 16).map { i => UserIngressParams(i) },
   egresses        = (0 until 16).map { i => UserEgressParams(i) },
@@ -460,8 +460,8 @@ class TestConfig45 extends NoCTesterConfig(NoCTesterParams(NoCParams(
   topology        = Mesh2D(4, 4),
   channelParamGen = (a, b) => UserChannelParams(
     Seq.fill(2) { UserVirtualChannelParams(2) },
-    srcMultiplier = 2,
-    destMultiplier = 2
+    srcSpeedup = 2,
+    destSpeedup = 2
   ),
   ingresses       = (0 until 16).map { i => UserIngressParams(i) },
   egresses        = (0 until 16).map { i => UserEgressParams(i) },

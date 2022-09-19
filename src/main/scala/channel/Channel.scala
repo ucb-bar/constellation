@@ -10,7 +10,7 @@ import constellation.noc.{HasNoCParams}
 
 class Channel(val cParam: ChannelParams)(implicit val p: Parameters) extends Bundle {
   val nVirtualChannels = cParam.nVirtualChannels
-  val flit = Vec(cParam.srcMultiplier, Valid(new Flit(cParam.payloadBits)))
+  val flit = Vec(cParam.srcSpeedup, Valid(new Flit(cParam.payloadBits)))
   val credit_return = Input(UInt(cParam.nVirtualChannels.W))
   val vc_free = Input(UInt(cParam.nVirtualChannels.W))
 }

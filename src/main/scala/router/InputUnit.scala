@@ -25,9 +25,9 @@ class AbstractInputUnitIO(
 
   val out_credit_available = Input(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) }))
 
-  val salloc_req = Vec(cParam.destMultiplier, Decoupled(new SwitchAllocReq(outParams, egressParams)))
+  val salloc_req = Vec(cParam.destSpeedup, Decoupled(new SwitchAllocReq(outParams, egressParams)))
 
-  val out = Vec(cParam.destMultiplier, Valid(new SwitchBundle(outParams, egressParams)))
+  val out = Vec(cParam.destSpeedup, Valid(new SwitchBundle(outParams, egressParams)))
   val debug = Output(new Bundle {
     val va_stall = UInt(log2Ceil(cParam.nVirtualChannels).W)
     val sa_stall = UInt(log2Ceil(cParam.nVirtualChannels).W)
@@ -49,14 +49,14 @@ abstract class AbstractInputUnit(
 class InputBuffer(cParam: ChannelParams)(implicit p: Parameters) extends Module {
   val nVirtualChannels = cParam.nVirtualChannels
   val io = IO(new Bundle {
-    val enq = Flipped(Vec(cParam.srcMultiplier, Valid(new Flit(cParam.payloadBits))))
+    val enq = Flipped(Vec(cParam.srcSpeedup, Valid(new Flit(cParam.payloadBits))))
     val deq = Vec(cParam.nVirtualChannels, Decoupled(new BaseFlit(cParam.payloadBits)))
   })
 
   val fullSize = cParam.virtualChannelParams.map(_.bufferSize).sum
 
   // Ugly case. Use multiple queues
-  if (cParam.srcMultiplier > 1 || cParam.destMultiplier > 1 || fullSize <= 1) {
+  if (cParam.srcSpeedup > 1 || cParam.destSpeedup > 1 || fullSize <= 1) {
     val qs = cParam.virtualChannelParams.map(v => Module(new Queue(new BaseFlit(cParam.payloadBits), v.bufferSize)))
     qs.zipWithIndex.foreach { case (q,i) =>
       val sel = io.enq.map(f => f.valid && f.bits.virt_channel_id === i.U)
@@ -147,7 +147,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   }
 
   val input_buffer = Module(new InputBuffer(cParam))
-  for (i <- 0 until cParam.srcMultiplier) {
+  for (i <- 0 until cParam.srcSpeedup) {
     input_buffer.io.enq(i) := io.in.flit(i)
   }
   input_buffer.io.deq.foreach(_.ready := false.B)
@@ -159,7 +159,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
 
   val states = Reg(Vec(nVirtualChannels, new InputState))
 
-  for (i <- 0 until cParam.srcMultiplier) {
+  for (i <- 0 until cParam.srcSpeedup) {
     when (io.in.flit(i).fire() && io.in.flit(i).bits.head) {
       val id = io.in.flit(i).bits.virt_channel_id
       assert(id < nVirtualChannels.U)
@@ -247,7 +247,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   }
   val salloc_arb = Module(new SwitchArbiter(
     nVirtualChannels,
-    cParam.destMultiplier,
+    cParam.destSpeedup,
     outParams, egressParams
   ))
 
@@ -282,9 +282,9 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   }
 
   val salloc_outs = if (combineSAST) {
-    Wire(Vec(cParam.destMultiplier, new OutBundle))
+    Wire(Vec(cParam.destSpeedup, new OutBundle))
   } else {
-    Reg(Vec(cParam.destMultiplier, new OutBundle))
+    Reg(Vec(cParam.destSpeedup, new OutBundle))
   }
 
   io.in.credit_return := salloc_arb.io.out.zipWithIndex.map { case (o, i) =>
@@ -295,7 +295,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
       salloc_arb.io.chosen_oh(i), 0.U)
   }.reduce(_|_)
 
-  for (i <- 0 until cParam.destMultiplier) {
+  for (i <- 0 until cParam.destSpeedup) {
     val salloc_out = salloc_outs(i)
     salloc_out.valid := salloc_arb.io.out(i).fire()
     salloc_out.vid := OHToUInt(salloc_arb.io.chosen_oh(i))

@@ -1,4 +1,4 @@
-Topology Specification
+Topology
 ----------------------
 
 A ``PhysicalTopology`` is a case class which describes a directed graph, where nodes represent

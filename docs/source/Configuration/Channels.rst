@@ -1,4 +1,4 @@
-Channel Specification
+Channels
 ---------------------
 
 ``channelParamGen`` is a function which determines the channel parameters for each directed
@@ -14,7 +14,7 @@ This function can return a different set of parameters for each edge.
    :end-before: END: ChannelParams
 
 
-Virtual Channel Parameters
+Virtual Channels
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The ``virtualChannelParams`` field contains a list of ``UserVirtualChannelParams`` objects, where
@@ -22,17 +22,42 @@ the each element represents one virtual channel, and the ``UserVirtualChannelPar
 the number of buffer entries for that virtual channel.
 
 
-Diplomatic Channel Generation
+Channel Generation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Currently, the ``channelGen`` field is only used to specify adding additional pipeline buffers in
+a channel.
+
+For example, the following segment sets a two-deep buffer on the channel.
+
+.. code:: scala
+
+          channelGen = (u) => {
+            implicit val p: Parameters = u
+            ChannelBuffer(2) := _
+          }
+
+
+.. Note:: In the future more functionality can be added through this interface.
+
+
+Speedup
+^^^^^^^^^^^^^
+
+``srcSpeedup`` indicates the number of flits that may **enter** a channel in a cycle.
+For ``srcSpeedup`` > 1, the generator will effectively increase the input bandwidth of
+the channel.
+
+``destSpeedup`` indicates the number of flits that may **exit** a channel in a cycle.
+Increasing this pressures the routing resources and switch of the destination router.
+
+.. Note:: Setting ``srcSpeedup > destSpeedup`` is an unusual design point.
 
 
 Clock Crossings
 ^^^^^^^^^^^^^^^^
 
-Speedup
-^^^^^^^^^^^^^
-blah blah blah
-
 Currently unsupported. One day this will allow auto insertion of clock crossings between
 routers of the network on different clock domains.
+
 

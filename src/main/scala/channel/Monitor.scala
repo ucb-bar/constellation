@@ -14,7 +14,7 @@ class NoCMonitor(val cParam: ChannelParams)(implicit val p: Parameters) extends 
   })
 
   val in_flight = RegInit(VecInit(Seq.fill(cParam.nVirtualChannels) { false.B }))
-  for (i <- 0 until cParam.srcMultiplier) {
+  for (i <- 0 until cParam.srcSpeedup) {
     val flit = io.in.flit(i)
     when (flit.valid) {
       when (flit.bits.head) {

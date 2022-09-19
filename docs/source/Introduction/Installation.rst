@@ -85,4 +85,4 @@ After following those steps, run the following
 
 .. code-block:: shell
 
-   make -C generators/constellation/src/main/resources/csrc/netrace
+   make -C generators/constellation/src/main/resources/csrc/netrace netrace.o CFLAGS="-fPIC -O3"

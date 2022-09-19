@@ -16,20 +16,32 @@ import constellation.topology.{PhysicalTopology, Mesh2DLikePhysicalTopology, Hie
  *                 By default, we ignore the escape-channel-based deadlock-free properties, and just check
  *                 for deadlock-freedom by verifying lack of a cyclic dependency.
  */
+// BEGIN: RoutingRelation
 abstract class RoutingRelation(topo: PhysicalTopology) {
-  def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo): Boolean
+  // Child classes must implement these
+  def rel       (srcC: ChannelRoutingInfo,
+                 nxtC: ChannelRoutingInfo,
+                 flow: FlowRoutingInfo): Boolean
 
-  val memoize = new HashMap[(ChannelRoutingInfo, ChannelRoutingInfo, FlowRoutingInfo), Boolean]()
+  def isEscape  (c: ChannelRoutingInfo,
+                 vNetId: Int): Boolean = true
+
+  def getNPrios (src: ChannelRoutingInfo): Int = 1
+
+  def getPrio   (srcC: ChannelRoutingInfo,
+                 nxtC: ChannelRoutingInfo,
+                 flow: FlowRoutingInfo): Int = 0
+
+  // END: RoutingRelation
+
+  private val memoize = new HashMap[(ChannelRoutingInfo, ChannelRoutingInfo, FlowRoutingInfo), Boolean]()
   def apply(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo): Boolean = {
     require(srcC.dst == nxtC.src)
     val key = (srcC, nxtC, flow)
     memoize.getOrElseUpdate(key, rel(srcC, nxtC, flow))
   }
-
-  def isEscape(c: ChannelRoutingInfo, vNetId: Int): Boolean = true
-  def getNPrios(src: ChannelRoutingInfo): Int = 1
-  def getPrio(src: ChannelRoutingInfo, a: ChannelRoutingInfo, flow: FlowRoutingInfo): Int = 0
 }
+// END: RoutingRelation
 
 /** Given a deadlock-prone routing relation and a routing relation representing the network's escape
   *  channels, returns a routing relation that adds the escape channels to the deadlock-prone relation.

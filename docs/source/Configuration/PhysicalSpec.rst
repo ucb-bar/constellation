@@ -14,4 +14,5 @@ The NoC's physical specifcation is itself broken down into five components.
 
    Topologies
    Channels
-
+   Terminals
+   Routers

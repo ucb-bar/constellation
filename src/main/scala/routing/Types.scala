@@ -13,10 +13,15 @@ import constellation.channel.{Flit}
  * @param vc ID for the virtual channel
  * @param dst the destination node
  * @param n_vc the number of virtual channels
- */
+  */
+// BEGIN: ChannelRoutingInfo
 case class ChannelRoutingInfo(
-  src: Int, vc: Int, dst: Int, n_vc: Int
+  src: Int,
+  dst: Int,
+  vc: Int,
+  n_vc: Int
 ) {
+  // END: ChannelRoutingInfo
   require (src >= -1 && dst >= -1 && vc >= 0, s"Illegal $this")
   require (!(src == -1 && dst == -1), s"Illegal $this")
   require (vc < n_vc, s"Illegal $this")
@@ -33,14 +38,17 @@ case class ChannelRoutingInfo(
   * @param vNet virtual subnetwork identifier
   * @param dst packet's destination node ID
   */
+// BEGIN: FlowRoutingInfo
 case class FlowRoutingInfo(
-  ingressId: Int, egressId: Int,
+  ingressId: Int,
+  egressId: Int,
   vNetId: Int,
   ingressNode: Int,
   ingressNodeId: Int,
   egressNode: Int,
   egressNodeId: Int
 ) {
+// END: FlowRoutingInfo
   def isFlow(f: FlowRoutingBundle): Bool = {
     (f.ingress_node === ingressNode.U &&
       f.egress_node === egressNode.U &&

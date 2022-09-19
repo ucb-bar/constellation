@@ -25,15 +25,15 @@ class Switch(
     with HasRouterOutputParams {
 
   val io = IO(new Bundle {
-    val in = MixedVec(allInParams.map { u => Vec(u.destMultiplier,
+    val in = MixedVec(allInParams.map { u => Vec(u.destSpeedup,
       Input(Valid(new SwitchBundle(outParams, egressParams)))) })
-    val out = MixedVec(allOutParams.map { u => Vec(u.srcMultiplier,
+    val out = MixedVec(allOutParams.map { u => Vec(u.srcSpeedup,
       Output(Valid(new Flit(u.payloadBits)))) })
-    val sel = MixedVec(allOutParams.map { o => Vec(o.srcMultiplier,
-      MixedVec(allInParams.map { i => Vec(i.destMultiplier, Input(Bool())) })) })
+    val sel = MixedVec(allOutParams.map { o => Vec(o.srcSpeedup,
+      MixedVec(allInParams.map { i => Vec(i.destSpeedup, Input(Bool())) })) })
   })
 
-  val in_flat = Wire(Vec(allInParams.map(_.destMultiplier).reduce(_+_),
+  val in_flat = Wire(Vec(allInParams.map(_.destSpeedup).reduce(_+_),
     Valid(new SwitchBundle(outParams, egressParams))))
   var idx = 0
   io.in.foreach(_.foreach { i =>
@@ -42,7 +42,7 @@ class Switch(
   })
 
   for (i <- 0 until nAllOutputs) {
-    for (j <- 0 until allOutParams(i).srcMultiplier) {
+    for (j <- 0 until allOutParams(i).srcSpeedup) {
       val sel_flat = io.sel(i)(j).asUInt
       assert(PopCount(sel_flat) <= 1.U)
       io.out(i)(j).valid := Mux1H(sel_flat, in_flat.map(_.valid)) && sel_flat =/= 0.U
