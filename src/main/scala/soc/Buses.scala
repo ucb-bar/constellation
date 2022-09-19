@@ -1,4 +1,4 @@
-package constellation.rc
+package constellation.soc
 
 import chisel3._
 import chisel3.util._
@@ -11,25 +11,19 @@ import freechips.rocketchip.subsystem._
 import freechips.rocketchip.util._
 
 import constellation.noc.{NoCParams}
+import constellation.protocol._
 
 import scala.collection.immutable.{ListMap}
 
-case class ConstellationTLNetworkNodeMappingKey(where: Location[TLBusWrapper]) extends Field[ConstellationDiplomaticNetworkNodeMapping](
-  ConstellationDiplomaticNetworkNodeMapping()
-)
-
 case class ConstellationSystemBusParams(
-  params: SystemBusParams,
-  privateNoC: Option[NoCParams]
+  sbusParams: SystemBusParams,
+  tlNoCParams: TLNoCParams,
+  useGlobalNoC: Boolean = false
 ) extends TLBusWrapperInstantiationLike {
-  def instantiate(context: HasTileLinkLocations, loc: Location[TLBusWrapper])(implicit p: Parameters): ConstellationSystemBus = {
-    val base_noc_params = TLNoCParams("sbus", p(ConstellationTLNetworkNodeMappingKey(loc)), privateNoC)
-    val noc_params = context match {
-      case c: CanHaveGlobalTLInterconnect =>
-        base_noc_params.copy(globalTerminalChannels = Some(() => c.getSubnetTerminalChannels(SBUS)))
-      case _ => base_noc_params
-    }
-    val constellation = LazyModule(new ConstellationSystemBus(params, noc_params, loc.name))
+  def instantiate(context: HasTileLinkLocations, loc: Location[TLBusWrapper]
+  )(implicit p: Parameters): ConstellationSystemBus = {
+    val constellation = LazyModule(new ConstellationSystemBus(
+      sbusParams, tlNoCParams, loc.name, useGlobalNoC, context))
 
     constellation.suggestName(loc.name)
     context.tlBusWrapperLocationMap += (loc -> constellation)
@@ -37,17 +31,25 @@ case class ConstellationSystemBusParams(
   }
 }
 
-
-class ConstellationSystemBus(sbus_params: SystemBusParams, noc_params: TLNoCParams, name: String)
-  (implicit p: Parameters) extends TLBusWrapper(sbus_params, name) {
+class ConstellationSystemBus(
+  sbus_params: SystemBusParams, noc_params: TLNoCParams, name: String,
+  useGlobalNoC: Boolean, context: HasTileLinkLocations
+)(implicit p: Parameters) extends TLBusWrapper(sbus_params, name) {
   private val replicator = sbus_params.replication.map(r => LazyModule(new RegionReplicator(r)))
   val prefixNode = replicator.map { r =>
     r.prefix := addressPrefixNexusNode
     addressPrefixNexusNode
   }
 
-  private val system_bus_noc = LazyModule(new TLNoC(noc_params))
-  val inwardNode: TLInwardNode = system_bus_noc.node :=* TLFIFOFixer(TLFIFOFixer.allVolatile) :=* replicator.map(_.node).getOrElse(TLTempNode())
+  private val system_bus_noc = if (useGlobalNoC) {
+    context.asInstanceOf[CanHaveGlobalNoC].globalNoCDomain {
+      LazyModule(new TLGlobalNoC(noc_params))
+    }
+  } else {
+    LazyModule(new TLNoC(noc_params.copy(nocParams=noc_params.nocParams.copy(nocName=name))))
+  }
+  val inwardNode: TLInwardNode = (system_bus_noc.node :=* TLFIFOFixer(TLFIFOFixer.allVolatile)
+    :=* replicator.map(_.node).getOrElse(TLTempNode()))
   val outwardNode: TLOutwardNode = system_bus_noc.node
   def busView: TLEdge = system_bus_noc.node.edges.in.head
 
@@ -55,17 +57,14 @@ class ConstellationSystemBus(sbus_params: SystemBusParams, noc_params: TLNoCPara
 }
 
 case class ConstellationMemoryBusParams(
-  params: MemoryBusParams,
-  privateNoC: Option[NoCParams]
+  mbusParams: MemoryBusParams,
+  tlNoCParams: TLNoCParams,
+  useGlobalNoC: Boolean = false
 ) extends TLBusWrapperInstantiationLike {
-  def instantiate(context: HasTileLinkLocations, loc: Location[TLBusWrapper])(implicit p: Parameters): ConstellationMemoryBus = {
-    val base_noc_params = TLNoCParams("mbus", p(ConstellationTLNetworkNodeMappingKey(loc)), privateNoC)
-    val noc_params = context match {
-      case c: CanHaveGlobalTLInterconnect =>
-        base_noc_params.copy(globalTerminalChannels = Some(() => c.getSubnetTerminalChannels(MBUS)))
-      case _ => base_noc_params
-    }
-    val constellation = LazyModule(new ConstellationMemoryBus(params, noc_params, loc.name))
+  def instantiate(context: HasTileLinkLocations, loc: Location[TLBusWrapper]
+  )(implicit p: Parameters): ConstellationMemoryBus = {
+    val constellation = LazyModule(new ConstellationMemoryBus(
+      mbusParams, tlNoCParams, loc.name, useGlobalNoC, context))
 
     constellation.suggestName(loc.name)
     context.tlBusWrapperLocationMap += (loc -> constellation)
@@ -73,7 +72,7 @@ case class ConstellationMemoryBusParams(
   }
 }
 
-class ConstellationMemoryBus(mbus_params: MemoryBusParams, noc_params: TLNoCParams, name: String)
+class ConstellationMemoryBus(mbus_params: MemoryBusParams, noc_params: TLNoCParams, name: String, useGlobalNoC: Boolean, context: HasTileLinkLocations)
   (implicit p: Parameters) extends TLBusWrapper(mbus_params, name) {
   private val replicator = mbus_params.replication.map(r => LazyModule(new RegionReplicator(r)))
   val prefixNode = replicator.map { r =>
@@ -81,7 +80,13 @@ class ConstellationMemoryBus(mbus_params: MemoryBusParams, noc_params: TLNoCPara
     addressPrefixNexusNode
   }
 
-  private val memory_bus_noc = LazyModule(new TLNoC(noc_params))
+  private val memory_bus_noc = if (useGlobalNoC) {
+    context.asInstanceOf[CanHaveGlobalNoC].globalNoCDomain {
+      LazyModule(new TLGlobalNoC(noc_params))
+    }
+  } else {
+    LazyModule(new TLNoC(noc_params.copy(nocParams=noc_params.nocParams.copy(nocName=name))))
+  }
   val inwardNode: TLInwardNode =
     replicator.map(memory_bus_noc.node :*=* TLFIFOFixer(TLFIFOFixer.all) :*=* _.node)
         .getOrElse(memory_bus_noc.node :*=* TLFIFOFixer(TLFIFOFixer.all))
@@ -93,19 +98,12 @@ class ConstellationMemoryBus(mbus_params: MemoryBusParams, noc_params: TLNoCPara
 }
 
 case class ConstellationPeripheryBusParams(
-  params: PeripheryBusParams,
-  privateNoC: Option[NoCParams],
-  explicitPayloadWidth: Option[Int] = None
+  pbusParams: PeripheryBusParams,
+  tlNoCParams: TLNoCParams
 ) extends TLBusWrapperInstantiationLike {
-  def instantiate(context: HasTileLinkLocations, loc: Location[TLBusWrapper])(implicit p: Parameters): ConstellationPeripheryBus = {
-    val base_noc_params = TLNoCParams(loc.name, p(ConstellationTLNetworkNodeMappingKey(loc)), privateNoC,
-      explicitPayloadWidth=explicitPayloadWidth)
-    val noc_params = context match {
-      case c: CanHaveGlobalTLInterconnect =>
-        base_noc_params.copy(globalTerminalChannels = Some(() => c.getSubnetTerminalChannels(MBUS)))
-      case _ => base_noc_params
-    }
-    val constellation = LazyModule(new ConstellationPeripheryBus(loc.name, params, noc_params))
+  def instantiate(context: HasTileLinkLocations, loc: Location[TLBusWrapper]
+  )(implicit p: Parameters): ConstellationPeripheryBus = {
+    val constellation = LazyModule(new ConstellationPeripheryBus(pbusParams, tlNoCParams, loc.name))
 
     constellation.suggestName(loc.name)
     context.tlBusWrapperLocationMap += (loc -> constellation)
@@ -113,7 +111,7 @@ case class ConstellationPeripheryBusParams(
   }
 }
 
-class ConstellationPeripheryBus(name: String, pbus_params: PeripheryBusParams, noc_params: TLNoCParams)
+class ConstellationPeripheryBus(pbus_params: PeripheryBusParams, noc_params: TLNoCParams, name: String)
   (implicit p: Parameters) extends TLBusWrapper(pbus_params, name) {
 
   private val replicator = pbus_params.replication.map(r => LazyModule(new RegionReplicator(r)))
@@ -125,7 +123,8 @@ class ConstellationPeripheryBus(name: String, pbus_params: PeripheryBusParams, n
   private val fixer = LazyModule(new TLFIFOFixer(TLFIFOFixer.all))
   private val node: TLNode = pbus_params.atomics.map { pa =>
     val in_xbar = LazyModule(new TLXbar)
-    val out_noc = LazyModule(new TLNoC(noc_params))
+    val out_noc = LazyModule(new TLNoC(
+      noc_params.copy(nocParams=noc_params.nocParams.copy(nocName=name))))
     val fixer_node = replicator.map(fixer.node :*= _.node).getOrElse(fixer.node)
     (out_noc.node
       :*= fixer_node
@@ -146,3 +145,4 @@ class ConstellationPeripheryBus(name: String, pbus_params: PeripheryBusParams, n
   val builtInDevices: BuiltInDevices = BuiltInDevices.attach(pbus_params, outwardNode)
 
 }
+

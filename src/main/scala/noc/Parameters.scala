@@ -11,11 +11,11 @@ import constellation.channel._
 import constellation.routing._
 import constellation.topology.{PhysicalTopology, UnidirectionalLine}
 
-
+// BEGIN: NoC Parameters
 case class NoCParams(
   // Physical specifications
   topology: PhysicalTopology = UnidirectionalLine(1),
-  channelParamGen: (Int, Int) => UserChannelParams = (a: Int, b: Int) => UserChannelParams(),
+  channelParamGen: (Int, Int) => UserChannelParams = (_, _) => UserChannelParams(),
   ingresses: Seq[UserIngressParams] = Nil,
   egresses: Seq[UserEgressParams] = Nil,
   routerParams: Int => UserRouterParams = (i: Int) => UserRouterParams(),
@@ -23,7 +23,7 @@ case class NoCParams(
   // Flow specification
   // (blocker, blockee) => bool
   // If true, then blocker must be able to proceed when blockee is blocked
-  vNetBlocking: (Int, Int) => Boolean = (_: Int, _: Int) => true,
+  vNetBlocking: (Int, Int) => Boolean = (_, _) => true,
   flows: Seq[FlowParams] = Nil,
 
   // Routing specification
@@ -34,7 +34,7 @@ case class NoCParams(
   skipValidationChecks: Boolean = false,
   hasCtrl: Boolean = false,
 )
-//case object NoCKey extends Field[NoCParams](NoCParams())
+// END: NoC Parameters
 
 
 case object InternalNoCKey extends Field[InternalNoCParams]
@@ -68,7 +68,7 @@ trait HasNoCParams {
   def maxIngressesAtNode = nocParams.routerParams.map(_.nIngress).max
   def maxEgressesAtNode = nocParams.routerParams.map(_.nEgress).max
   def routingRelation = nocParams.routingRelation
-  def virtualChannelBits = log2Up( (nocParams.channelParams.map(_.nVirtualChannels) :+ 0).max)
+  def virtualChannelBits = log2Up((nocParams.channelParams.map(_.nVirtualChannels) :+ 0).max)
 }
 
 object InternalNoCParams {
@@ -155,6 +155,7 @@ object InternalNoCParams {
         val iId = iP.destId
         //println(s"Constellation: $nocName Checking connectivity from ingress $iIdx")
         iP.possibleFlows.map { flow =>
+
           val flowPossibleFlows = scala.collection.mutable.Set[ChannelRoutingInfo]()
           var unexplored: Seq[ChannelRoutingInfo] = iP.channelRoutingInfos
           while (unexplored.size != 0) {
@@ -170,7 +171,7 @@ object InternalNoCParams {
                   }.flatten
                 }.flatten
                 require(nexts.size > 0,
-                  s"Failed to route from $iId to ${flow.egressNode} at $head for vnet $vNetId \n  $stack \n  ${nextChannelParamMap(head.dst)}")
+                  s"Failed to route $flow at $head \n  $stack \n  ${nextChannelParamMap(head.dst)}")
                 require((nexts.toSet & stack.toSet).size == 0,
                   s"$flow, $nexts, $stack")
                 stack = Seq(nexts.head) ++ stack
@@ -236,7 +237,11 @@ object InternalNoCParams {
       println(s"Constellation: $nocName Checking virtual subnet connectivity")
       for (vNetId <- 0 until nVirtualNetworks) {
         // blockees are vNets which the current vNet can block without affecting its own forwards progress
-        val blockees = (0 until nVirtualNetworks).filter(v => v != vNetId && nocParams.vNetBlocking(vNetId, v))
+        val blockees = (0 until nVirtualNetworks).filter(v =>
+          v != vNetId && nocParams.vNetBlocking(vNetId, v) && flows.exists(_.vNetId == v)
+        )
+        if (blockees.size > 0)
+          println(s"Constellation: $nocName Checking if $vNetId can proceed when blocked by ${blockees}")
         val blockeeSets = blockees.toSet.subsets.filter(_.size > 0)
         // For each subset of blockers for this virtual network, recheck connectivity assuming
         // every virtual channel accessible to each blocker is locked

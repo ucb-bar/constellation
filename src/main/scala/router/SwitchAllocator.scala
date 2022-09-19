@@ -73,16 +73,16 @@ class SwitchAllocator(
     with HasRouterOutputParams {
   val io = IO(new Bundle {
     val req = MixedVec(allInParams.map(u =>
-      Vec(u.destMultiplier, Flipped(Decoupled(new SwitchAllocReq(outParams, egressParams))))))
+      Vec(u.destSpeedup, Flipped(Decoupled(new SwitchAllocReq(outParams, egressParams))))))
     val credit_alloc = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Output(new OutputCreditAlloc))})
-    val switch_sel = MixedVec(allOutParams.map { o => Vec(o.srcMultiplier,
-      MixedVec(allInParams.map { i => Vec(i.destMultiplier, Output(Bool())) })) })
+    val switch_sel = MixedVec(allOutParams.map { o => Vec(o.srcSpeedup,
+      MixedVec(allInParams.map { i => Vec(i.destSpeedup, Output(Bool())) })) })
   })
   val nInputChannels = allInParams.map(_.nVirtualChannels).sum
 
   val arbs = allOutParams.map { oP => Module(new SwitchArbiter(
-    allInParams.map(_.destMultiplier).reduce(_+_),
-    oP.srcMultiplier,
+    allInParams.map(_.destSpeedup).reduce(_+_),
+    oP.srcSpeedup,
     outParams,
     egressParams
   ))}
@@ -101,10 +101,10 @@ class SwitchAllocator(
   })
 
   for (i <- 0 until nAllOutputs) {
-    for (j <- 0 until allOutParams(i).srcMultiplier) {
+    for (j <- 0 until allOutParams(i).srcSpeedup) {
       idx = 0
       for (m <- 0 until nAllInputs) {
-        for (n <- 0 until allInParams(m).destMultiplier) {
+        for (n <- 0 until allInParams(m).destSpeedup) {
           io.switch_sel(i)(j)(m)(n) := arbs(i).io.in(idx).valid && arbs(i).io.chosen_oh(j)(idx) && arbs(i).io.out(j).valid
           idx += 1
         }

@@ -3,21 +3,25 @@ package constellation.topology
 import scala.math.{pow, cos, sin, Pi}
 import scala.collection.immutable.ListMap
 
+// BEGIN: PhysicalTopology
 trait PhysicalTopology {
   // Number of nodes in this physical topology
   val nNodes: Int
 
-  /** Method that describes the particular topology represented by the concrete class. Returns true
-    *  if the two nodes SRC and DST can be connected via a channel in this topology and false if they cannot.
+  /** Method that describes the particular topology represented by the concrete
+    * class. Returns true if the two nodes SRC and DST can be connected via a
+    * directed channel in this topology and false if they cannot.
     *
     *  @param src source point
     *  @param dst destination point
     */
   def topo(src: Int, dst: Int): Boolean
 
-  /** Plotter from TopologyPlotters.scala. Helps construct diagram of a concrete topology. */
+  /** Plotter from TopologyPlotters.scala.
+    * Helps construct diagram of a concrete topology. */
   val plotter: PhysicalTopologyPlotter
 }
+// END: PhysicalTopology
 
 
 /** A network where sequential nodes are connected unidirectionally */
@@ -38,11 +42,13 @@ trait Torus1DLikeTopology extends PhysicalTopology {
   val plotter = new Torus1DPlotter(this)
 }
 
-/** An n-node network shaped like a torus, with clockwise channels */
+// BEGIN: UnidirectionalTorus1D
+/** An n-node network shaped like a torus, with directed channels */
 case class UnidirectionalTorus1D(n: Int) extends Torus1DLikeTopology {
   val nNodes = n
-  def topo(src: Int, dest: Int) = dest - src == 1 || (dest == 0 && src == nNodes - 1)
+  def topo(src: Int, dest: Int) = (dest - src + nNodes) % nNodes == 1
 }
+// END: UnidirectionalTorus1D
 
 /** An n-node network shaped like a torus, with bidirectional channels */
 case class BidirectionalTorus1D(n: Int) extends Torus1DLikeTopology {
@@ -149,7 +155,7 @@ case class BidirectionalTorus2D(nX: Int, nY: Int) extends Mesh2DLikePhysicalTopo
   }
 }
 
-case class TerminalPlane(val base: PhysicalTopology) extends PhysicalTopology {
+case class TerminalRouter(val base: PhysicalTopology) extends PhysicalTopology {
   val nNodes = (2 * base.nNodes)
   def isBase(n: Int) = n >= base.nNodes
   def isTerminal(n: Int) = n < base.nNodes
@@ -164,7 +170,7 @@ case class TerminalPlane(val base: PhysicalTopology) extends PhysicalTopology {
       same && (toIngress || toEgress)
     }
   }
-  val plotter = new TerminalPlanePlotter(this)
+  val plotter = new TerminalRouterPlotter(this)
 }
 
 // Hierarchical topologies add bidirection connections between a src in the base and a dst in the child

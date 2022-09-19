@@ -31,7 +31,7 @@ class AbstractOutputUnitIO(
 )(implicit val p: Parameters) extends Bundle with HasRouterInputParams {
   val nodeId = cParam.srcId
   val nVirtualChannels = cParam.nVirtualChannels
-  val in = Flipped(Vec(cParam.srcMultiplier, Valid(new Flit(cParam.payloadBits))))
+  val in = Flipped(Vec(cParam.srcSpeedup, Valid(new Flit(cParam.payloadBits))))
   val credit_available = Output(Vec(nVirtualChannels, Bool()))
   val channel_status = Output(Vec(nVirtualChannels, new OutputChannelStatus))
   val allocs = Input(Vec(nVirtualChannels, new OutputChannelAlloc))

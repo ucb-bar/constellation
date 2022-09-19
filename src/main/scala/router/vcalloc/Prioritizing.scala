@@ -21,7 +21,8 @@ trait Prioritizing { this: VCAllocator =>
     fire: Bool): MixedVec[Vec[Bool]] = {
     val w = in.getWidth
     if (w > 1) {
-      val nPrios = allInParams.map(_.channelRoutingInfos).flatten.map(c => routingRelation.getNPrios(c)).max
+      val nPrios = (allOutParams ++ allInParams)
+        .map(_.channelRoutingInfos).flatten.map(c => routingRelation.getNPrios(c)).max
 
       case class PrioHelper(prio: Int, outId: Int, outVId: Int, inId: Int, inVId: Int, flow: FlowRoutingInfo)
 

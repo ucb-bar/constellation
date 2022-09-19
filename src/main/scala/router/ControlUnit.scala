@@ -55,7 +55,7 @@ class RouterControlUnit(
     val ctrl = new RouterCtrlBundle
 
     val in_block = Vec(allInParams.size, Output(Bool()))
-    val in_fire  = MixedVec(allInParams.map { i => Vec(i.destMultiplier, Input(Bool())) })
+    val in_fire  = MixedVec(allInParams.map { i => Vec(i.destSpeedup, Input(Bool())) })
   })
   require(allInParams.size <= CTRL_MAX_INS)
   io.ctrl.rdata := 0.U

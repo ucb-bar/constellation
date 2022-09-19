@@ -11,7 +11,7 @@ import freechips.rocketchip.amba.axi4._
 
 import scala.collection.immutable.ListMap
 import constellation.noc.{NoCParams}
-import constellation.rc._
+import constellation.protocol._
 
 case class AXI4NoCTesterParams(
   nocParams: NoCParams = NoCParams(),
@@ -33,12 +33,12 @@ class AXI4NoCTester(implicit p: Parameters) extends LazyModule {
   val txns = tParams.txns
   val inNodeMapping = ListMap(tParams.inNodeMapping.zipWithIndex.map { case (i,j) => s"[$j]" -> i }:_*)
   val outNodeMapping = ListMap(tParams.outNodeMapping.zipWithIndex.map { case (i,j) => s"[$j]" -> i }:_*)
-  val nodeMapping = ConstellationDiplomaticNetworkNodeMapping(
+  val nodeMapping = DiplomaticNetworkNodeMapping(
     inNodeMapping, outNodeMapping)
   val nSlaves = outNodeMapping.size
   val nMasters = inNodeMapping.size
 
-  val noc = LazyModule(new AXI4NoC(AXI4NoCParams("test", nodeMapping, p(AXI4NoCTesterKey).nocParams)))
+  val noc = LazyModule(new AXI4NoC(AXI4NoCParams(nodeMapping, p(AXI4NoCTesterKey).nocParams.copy(nocName="test"))))
   val slaveSize = 0x1000
   val masterBandSize = slaveSize >> log2Ceil(nMasters)
   def filter(i: Int) = TLFilter.mSelectIntersect(AddressSet(i * masterBandSize, ~BigInt(slaveSize - masterBandSize)))

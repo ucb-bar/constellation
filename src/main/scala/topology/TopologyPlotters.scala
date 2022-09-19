@@ -102,7 +102,7 @@ class TreePlotter(topo: BidirectionalTree) extends PhysicalTopologyPlotter {
 }
 
 
-class TerminalPlanePlotter(topo: TerminalPlane) extends PhysicalTopologyPlotter {
+class TerminalRouterPlotter(topo: TerminalRouter) extends PhysicalTopologyPlotter {
   val basePlotter = topo.base.plotter
   def node(n: Int) = {
     if (topo.isBase(n)) {
