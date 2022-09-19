@@ -26,6 +26,15 @@ class NoCEvalConfig(p: NoCEvalParams) extends Config((site, here, up) => {
   case NoCEvalKey => p
 })
 
+class TestSingleNode extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = UnidirectionalLine(1),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(1) { UserVirtualChannelParams(1) }),
+  ingresses       = Seq(0).map { i => UserIngressParams(i) },
+  egresses        = Seq(0).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(1, 1) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = UnidirectionalLineRouting()
+)))
+
 class TestConfig00 extends NoCTesterConfig(NoCTesterParams(NoCParams(
   topology        = UnidirectionalLine(2),
   channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(3) }),
@@ -894,6 +903,19 @@ class AXI4TestConfig03 extends AXI4NoCTesterConfig(AXI4NoCTesterParams(
   )
 ))
 
+class EvalTestConfigSingleNode extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.79,
+  flows              = (s, d) => 0.25,
+  nocParams = NoCParams(
+    topology        = UnidirectionalLine(1),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(1) { UserVirtualChannelParams(1) }),
+    ingresses       = Seq(0).map { i => UserIngressParams(i) },
+    egresses        = Seq(0).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(1, 1) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = UnidirectionalLineRouting()
+  )
+))
+
 class EvalTestConfig00 extends NoCEvalConfig(NoCEvalParams(
   requiredThroughput = 0.79,
   flows              = (s, d) => 1.0,
@@ -906,6 +928,7 @@ class EvalTestConfig00 extends NoCEvalConfig(NoCEvalParams(
     routingRelation  = UnidirectionalLineRouting()
   )
 ))
+
 class EvalTestConfig01 extends NoCEvalConfig(NoCEvalParams(
   requiredThroughput = 0.79,
   flows              = (s, d) => 0.25,
