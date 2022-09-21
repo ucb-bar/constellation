@@ -373,18 +373,33 @@ abstract class AXI4NoCModuleImp(outer: LazyModule) extends LazyModuleImp(outer) 
   val edgesIn: Seq[AXI4EdgeParameters]
   val edgesOut: Seq[AXI4EdgeParameters]
   val nodeMapping: DiplomaticNetworkNodeMapping
+  val nocName: String
   val awQueueDepth: Int
   lazy val inNames  = nodeMapping.genUniqueName(edgesIn.map(_.master.masters.map(_.name)))
   lazy val outNames = nodeMapping.genUniqueName(edgesOut.map(_.slave.slaves.map(_.name)))
-  lazy val edgeInNodes = inNames.map(n => nodeMapping.getNodeIn(n))
-  lazy val edgeOutNodes = outNames.map(n => nodeMapping.getNodeOut(n))
+  lazy val edgeInNodes = nodeMapping.getNodesIn(inNames)
+  lazy val edgeOutNodes = nodeMapping.getNodesOut(outNames)
   lazy val protocolParams = AXI4ProtocolParams(
     edgesIn = edgesIn,
     edgesOut = edgesOut,
-    edgeInNodes = edgeInNodes,
-    edgeOutNodes = edgeOutNodes,
+    edgeInNodes = edgeInNodes.flatten,
+    edgeOutNodes = edgeOutNodes.flatten,
     awQueueDepth = awQueueDepth
   )
+
+  def printNodeMappings() {
+    println(s"Constellation: AXI4NoC $nocName inwards mapping:")
+    for ((n, i) <- inNames zip edgeInNodes) {
+      val node = i.map(_.toString).getOrElse("X")
+      println(s"  $node <- $n")
+    }
+
+    println(s"Constellation: AXI4NoC $nocName outwards mapping:")
+    for ((n, i) <- outNames zip edgeOutNodes) {
+      val node = i.map(_.toString).getOrElse("X")
+      println(s"  $node <- $n")
+    }
+  }
 }
 
 // private AXI4 NoC
@@ -394,17 +409,20 @@ case class AXI4NoCParams(
   nocParams: NoCParams,
   awQueueDepth: Int = 2
 )
-class AXI4NoC(params: AXI4NoCParams)(implicit p: Parameters) extends LazyModule {
+class AXI4NoC(params: AXI4NoCParams, name: String = "test")(implicit p: Parameters) extends LazyModule {
   // END: AXI4NoCParams
   val node = new AXI4NoCNode
   lazy val module = new AXI4NoCModuleImp(this) {
     val (io_in, edgesIn) = node.in.unzip
     val (io_out, edgesOut) = node.out.unzip
     val nodeMapping = params.nodeMappings
+    val nocName = name
     val awQueueDepth = params.awQueueDepth
 
+    printNodeMappings()
+
     val noc = Module(new ProtocolNoC(ProtocolNoCParams(
-      params.nocParams.copy(hasCtrl = false),
+      params.nocParams.copy(hasCtrl = false, nocName = name),
       Seq(protocolParams)
     )))
 

@@ -43,10 +43,10 @@ class ConstellationSystemBus(
 
   private val system_bus_noc = if (useGlobalNoC) {
     context.asInstanceOf[CanHaveGlobalNoC].globalNoCDomain {
-      LazyModule(new TLGlobalNoC(noc_params))
+      LazyModule(new TLGlobalNoC(noc_params, name))
     }
   } else {
-    LazyModule(new TLNoC(noc_params.copy(nocParams=noc_params.nocParams.copy(nocName=name))))
+    LazyModule(new TLNoC(noc_params, name))
   }
   val inwardNode: TLInwardNode = (system_bus_noc.node :=* TLFIFOFixer(TLFIFOFixer.allVolatile)
     :=* replicator.map(_.node).getOrElse(TLTempNode()))
@@ -82,10 +82,10 @@ class ConstellationMemoryBus(mbus_params: MemoryBusParams, noc_params: TLNoCPara
 
   private val memory_bus_noc = if (useGlobalNoC) {
     context.asInstanceOf[CanHaveGlobalNoC].globalNoCDomain {
-      LazyModule(new TLGlobalNoC(noc_params))
+      LazyModule(new TLGlobalNoC(noc_params, name))
     }
   } else {
-    LazyModule(new TLNoC(noc_params.copy(nocParams=noc_params.nocParams.copy(nocName=name))))
+    LazyModule(new TLNoC(noc_params, name))
   }
   val inwardNode: TLInwardNode =
     replicator.map(memory_bus_noc.node :*=* TLFIFOFixer(TLFIFOFixer.all) :*=* _.node)
@@ -123,8 +123,7 @@ class ConstellationPeripheryBus(pbus_params: PeripheryBusParams, noc_params: TLN
   private val fixer = LazyModule(new TLFIFOFixer(TLFIFOFixer.all))
   private val node: TLNode = pbus_params.atomics.map { pa =>
     val in_xbar = LazyModule(new TLXbar)
-    val out_noc = LazyModule(new TLNoC(
-      noc_params.copy(nocParams=noc_params.nocParams.copy(nocName=name))))
+    val out_noc = LazyModule(new TLNoC(noc_params, name))
     val fixer_node = replicator.map(fixer.node :*= _.node).getOrElse(fixer.node)
     (out_noc.node
       :*= fixer_node
@@ -134,7 +133,7 @@ class ConstellationPeripheryBus(pbus_params: PeripheryBusParams, noc_params: TLN
         } .getOrElse { TLAtomicAutomata(arithmetic = pa.arithmetic) })
       :*= in_xbar.node)
   } .getOrElse {
-    val noc = LazyModule(new TLNoC(noc_params))
+    val noc = LazyModule(new TLNoC(noc_params, name))
     noc.node :*= fixer.node
   }
 
