@@ -420,7 +420,7 @@ abstract class TLNoCModuleImp(outer: LazyModule) extends LazyModuleImp(outer) {
     println(s"Constellation: TLNoC $nocName inwards mapping:")
     for ((n, i) <- inNames zip edgeInNodes) {
       val node = i.map(_.toString).getOrElse("X")
-      println(s"$node <- $n")
+      println(s"  $node <- $n")
     }
 
     println(s"Constellation: TLNoC $nocName outwards mapping:")
