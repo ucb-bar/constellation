@@ -22,7 +22,7 @@ case class DiplomaticNetworkNodeMapping(
   def genUniqueName(all: Seq[Seq[String]]) = {
     all.zipWithIndex.map { case (strs, i) =>
       val matches = all.take(i).map(_.mkString).count(_ == strs.mkString)
-      strs.map(s => s"${s}[${matches}]").mkString(",")
+      strs.map(s => s"${s}[${matches}]").mkString(",") + "|"
     }
   }
   def getNode(l: String, nodeMapping: ListMap[String, Int]): Option[Int] = {
