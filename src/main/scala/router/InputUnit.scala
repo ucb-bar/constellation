@@ -53,10 +53,25 @@ class InputBuffer(cParam: ChannelParams)(implicit p: Parameters) extends Module 
     val deq = Vec(cParam.nVirtualChannels, Decoupled(new BaseFlit(cParam.payloadBits)))
   })
 
-  val fullSize = cParam.virtualChannelParams.map(_.bufferSize).sum
+  val useOutputQueues = cParam.useOutputQueues
+  val delims = if (useOutputQueues) {
+    cParam.virtualChannelParams.map(u => if (u.traversable) u.bufferSize else 0).scanLeft(0)(_+_)
+  } else {
+    // If no queuing, have to add an additional slot since head == tail implies empty
+    // TODO this should be fixed, should use all slots available
+    cParam.virtualChannelParams.map(u => if (u.traversable) u.bufferSize + 1 else 0).scanLeft(0)(_+_)
+  }
+  val starts = delims.dropRight(1).zipWithIndex.map { case (s,i) =>
+    if (cParam.virtualChannelParams(i).traversable) s else 0
+  }
+  val ends = delims.tail.zipWithIndex.map { case (s,i) =>
+    if (cParam.virtualChannelParams(i).traversable) s else 0
+  }
+  val fullSize = delims.last
 
   // Ugly case. Use multiple queues
   if (cParam.srcSpeedup > 1 || cParam.destSpeedup > 1 || fullSize <= 1) {
+    require(useOutputQueues)
     val qs = cParam.virtualChannelParams.map(v => Module(new Queue(new BaseFlit(cParam.payloadBits), v.bufferSize)))
     qs.zipWithIndex.foreach { case (q,i) =>
       val sel = io.enq.map(f => f.valid && f.bits.virt_channel_id === i.U)
@@ -67,23 +82,18 @@ class InputBuffer(cParam: ChannelParams)(implicit p: Parameters) extends Module 
       io.deq(i) <> q.io.deq
     }
   } else {
-
-    val delims = cParam.virtualChannelParams.map(u => if (u.traversable) u.bufferSize else 0).scanLeft(0)(_+_)
-    val starts = delims.dropRight(1)
-    val ends = delims.tail
-
     val mem = Mem(fullSize, new BaseFlit(cParam.payloadBits))
     val heads = RegInit(VecInit(starts.map(_.U(log2Ceil(fullSize).W))))
     val tails = RegInit(VecInit(starts.map(_.U(log2Ceil(fullSize).W))))
     val empty = (heads zip tails).map(t => t._1 === t._2)
 
-    val qs = Seq.fill(nVirtualChannels) { Module(new Queue(new BaseFlit(cParam.payloadBits), 2)) }
+    val qs = Seq.fill(nVirtualChannels) { Module(new Queue(new BaseFlit(cParam.payloadBits), 1, pipe=true)) }
     qs.foreach(_.io.enq.valid := false.B)
     qs.foreach(_.io.enq.bits := DontCare)
 
     val vc_sel = UIntToOH(io.enq(0).bits.virt_channel_id)
     val flit = Wire(new BaseFlit(cParam.payloadBits))
-    val direct_to_q = Mux1H(vc_sel, qs.map(_.io.enq.ready)) && Mux1H(vc_sel, empty)
+    val direct_to_q = (Mux1H(vc_sel, qs.map(_.io.enq.ready)) && Mux1H(vc_sel, empty)) && useOutputQueues.B
     flit.head := io.enq(0).bits.head
     flit.tail := io.enq(0).bits.tail
     flit.payload := io.enq(0).bits.payload
@@ -103,25 +113,44 @@ class InputBuffer(cParam: ChannelParams)(implicit p: Parameters) extends Module 
       }
     }
 
-    val can_to_q = (0 until nVirtualChannels).map { i => !empty(i) && qs(i).io.enq.ready }
-    val to_q_oh = PriorityEncoderOH(can_to_q)
-    val to_q = OHToUInt(to_q_oh)
-    when (can_to_q.orR) {
-      val head = Mux1H(to_q_oh, heads)
-      heads(to_q) := Mux(
-        head === Mux1H(to_q_oh, ends.map(_ - 1).map(_ max 0).map(_.U)),
-        Mux1H(to_q_oh, starts.map(_.U)),
-        head + 1.U)
-      for (i <- 0 until nVirtualChannels) {
-        when (to_q_oh(i)) {
-          qs(i).io.enq.valid := true.B
-          qs(i).io.enq.bits := mem.read(head)
+    if (useOutputQueues) {
+      val can_to_q = (0 until nVirtualChannels).map { i => !empty(i) && qs(i).io.enq.ready }
+      val to_q_oh = PriorityEncoderOH(can_to_q)
+      val to_q = OHToUInt(to_q_oh)
+      when (can_to_q.orR) {
+        val head = Mux1H(to_q_oh, heads)
+        heads(to_q) := Mux(
+          head === Mux1H(to_q_oh, ends.map(_ - 1).map(_ max 0).map(_.U)),
+          Mux1H(to_q_oh, starts.map(_.U)),
+          head + 1.U)
+        for (i <- 0 until nVirtualChannels) {
+          when (to_q_oh(i)) {
+            qs(i).io.enq.valid := true.B
+            qs(i).io.enq.bits := mem.read(head)
+          }
         }
       }
-    }
-
-    for (i <- 0 until nVirtualChannels) {
-      io.deq(i) <> qs(i).io.deq
+      for (i <- 0 until nVirtualChannels) {
+        io.deq(i) <> qs(i).io.deq
+      }
+    } else {
+      qs.map(_.io.deq.ready := false.B)
+      val ready_sel = io.deq.map(_.ready)
+      val fire = io.deq.map(_.fire())
+      assert(PopCount(fire) <= 1.U)
+      val head = Mux1H(fire, heads)
+      when (fire.orR) {
+        val fire_idx = OHToUInt(fire)
+        heads(fire_idx) := Mux(
+          head === Mux1H(fire, ends.map(_ - 1).map(_ max 0).map(_.U)),
+          Mux1H(fire, starts.map(_.U)),
+          head + 1.U)
+      }
+      val read_flit = mem.read(head)
+      for (i <- 0 until nVirtualChannels) {
+        io.deq(i).valid := !empty(i)
+        io.deq(i).bits := read_flit
+      }
     }
   }
 }
