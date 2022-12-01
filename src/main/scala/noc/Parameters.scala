@@ -11,6 +11,8 @@ import constellation.channel._
 import constellation.routing._
 import constellation.topology.{PhysicalTopology, UnidirectionalLine}
 
+import play.api.libs.json._
+
 // BEGIN: NoC Parameters
 case class NoCParams(
   // Physical specifications
@@ -40,13 +42,13 @@ case class NoCParams(
 case object InternalNoCKey extends Field[InternalNoCParams]
 
 case class InternalNoCParams(
-  userParams: NoCParams,
+  userParams: NoCParams,                      // done
   nVirtualNetworks: Int,
-  routingRelation: RoutingRelation,
-  channelParams: Seq[ChannelParams],
+  routingRelation: RoutingRelation,           // done
+  channelParams: Seq[ChannelParams],          // done
   ingressParams: Seq[IngressChannelParams],
   egressParams: Seq[EgressChannelParams],
-  routerParams: Seq[RouterParams]
+  routerParams: Seq[RouterParams]             // done
 )
 
 trait HasNoCParams {

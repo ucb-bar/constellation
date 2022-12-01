@@ -200,9 +200,9 @@ class Router(
     def sample(fire: Bool, s: String) = {
       val util_ctr = RegInit(0.U(64.W))
       val fired = RegInit(false.B)
-      util_ctr := util_ctr + fire
+      util_ctr := Mux(debug_sample === sample_rate - 1.U, 0.U(64.W), util_ctr) + fire
       fired := fired || fire
-      when (sample_rate =/= 0.U && debug_sample === sample_rate - 1.U && fired) {
+      when (debug_sample === sample_rate - 1.U) {
         printf(s"nocsample %d $s %d\n", debug_tsc, util_ctr);
         fired := fire
       }

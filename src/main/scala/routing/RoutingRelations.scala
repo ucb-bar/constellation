@@ -6,6 +6,8 @@ import freechips.rocketchip.config.{Parameters}
 import scala.collection.immutable.ListMap
 import constellation.topology.{PhysicalTopology, Mesh2DLikePhysicalTopology, HierarchicalTopology}
 
+import play.api.libs.json._
+
 /** Routing and channel allocation policy
  *
  * @param f function that takes in source channel, next channel, and packet routing info.

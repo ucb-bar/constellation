@@ -8,6 +8,8 @@ import freechips.rocketchip.diplomacy.{ClockCrossingType, NoCrossing}
 import constellation.routing.{ChannelRoutingInfo, FlowRoutingInfo}
 import constellation.noc.{HasNoCParams}
 
+import play.api.libs.json._
+
 // BEGIN: FlowParams
 case class FlowParams(
   ingressId: Int,
