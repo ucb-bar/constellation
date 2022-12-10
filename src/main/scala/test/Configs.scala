@@ -35,6 +35,15 @@ class TestSingleNode extends NoCTesterConfig(NoCTesterParams(NoCParams(
   routingRelation = UnidirectionalLineRouting()
 )))
 
+class TestThreeNodeLine extends NoCTesterConfig(NoCTesterParams(NoCParams(
+  topology        = UnidirectionalLine(3),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(1) { UserVirtualChannelParams(1) }),
+  ingresses       = Seq(0).map { i => UserIngressParams(i) },
+  egresses        = Seq(2).map { i => UserEgressParams(i) },
+  flows           = Seq.tabulate(1, 1) { (s, d) => FlowParams(s, d, 0) }.flatten,
+  routingRelation = UnidirectionalLineRouting()
+)))
+
 class TestConfig00 extends NoCTesterConfig(NoCTesterParams(NoCParams(
   topology        = UnidirectionalLine(2),
   channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(3) }),
@@ -940,6 +949,32 @@ class EvalTestConfigSingleNode extends NoCEvalConfig(NoCEvalParams(
   )
 ))
 
+class EvalTestConfigThreeNodeLine extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.79,
+  flows              = (s, d) => 0.25,
+  nocParams = NoCParams(
+    topology        = UnidirectionalLine(3),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(1) { UserVirtualChannelParams(1) }),
+    ingresses       = Seq(0).map { i => UserIngressParams(i) },
+    egresses        = Seq(2).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(1, 1) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = UnidirectionalLineRouting()
+  )
+))
+
+class EvalTestConfig2by2Mesh extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput    = 0.1,
+  flows              = (s, d) => 0.5 / 25,
+  nocParams = NoCParams(
+    topology         = Mesh2D(2, 2),
+    channelParamGen  = (a, b) => UserChannelParams(Seq.fill(1) { UserVirtualChannelParams(1) }),
+    ingresses        = (0 until 4).map { i => UserIngressParams(i) },
+    egresses         = (0 until 4).map { i => UserEgressParams(i) },
+    flows            = Seq.tabulate(4, 4) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation  = Mesh2DEscapeRouting()
+  )
+))
+
 class EvalTestConfig00 extends NoCEvalConfig(NoCEvalParams(
   requiredThroughput = 0.79,
   flows              = (s, d) => 1.0,
@@ -980,7 +1015,7 @@ class EvalTestConfig02 extends NoCEvalConfig(NoCEvalParams(
     routingRelation  = UnidirectionalLineRouting()
   )
 ))
-class EvalTestConfig03 extends NoCEvalConfig(NoCEvalParams(
+class EvalTestConfigUnidirectionalTorus1D extends NoCEvalConfig(NoCEvalParams(
   requiredThroughput    = 0.9,
   requiredMedianLatency = 30,
   requiredMaxLatency    = 175,
@@ -1006,6 +1041,7 @@ class EvalTestConfig04 extends NoCEvalConfig(NoCEvalParams(
     routingRelation  = ButterflyRouting()
   )
 ))
+
 class EvalTestConfig05 extends NoCEvalConfig(NoCEvalParams(
   requiredMedianLatency = 75,
   requiredMaxLatency    = 1500,
@@ -1023,6 +1059,7 @@ class EvalTestConfig05 extends NoCEvalConfig(NoCEvalParams(
     routingRelation  = Mesh2DEscapeRouting()
   )
 ))
+
 class EvalTestConfig06 extends NoCEvalConfig(NoCEvalParams(
   requiredMedianLatency = 25,
   requiredMaxLatency    = 125,
