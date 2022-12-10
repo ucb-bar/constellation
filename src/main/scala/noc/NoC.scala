@@ -213,7 +213,6 @@ class NoC(nocParams: NoCParams)(implicit p: Parameters) extends LazyModule {
     ElaborationArtefacts.add(prepend("noc.edgeprops"), edgeProps)
 
     ElaborationArtefacts.add(prepend("noc_cfg.json"), JSONConverters.printAsJson(nocParams).toString())
-    ElaborationArtefacts.add(prepend("internal_noc_cfg.json"), JSONConverters.printAsJson(internalParams).toString())
 
     println(s"Constellation: $nocName Finished NoC RTL generation")
   }

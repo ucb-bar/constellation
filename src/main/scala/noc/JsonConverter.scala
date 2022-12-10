@@ -22,28 +22,24 @@ object JSONConverters {
   implicit val jsonUserChannelParams = new Writes[UserChannelParams] {
     def writes(ucp: UserChannelParams) = Json.obj(
       "virtualChannelParams"  -> ucp.virtualChannelParams,
+      // excluding channelGen
+      "crossingType"          -> ucp.getClass.getName(),
       "srcSpeedup"            -> ucp.srcSpeedup,
       "dstSpeedup"            -> ucp.destSpeedup
     )
   }
 
-  implicit val jsonVirtualChannelParams = new Writes[VirtualChannelParams] {
-    def writes(vcp: VirtualChannelParams) = Json.obj(
-      "src"         -> vcp.src,
-      "dst"         -> vcp.dst,
-      "vc"          -> vcp.vc,
-      "bufferSize"  -> vcp.bufferSize
-    )
-  }
+  case class UserChannelParamsWrapper(
+    srcId: Int,
+    destId: Int,
+    userChannelParams: UserChannelParams
+  )
 
-  implicit val jsonChannelParams = new Writes[ChannelParams] {
-    def writes(cp: ChannelParams) = Json.obj(
-      "srcId"                 -> cp.srcId,
-      "destId"                -> cp.destId,
-      "payloadBits"           -> cp.payloadBits,
-      "virtualChannelParams"  -> Json.arr(cp.virtualChannelParams),
-      "srcSpeedup"            -> cp.srcSpeedup,
-      "destSpeeup"            -> cp.destSpeedup
+  implicit val jsonUserChannelParamsWrapper = new Writes[UserChannelParamsWrapper] {
+    def writes(ucpw: UserChannelParamsWrapper) = Json.obj(
+        "srcId" -> ucpw.srcId,
+        "destId" -> ucpw.destId,
+        "userChannelParams" -> ucpw.userChannelParams
     )
   }
 
@@ -61,28 +57,6 @@ object JSONConverters {
     )
   }
 
-  implicit val jsonFlowParams = new Writes[FlowParams] {
-    def writes(fp: FlowParams) = Json.obj(
-      "ingressId"    -> fp.ingressId,
-      "egressId"     -> fp.egressId,
-      "vNetId"       -> fp.vNetId
-    )
-  }
-
-  implicit val jsonNoCParams = new Writes[NoCParams] {
-    def writes(np: NoCParams) = Json.obj(
-      "topology"     -> np.topology.getClass().getName(),
-      // channelParamGen is a function
-      "ingresses"    -> np.ingresses,
-      "egresses"     -> np.egresses,
-      // routerParams is a function
-      // vNetBlocking is a function
-      "flows"        -> np.flows,
-      // routing relation omitted
-      "nocName"      -> np.nocName
-    )
-  }
-
   implicit val jsonUserRouterParams = new Writes[UserRouterParams] {
     def writes(urp: UserRouterParams) = Json.obj(
       "payloadBits"    -> urp.payloadBits,
@@ -92,49 +66,46 @@ object JSONConverters {
     )
   }
 
-  implicit val jsonIngressChannelParams = new Writes[IngressChannelParams] {
-    def writes(icp: IngressChannelParams) = Json.obj(
-      "ingressId"   -> icp.ingressId,
-      "destId"      -> icp.destId,
-      // possibleFlows omitted
-      "vNetId"      -> icp.vNetId,
-      "payloadBits" -> icp.payloadBits
-
+  implicit val jsonFlowParams = new Writes[FlowParams] {
+    def writes(fp: FlowParams) = Json.obj(
+      "ingressId"    -> fp.ingressId,
+      "egressId"     -> fp.egressId,
+      "vNetId"       -> fp.vNetId
     )
   }
 
-  implicit val jsonEgressChannelParams = new Writes[EgressChannelParams] {
-    def writes(ecp: EgressChannelParams) = Json.obj(
-      "egressId"   -> ecp.egressId,
-      "srcId"      -> ecp.srcId,
-      // possibleFlows omitted
-      "payloadBits" -> ecp.payloadBits
-    )
-  }
+  implicit val jsonNoCParams = new Writes[NoCParams] {
+    def writes(nocParams: NoCParams) = {
+      val nNodes = nocParams.topology.nNodes
+      val channelParams = Seq.tabulate(nNodes, nNodes) { case (i,j) =>
+        if (nocParams.topology.topo(i, j)) {
+          val cP = nocParams.channelParamGen(i, j)
+          Some(UserChannelParamsWrapper(
+            srcId = i,
+            destId = j,
+            userChannelParams = cP,
+          ))
+        } else {
+          None
+        }
+      }.flatten.flatten
 
-  implicit val routerParams = new Writes[RouterParams] {
-    def writes(rp: RouterParams) = Json.obj(
-      "nodeId"   -> rp.nodeId,
-      "nIngress" -> rp.nIngress,
-      "nEgress"  -> rp.nEgress,
-      "user"     -> rp.user
-    )
-  }
+      val routerParams = (0 until nNodes).map { i =>
+        nocParams.routerParams(i)
+      }
 
-  implicit val jsonInternalNoCParams = new Writes[InternalNoCParams] {
-    def writes(inp: InternalNoCParams) = Json.obj(
-      "userParams"       -> inp.userParams,
-      "nVirtualNetworks" -> inp.nVirtualNetworks,
-      // routing relation omitted
-      "channelParams"    -> inp.channelParams,
-      "ingressParams"    -> inp.ingressParams,
-      "egressParams"     -> inp.egressParams,
-      "routerParams"     -> inp.routerParams
-    )
-  }
-
-  def printAsJson(inp: InternalNoCParams): JsValue = {
-    Json.toJson(inp)
+      Json.obj(
+      "topology"     -> nocParams.topology.getClass().getName(),
+      "channelParams" -> channelParams,
+      "ingresses"    -> nocParams.ingresses,
+      "egresses"     -> nocParams.egresses,
+      "routerParams" -> routerParams,
+      // vNetBlocking is a function
+      "flows"        -> nocParams.flows,
+      "routingRelation" -> routingRelation.getClass().getName(),
+      "nocName"      -> nocParams.nocName
+      )
+    }
   }
 
   def printAsJson(np: NoCParams): JsValue = {
