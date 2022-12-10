@@ -23,6 +23,7 @@ case class UserChannelParams(
   channelGen: Parameters => ChannelOutwardNode => ChannelOutwardNode =
     p => u => u,
   crossingType: ClockCrossingType = NoCrossing,
+  useOutputQueues: Boolean = true,
   srcSpeedup: Int = 1,
   destSpeedup: Int = 1
 ) {
@@ -97,7 +98,8 @@ case class ChannelParams(
   virtualChannelParams: Seq[VirtualChannelParams],
   srcSpeedup: Int,
   destSpeedup: Int,
-  channelGen: Parameters => ChannelOutwardNode => ChannelOutwardNode = { p => u => u }
+  channelGen: Parameters => ChannelOutwardNode => ChannelOutwardNode = { p => u => u },
+  useOutputQueues: Boolean,
 ) extends BaseChannelParams {
   val nVirtualChannels = virtualChannelParams.size
   val maxBufferSize = virtualChannelParams.map(_.bufferSize).max
@@ -127,7 +129,8 @@ object ChannelParams {
       channelGen = user.channelGen,
       virtualChannelParams = user.virtualChannelParams.zipWithIndex.map { case (vP, vc) =>
         VirtualChannelParams(srcId, destId, vc, vP.bufferSize, Set[FlowRoutingInfo]())
-      }
+      },
+      useOutputQueues = user.useOutputQueues
     )
   }
 }

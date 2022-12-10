@@ -294,6 +294,7 @@ case class TileLinkProtocolParams(
   edgeOutNodes: Seq[Int]
 ) extends ProtocolParams with TLFieldHelper {
   // END: TileLinkProtocolParams
+  require(edgesIn.size == edgeInNodes.size && edgesOut.size == edgeOutNodes.size)
   val wideBundle = TLBundleParameters.union(edgesIn.map(_.bundle) ++ edgesOut.map(_.bundle))
   val inputIdRanges = TLXbar.mapInputIds(edgesIn.map(_.client))
   val outputIdRanges = TLXbar.mapOutputIds(edgesOut.map(_.manager))
@@ -404,16 +405,30 @@ abstract class TLNoCModuleImp(outer: LazyModule) extends LazyModuleImp(outer) {
   val edgesIn: Seq[TLEdge]
   val edgesOut: Seq[TLEdge]
   val nodeMapping: DiplomaticNetworkNodeMapping
+  val nocName: String
   lazy val inNames  = nodeMapping.genUniqueName(edgesIn.map(_.master.masters.map(_.name)))
   lazy val outNames = nodeMapping.genUniqueName(edgesOut.map(_.slave.slaves.map(_.name)))
-  lazy val edgeInNodes = inNames.map(n => nodeMapping.getNodeIn(n))
-  lazy val edgeOutNodes = outNames.map(n => nodeMapping.getNodeOut(n))
+  lazy val edgeInNodes = nodeMapping.getNodesIn(inNames)
+  lazy val edgeOutNodes = nodeMapping.getNodesOut(outNames)
   lazy val protocolParams = TileLinkProtocolParams(
     edgesIn = edgesIn,
     edgesOut = edgesOut,
-    edgeInNodes = edgeInNodes,
-    edgeOutNodes = edgeOutNodes
+    edgeInNodes = edgeInNodes.flatten,
+    edgeOutNodes = edgeOutNodes.flatten
   )
+  def printNodeMappings() {
+    println(s"Constellation: TLNoC $nocName inwards mapping:")
+    for ((n, i) <- inNames zip edgeInNodes) {
+      val node = i.map(_.toString).getOrElse("X")
+      println(s"  $node <- $n")
+    }
+
+    println(s"Constellation: TLNoC $nocName outwards mapping:")
+    for ((n, i) <- outNames zip edgeOutNodes) {
+      val node = i.map(_.toString).getOrElse("X")
+      println(s"  $node <- $n")
+    }
+  }
 }
 
 // Instantiates a private TLNoC. Replaces the TLXbar
@@ -422,15 +437,17 @@ case class TLNoCParams(
   nodeMappings: DiplomaticNetworkNodeMapping,
   nocParams: NoCParams = NoCParams()
 )
-class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLNoCLike {
+class TLNoC(params: TLNoCParams, name: String = "test")(implicit p: Parameters) extends TLNoCLike {
   // END: TLNoCParams
   lazy val module = new TLNoCModuleImp(this) {
     val (io_in, edgesIn) = node.in.unzip
     val (io_out, edgesOut) = node.out.unzip
     val nodeMapping = params.nodeMappings
+    val nocName = name
 
+    printNodeMappings()
     val noc = Module(new ProtocolNoC(ProtocolNoCParams(
-      params.nocParams.copy(hasCtrl = false),
+      params.nocParams.copy(hasCtrl = false, nocName=name),
       Seq(protocolParams)
     )))
 
@@ -445,16 +462,14 @@ class TLNoC(params: TLNoCParams)(implicit p: Parameters) extends TLNoCLike {
 
 
 // Maps this interconnect onto a global NoC
-case class TLGlobalNoCParams(
-  nodeMappings: DiplomaticNetworkNodeMapping
-)
-
-class TLGlobalNoC(params: TLNoCParams)(implicit p: Parameters) extends TLNoCLike {
+class TLGlobalNoC(params: TLNoCParams, name: String = "test")(implicit p: Parameters) extends TLNoCLike {
   lazy val module = new TLNoCModuleImp(this) with CanAttachToGlobalNoC {
     val (io_in, edgesIn) = node.in.unzip
     val (io_out, edgesOut) = node.out.unzip
     val nodeMapping = params.nodeMappings
+    val nocName = name
 
+    printNodeMappings()
     val io_global = IO(Flipped(protocolParams.genIO()))
     io_global match {
       case protocol: TileLinkInterconnectInterface => {

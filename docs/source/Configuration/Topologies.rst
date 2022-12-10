@@ -70,7 +70,7 @@ their own topology.
 | ``Mesh2D``                | | ``nX``: Extent in X-dimension  | |topo_mesh|        |
 |                           | | ``nY``: Extent in Y-dimension  |                    |
 +---------------------------+----------------------------------+--------------------+
-| ``UnidirectionalTorus2D`` | | ``nX``: Extent in X-dimension  | |topo_unitorus1d|  |
+| ``UnidirectionalTorus2D`` | | ``nX``: Extent in X-dimension  | |topo_unitorus2d|  |
 |                           | | ``nY``: Extent in Y-dimension  |                    |
 +---------------------------+----------------------------------+--------------------+
 | ``BidirectionalTorus2D``  | | ``nX``: Extent in X-dimension  | |topo_bitorus2d|   |

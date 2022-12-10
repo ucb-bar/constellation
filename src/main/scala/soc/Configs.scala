@@ -64,6 +64,24 @@ class WithCbusNoC(tlnocParams: TLNoCParams) extends Config((site, here, up) => {
   }
 })
 
+class WithPbusNoC(tlnocParams: TLNoCParams, globalNoC: Boolean = false) extends Config((site, here, up) => {
+  case TLNetworkTopologyLocated(InSubsystem) => {
+    up(TLNetworkTopologyLocated(InSubsystem), site).map(topo => {
+      topo match {
+        case j: TLBusWrapperTopology => {
+          new TLBusWrapperTopology(j.instantiations.map(inst => inst match {
+            case (PBUS, pbus_params: PeripheryBusParams) =>
+              (PBUS, ConstellationPeripheryBusParams(pbus_params, tlnocParams, globalNoC))
+            case a => a
+          }), j.connections)
+        }
+        case x => x
+      }
+    })
+  }
+})
+
+
 class WithGlobalNoC(params: GlobalNoCParams) extends Config((site, here, up) => {
   case GlobalNoCKey => params
 })

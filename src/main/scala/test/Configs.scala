@@ -181,7 +181,7 @@ class TestConfig16 extends NoCTesterConfig(NoCTesterParams(
     flows           = Seq.tabulate(10, 10) { (s, d) => FlowParams(s, d, 0) }.flatten,
     routingRelation = UnidirectionalTorus1DDatelineRouting()
   ),
-  inputPacketStallProbability = 0.9
+  inputPacketStallProbability = 0.95
 ))
 class TestConfig17 extends NoCTesterConfig(NoCTesterParams(NoCParams(
   topology        = BidirectionalTorus1D(2),
@@ -427,7 +427,8 @@ class TestConfig41 extends NoCTesterConfig(NoCTesterParams(NoCParams(
 )))
 class TestConfig42 extends NoCTesterConfig(NoCTesterParams(NoCParams(
   topology        = Mesh2D(4, 4),
-  channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(2) }),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(2) },
+    useOutputQueues = false),
   routerParams    = (i) => UserRouterParams(combineRCVA=true, combineSAST=true),
   ingresses       = (0 until 16).map { i => UserIngressParams(i) },
   egresses        = (0 until 16).map { i => UserEgressParams(i) },
@@ -505,7 +506,8 @@ class TestConfig49 extends NoCTesterConfig(NoCTesterParams(NoCParams(
 )))
 class TestConfig50 extends NoCTesterConfig(NoCTesterParams(NoCParams(
   topology        = Mesh2D(3, 3),
-  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(3) }),
+  channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(3) },
+    useOutputQueues = false),
   ingresses       = (0 until 9).map { i => UserIngressParams(i) },
   egresses        = (0 until 9).map { i => UserEgressParams(i) },
   flows           = Seq.tabulate(9, 9) { (s, d) =>
@@ -547,7 +549,8 @@ class TestConfig53 extends NoCTesterConfig(NoCTesterParams(
 class TestConfig54 extends NoCTesterConfig(NoCTesterParams(
   NoCParams(
     topology        = UnidirectionalTorus2D(5, 5),
-    channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(4) }),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(4) },
+      useOutputQueues = false),
     ingresses       = (0 until 25).map { i => UserIngressParams(i) },
     egresses        = (0 until 25).map { i => UserEgressParams(i) },
     flows           = Seq.tabulate(25, 25) { (s, d) => FlowParams(s, d, 0) }.flatten,
@@ -645,7 +648,9 @@ class TestConfig63 extends NoCTesterConfig(NoCTesterParams(
 class TestConfig64 extends NoCTesterConfig(NoCTesterParams(
   NoCParams(
     topology        = TerminalRouter(Mesh2D(4, 4)),
-    channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) }),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(4) { UserVirtualChannelParams(5) },
+      useOutputQueues = false,
+    ),
     routerParams    = (i) => UserRouterParams(coupleSAVA=true),
     ingresses       = (0 until 4).map { i => UserIngressParams(i) },
     egresses        = (4 until 16).map { i => UserEgressParams(i) },
