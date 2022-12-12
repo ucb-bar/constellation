@@ -23,6 +23,8 @@ libraryDependencies ++= (if (standalone) {
   Nil
 })
 
+libraryDependencies += "com.typesafe.play" %% "play-json" % "2.9.3"
+
 addCompilerPlugin("edu.berkeley.cs" % "chisel3-plugin"
   % (if (standalone) "3.5.2" else "3.5.1") cross CrossVersion.full)
 
@@ -35,4 +37,3 @@ Test / testGrouping := (Test / testGrouping).value.flatMap { group =>
    }
 }
 concurrentRestrictions := Seq(Tags.limit(Tags.ForkedTestGroup, 72))
-
