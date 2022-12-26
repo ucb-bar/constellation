@@ -31,6 +31,16 @@ case class UnidirectionalLine(n: Int, skips: Seq[(Int, Int)] = Nil) extends Phys
   val plotter = new LinePlotter(this)
 }
 
+/** A network where ingresses connect to nodes [0, nIngress - 1] and egresses connect to [nIngress, nIngress * 2 - 1].
+    Power Eval node is at index nIngress
+    You should connect only 1 ingress/egress to each node. */
+case class PowerEvalTopology(nIngress: Int) extends PhysicalTopology {
+  val nNodes = nIngress * 2
+  val middleNode = nIngress
+  def topo(src: Int, dest: Int) = src < dest && (dest == middleNode || src == middleNode)
+  val plotter = new LinePlotter(this)
+}
+
 /** A network where sequential nodes are connected bidirectionally */
 case class BidirectionalLine(n: Int) extends PhysicalTopology {
   val nNodes = n

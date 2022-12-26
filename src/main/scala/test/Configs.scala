@@ -975,6 +975,19 @@ class EvalTestConfig2by2Mesh extends NoCEvalConfig(NoCEvalParams(
   )
 ))
 
+class EvalTestPowerEvalTopology extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(4),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(1) { UserVirtualChannelParams(1) }),
+    ingresses       = (0 until 4).map { i => UserIngressParams(i) },
+    egresses        = (4 until 8).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(4, 4) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+
 class EvalTestConfig00 extends NoCEvalConfig(NoCEvalParams(
   requiredThroughput = 0.79,
   flows              = (s, d) => 1.0,

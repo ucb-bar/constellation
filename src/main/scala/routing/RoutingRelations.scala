@@ -108,6 +108,16 @@ object AllLegalRouting {
   }
 }
 
+object PowerEvalTopologyRouting {
+  def apply() = (topo: PhysicalTopology) => new RoutingRelation(topo) {
+    def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+      // flow.egressNode is destination. Route either to middle node (node > than srcNode) or dest (flow.egressNode)
+      val middleNode = topo.nNodes / 2
+      (nxtC.dst == middleNode) || (nxtC.dst == flow.egressNode)
+    }
+  }
+}
+
 object UnidirectionalLineRouting {
   def apply() = (topo: PhysicalTopology) => new RoutingRelation(topo) {
     def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
