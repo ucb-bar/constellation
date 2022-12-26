@@ -29,7 +29,8 @@ class EvalNoCChiselTester(implicit val p: Parameters) extends Module {
 
 abstract class BaseNoCTest(
   gen: Parameters => Module,
-  configs: Seq[Config]) extends AnyFlatSpec with ChiselScalatestTester {
+  configs: Seq[Config],
+  extraVerilatorFlags: Seq[String] = Nil) extends AnyFlatSpec with ChiselScalatestTester {
   behavior of "NoC"
 
   configs.foreach { config =>
@@ -38,8 +39,7 @@ abstract class BaseNoCTest(
       test(gen(p))
       .withAnnotations(Seq(
         VerilatorBackendAnnotation,
-        VerilatorFlags(Seq(
-          "../../../src/main/resources/csrc/netrace/netrace.o")),
+        VerilatorFlags(extraVerilatorFlags),
         VerilatorCFlags(Seq(
           "-DNO_VPI",
           "-fpermissive"))
@@ -52,7 +52,7 @@ abstract class BaseNoCTest(
 abstract class NoCTest(configs: Seq[Config]) extends BaseNoCTest(p => new NoCChiselTester()(p), configs)
 abstract class TLNoCTest(configs: Seq[Config]) extends BaseNoCTest(p => new TLNoCChiselTester()(p), configs)
 abstract class AXI4NoCTest(configs: Seq[Config]) extends BaseNoCTest(p => new AXI4NoCChiselTester()(p), configs)
-abstract class EvalNoCTest(configs: Seq[Config]) extends BaseNoCTest(p => new EvalNoCChiselTester()(p), configs)
+abstract class EvalNoCTest(configs: Seq[Config]) extends BaseNoCTest(p => new EvalNoCChiselTester()(p), configs, Seq("../../../src/main/resources/csrc/netrace/netrace.o"))
 
 
 // these tests allow you to run an infividual config

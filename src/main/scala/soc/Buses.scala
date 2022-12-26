@@ -43,10 +43,10 @@ class ConstellationSystemBus(
 
   private val system_bus_noc = if (useGlobalNoC) {
     context.asInstanceOf[CanHaveGlobalNoC].globalNoCDomain {
-      LazyModule(new TLGlobalNoC(noc_params))
+      LazyModule(new TLGlobalNoC(noc_params, name))
     }
   } else {
-    LazyModule(new TLNoC(noc_params.copy(nocParams=noc_params.nocParams.copy(nocName=name))))
+    LazyModule(new TLNoC(noc_params, name))
   }
   val inwardNode: TLInwardNode = (system_bus_noc.node :=* TLFIFOFixer(TLFIFOFixer.allVolatile)
     :=* replicator.map(_.node).getOrElse(TLTempNode()))
@@ -82,10 +82,10 @@ class ConstellationMemoryBus(mbus_params: MemoryBusParams, noc_params: TLNoCPara
 
   private val memory_bus_noc = if (useGlobalNoC) {
     context.asInstanceOf[CanHaveGlobalNoC].globalNoCDomain {
-      LazyModule(new TLGlobalNoC(noc_params))
+      LazyModule(new TLGlobalNoC(noc_params, name))
     }
   } else {
-    LazyModule(new TLNoC(noc_params.copy(nocParams=noc_params.nocParams.copy(nocName=name))))
+    LazyModule(new TLNoC(noc_params, name))
   }
   val inwardNode: TLInwardNode =
     replicator.map(memory_bus_noc.node :*=* TLFIFOFixer(TLFIFOFixer.all) :*=* _.node)
@@ -99,11 +99,12 @@ class ConstellationMemoryBus(mbus_params: MemoryBusParams, noc_params: TLNoCPara
 
 case class ConstellationPeripheryBusParams(
   pbusParams: PeripheryBusParams,
-  tlNoCParams: TLNoCParams
+  tlNoCParams: TLNoCParams,
+  useGlobalNoC: Boolean = false
 ) extends TLBusWrapperInstantiationLike {
   def instantiate(context: HasTileLinkLocations, loc: Location[TLBusWrapper]
   )(implicit p: Parameters): ConstellationPeripheryBus = {
-    val constellation = LazyModule(new ConstellationPeripheryBus(pbusParams, tlNoCParams, loc.name))
+    val constellation = LazyModule(new ConstellationPeripheryBus(pbusParams, tlNoCParams, loc.name, useGlobalNoC, context))
 
     constellation.suggestName(loc.name)
     context.tlBusWrapperLocationMap += (loc -> constellation)
@@ -111,7 +112,7 @@ case class ConstellationPeripheryBusParams(
   }
 }
 
-class ConstellationPeripheryBus(pbus_params: PeripheryBusParams, noc_params: TLNoCParams, name: String)
+class ConstellationPeripheryBus(pbus_params: PeripheryBusParams, noc_params: TLNoCParams, name: String, useGlobalNoC: Boolean, context: HasTileLinkLocations)
   (implicit p: Parameters) extends TLBusWrapper(pbus_params, name) {
 
   private val replicator = pbus_params.replication.map(r => LazyModule(new RegionReplicator(r)))
@@ -120,11 +121,20 @@ class ConstellationPeripheryBus(pbus_params: PeripheryBusParams, noc_params: TLN
     addressPrefixNexusNode
   }
 
+  def genNoC(): TLNoCLike = if (useGlobalNoC) {
+    context.asInstanceOf[CanHaveGlobalNoC].globalNoCDomain {
+      val noc = LazyModule(new TLGlobalNoC(noc_params, name))
+      noc
+    }
+  } else {
+    val noc = LazyModule(new TLNoC(noc_params, name))
+    noc
+  }
+
   private val fixer = LazyModule(new TLFIFOFixer(TLFIFOFixer.all))
   private val node: TLNode = pbus_params.atomics.map { pa =>
     val in_xbar = LazyModule(new TLXbar)
-    val out_noc = LazyModule(new TLNoC(
-      noc_params.copy(nocParams=noc_params.nocParams.copy(nocName=name))))
+    val out_noc = genNoC()
     val fixer_node = replicator.map(fixer.node :*= _.node).getOrElse(fixer.node)
     (out_noc.node
       :*= fixer_node
@@ -134,7 +144,7 @@ class ConstellationPeripheryBus(pbus_params: PeripheryBusParams, noc_params: TLN
         } .getOrElse { TLAtomicAutomata(arithmetic = pa.arithmetic) })
       :*= in_xbar.node)
   } .getOrElse {
-    val noc = LazyModule(new TLNoC(noc_params))
+    val noc = genNoC()
     noc.node :*= fixer.node
   }
 

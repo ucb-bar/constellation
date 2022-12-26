@@ -22,19 +22,25 @@ case class DiplomaticNetworkNodeMapping(
   def genUniqueName(all: Seq[Seq[String]]) = {
     all.zipWithIndex.map { case (strs, i) =>
       val matches = all.take(i).map(_.mkString).count(_ == strs.mkString)
-      strs.map(s => s"${s}[${matches}]").mkString(",")
+      strs.map(s => s"${s}[${matches}]").mkString(",") + "|"
     }
   }
-  def getNode(nodeMapping: ListMap[String, Int], l: String): Int = {
+  def getNode(l: String, nodeMapping: ListMap[String, Int]): Option[Int] = {
     val keys = nodeMapping.keys.toSeq
     val matches = keys.map(k => l.contains(k))
-    require(matches.filter(i => i).size == 1, s"unable to find valid mapping for $l\n$nodeMapping")
-    val index = matches.indexWhere(i => i)
-    nodeMapping.values.toSeq(index)
+    if (matches.filter(i => i).size == 1) {
+      val index = matches.indexWhere(i => i)
+      Some(nodeMapping.values.toSeq(index))
+    } else {
+      None
+    }
   }
-  def getNodeIn(l: String): Int = getNode(inNodeMapping, l)
-  def getNodeOut(l: String): Int = getNode(outNodeMapping, l)
+  def getNodes(ls: Seq[String], mapping: ListMap[String, Int]): Seq[Option[Int]] = {
+    ls.map(l => getNode(l, mapping))
+  }
 
+  def getNodesIn(ls: Seq[String]): Seq[Option[Int]] = getNodes(ls, inNodeMapping)
+  def getNodesOut(ls: Seq[String]): Seq[Option[Int]] = getNodes(ls, outNodeMapping)
 }
 
 // BEGIN: ProtocolParams

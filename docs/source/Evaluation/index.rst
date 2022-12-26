@@ -2,14 +2,14 @@ Evaluation Framework
 ==========================
 
 Constellation includes a lightweight C++ evaluation framework, designed to support future advanced traffic models.
-Currently, the framework supports measuring per-floe latency and bandwidth using two traffic models.
+Currently, the framework supports measuring per-flow latency and bandwidth using two traffic models.
 
  - An injection-rate based model, with per-flow injection rates
  - A trace-driven model, which loads Netrace trace files
 
 Running a Simple Evaluation
 -----------------------------
-Traffic eveluations are best run in Chipyard-standalone mode.
+Traffic evaluations are best run in Chipyard-standalone mode.
 
 .. code-block:: shell
 
