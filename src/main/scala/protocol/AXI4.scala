@@ -58,7 +58,7 @@ class AXI4MasterToNoC(
   val requestWIO = awIn.io.deq.bits.out.asBools
 
   val in = Wire(new AXI4Bundle(wideBundle))
-  in :<> io.axi4
+  in :<>= io.axi4
 
   // Handle size = 1 gracefully (Chisel3 empty range is broken)
   def trim(id: UInt, size: Int) = if (size <= 1) 0.U else id(log2Ceil(size)-1, 0)
@@ -185,7 +185,7 @@ class AXI4SlaveToNoC(
   val out = Wire(new AXI4Bundle(wideBundle))
   val out_w_in_head = Wire(Bool())
   val out_w_in_id = Wire(UInt((1 << wideBundle.idBits).W))
-  io.axi4 :<> out
+  io.axi4 :<>= out
 
   // Grab the port ID mapping
   val inputIdRanges = AXI4Xbar.mapInputIds(edgesIn.map(_.master))
