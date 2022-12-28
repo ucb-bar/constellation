@@ -198,15 +198,16 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
 
     when (o.flit.fire()) {
 
-      assert(rob_valids(rob_idx), s"out[$i] unexpected response")
-      assert(rob_payload(rob_idx).asUInt === o.flit.bits.payload.asUInt, s"out[$i] incorrect payload");
-      assert(o.flit.bits.ingress_id === rob_ingress_id(rob_idx), s"out[$i] incorrect source")
-      assert(i.U === rob_egress_id(rob_idx), s"out[$i] incorrect destination")
-      assert(rob_flits_returned(rob_idx) < rob_n_flits(rob_idx), s"out[$i] too many flits returned")
+      assert(rob_valids(rob_idx), cf"out[${i.toString}] unexpected response")
+      assert(rob_payload(rob_idx).asUInt === o.flit.bits.payload.asUInt, cf"out[${i.toString}] incorrect payload");
+      assert(o.flit.bits.ingress_id === rob_ingress_id(rob_idx), cf"out[${i.toString}] incorrect source")
+      assert(i.U === rob_egress_id(rob_idx), cf"out[${i.toString}] incorrect destination")
+      assert(rob_flits_returned(rob_idx) < rob_n_flits(rob_idx), cf"out[${i.toString}] too many flits returned")
       assert((!packet_valid && o.flit.bits.head) || rob_idx === packet_rob_idx)
 
       when (o.flit.bits.head && enable_print_latency) {
-        printf(s"%d, $i, %d\n", rob_ingress_id(rob_idx), tsc - out_payload.tsc)
+        val fmtStr = s"%d, $i, %d\n"
+        printf(fmtStr, rob_ingress_id(rob_idx), tsc - out_payload.tsc)
       }
 
       rob_flits_returned(rob_idx) := rob_flits_returned(rob_idx) + 1.U
@@ -225,7 +226,7 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
 
   for (i <- 0 until robSz) {
     when (rob_valids(i)) {
-      assert(tsc - rob_tscs(i) < (16 << 10).U, s"ROB Entry $i took too long")
+      assert(tsc - rob_tscs(i) < (16 << 10).U, cf"ROB Entry ${i.toString} took too long")
     }
   }
 }
