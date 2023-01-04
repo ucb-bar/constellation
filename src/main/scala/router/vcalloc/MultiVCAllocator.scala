@@ -28,7 +28,7 @@ abstract class MultiVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) e
       Mux(io.channel_status(i)(j).available,
         outputAllocPolicy(
           oP.channelRoutingInfos(j),
-          io.req.map(_.bits.flow),
+          io.req.map(_.bits.flow).toSeq,
           in_allocs.map(_(i)(j)),
           io.out_allocs(i)(j).alloc
         ),
@@ -52,7 +52,7 @@ abstract class MultiVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) e
   for (i <- 0 until allOutParams.size) {
     (0 until allOutParams(i).nVirtualChannels).map { j =>
       io.out_allocs(i)(j).alloc := in_allocs.map(_(i)(j)).orR && io.channel_status(i)(j).available
-      io.out_allocs(i)(j).flow := Mux1H(out_allocs(i)(j).asUInt, io.req.map(_.bits.flow))
+      io.out_allocs(i)(j).flow := Mux1H(out_allocs(i)(j).asUInt, io.req.map(_.bits.flow).toSeq)
     }
   }
 }

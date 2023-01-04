@@ -18,9 +18,10 @@ class IngressUnit(
 )
   (implicit p: Parameters) extends AbstractInputUnit(cParam, outParams, egressParams)(p) {
 
-  val io = IO(new AbstractInputUnitIO(cParam, outParams, egressParams) {
+  class IngressUnitIO extends AbstractInputUnitIO(cParam, outParams, egressParams) {
     val in = Flipped(Decoupled(new IngressFlit(cParam.payloadBits)))
-  })
+  }
+  val io = IO(new IngressUnitIO)
 
   val route_buffer = Module(new Queue(new Flit(cParam.payloadBits), 2))
   val route_q = Module(new Queue(new RouteComputerResp(outParams, egressParams), 2,
@@ -119,8 +120,9 @@ class IngressUnit(
   out_bundle.valid := vcalloc_buffer.io.deq.fire()
   out_bundle.bits.flit := vcalloc_buffer.io.deq.bits
   out_bundle.bits.flit.virt_channel_id := 0.U
-  val out_channel_oh = vcalloc_q.io.deq.bits.vc_sel.map(_.reduce(_||_))
-  out_bundle.bits.out_virt_channel := Mux1H(out_channel_oh, vcalloc_q.io.deq.bits.vc_sel.map(v => OHToUInt(v)))
+  val out_channel_oh = vcalloc_q.io.deq.bits.vc_sel.map(_.reduce(_||_)).toSeq
+  out_bundle.bits.out_virt_channel := Mux1H(out_channel_oh,
+    vcalloc_q.io.deq.bits.vc_sel.map(v => OHToUInt(v)).toSeq)
 
   io.debug.va_stall := io.vcalloc_req.valid && !io.vcalloc_req.ready
   io.debug.sa_stall := io.salloc_req(0).valid && !io.salloc_req(0).ready

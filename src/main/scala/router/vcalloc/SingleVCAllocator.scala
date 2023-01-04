@@ -29,17 +29,17 @@ abstract class SingleVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) 
       }
     }
 
-    in_arb_vals(i) := io.req(i).valid && in_arb_reqs(i).map(_.orR).orR
+    in_arb_vals(i) := io.req(i).valid && in_arb_reqs(i).map(_.orR).toSeq.orR
   }
 
   // Input arbitration
   io.req.foreach(_.ready := false.B)
   val in_alloc = Wire(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) }))
-  val in_flow = Mux1H(in_arb_sel, io.req.map(_.bits.flow))
-  val in_vc = Mux1H(in_arb_sel, io.req.map(_.bits.in_vc))
+  val in_flow = Mux1H(in_arb_sel, io.req.map(_.bits.flow).toSeq)
+  val in_vc = Mux1H(in_arb_sel, io.req.map(_.bits.in_vc).toSeq)
   val in_vc_sel = Mux1H(in_arb_sel, in_arb_reqs)
   in_alloc := Mux(in_arb_vals.orR,
-    inputAllocPolicy(in_flow, in_vc_sel, OHToUInt(in_arb_sel), in_vc, io.req.map(_.fire).orR),
+    inputAllocPolicy(in_flow, in_vc_sel, OHToUInt(in_arb_sel), in_vc, io.req.map(_.fire).toSeq.orR),
     0.U.asTypeOf(in_alloc))
 
   // send allocation to inputunits
