@@ -986,7 +986,7 @@ class EvalTestPowerEvalTopology extends NoCEvalConfig(NoCEvalParams(
   nocParams = NoCParams(
     topology        = PowerEvalTopology(4),
     channelParamGen = (a, b) => UserChannelParams(Seq.fill(1) { UserVirtualChannelParams(1) }),
-    ingresses       = (0 until 4).map { i => UserIngressParams(i) },
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
     egresses        = (4 until 8).map { i => UserEgressParams(i) },
     flows           = Seq.tabulate(4, 4) { (s, d) => FlowParams(s, d, 0) }.flatten,
     routingRelation = PowerEvalTopologyRouting()
@@ -1033,7 +1033,7 @@ class EvalTestConfig02 extends NoCEvalConfig(NoCEvalParams(
     routingRelation  = UnidirectionalLineRouting()
   )
 ))
-class EvalTestConfigUnidirectionalTorus1D extends NoCEvalConfig(NoCEvalParams(
+class EvalTestConfig03 extends NoCEvalConfig(NoCEvalParams(
   requiredThroughput    = 0.9,
   requiredMedianLatency = 30,
   requiredMaxLatency    = 175,
@@ -1118,5 +1118,775 @@ class EvalTestConfig08 extends NoCEvalConfig(NoCEvalParams(
     egresses         = (0 until 16).map { i => UserEgressParams((i % 8) + 8 * 3) },
     flows            = Seq.tabulate(16, 16) { (s, d) => FlowParams(s, d, 0) }.flatten,
     routingRelation  = ButterflyRouting()
+  )
+))
+
+// CONFIGS FROM ORION: default_selected_power_45 CSV
+class ORIONPowerEvalTopology0 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(3) }),
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
+    egresses        = (4 until 9).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology1 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(7) }),
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
+    egresses        = (4 until 9).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology2 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(7),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(7) }),
+    ingresses       = (0 until 7).map { i => UserIngressParams(i) },
+    egresses        = (6 until 13).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(7, 7) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology3 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(2),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(7) }),
+    ingresses       = (0 until 2).map { i => UserIngressParams(i) },
+    egresses        = (1 until 3).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology4 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(7),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(9) }),
+    ingresses       = (0 until 7).map { i => UserIngressParams(i) },
+    egresses        = (6 until 13).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(7, 7) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology5 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(2),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(9) }),
+    ingresses       = (0 until 2).map { i => UserIngressParams(i) },
+    egresses        = (1 until 3).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology6 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(5) }),
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
+    egresses        = (4 until 9).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology7 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(7),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(9) }),
+    ingresses       = (0 until 7).map { i => UserIngressParams(i) },
+    egresses        = (6 until 13).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(7, 7) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology8 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(5) }),
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
+    egresses        = (4 until 9).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology9 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(2),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(3) }),
+    ingresses       = (0 until 2).map { i => UserIngressParams(i) },
+    egresses        = (1 until 3).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology10 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(2),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(7) { UserVirtualChannelParams(7) }),
+    ingresses       = (0 until 2).map { i => UserIngressParams(i) },
+    egresses        = (1 until 3).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology11 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(5) }),
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
+    egresses        = (4 until 9).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology12 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(5) }),
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
+    egresses        = (4 until 9).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology13 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(7),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(7) { UserVirtualChannelParams(9) }),
+    ingresses       = (0 until 7).map { i => UserIngressParams(i) },
+    egresses        = (6 until 13).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(7, 7) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology14 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(7) { UserVirtualChannelParams(9) }),
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
+    egresses        = (4 until 9).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology15 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(2),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(9) }),
+    ingresses       = (0 until 2).map { i => UserIngressParams(i) },
+    egresses        = (1 until 3).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology16 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(2),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(3) }),
+    ingresses       = (0 until 2).map { i => UserIngressParams(i) },
+    egresses        = (1 until 3).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology17 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(3),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(5) }),
+    ingresses       = (0 until 3).map { i => UserIngressParams(i) },
+    egresses        = (2 until 5).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(3, 3) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology18 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(3),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(9) }),
+    ingresses       = (0 until 3).map { i => UserIngressParams(i) },
+    egresses        = (2 until 5).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(3, 3) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology19 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(9) }),
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
+    egresses        = (4 until 9).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology20 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(2),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(7) { UserVirtualChannelParams(5) }),
+    ingresses       = (0 until 2).map { i => UserIngressParams(i) },
+    egresses        = (1 until 3).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology21 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(3),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(5) }),
+    ingresses       = (0 until 3).map { i => UserIngressParams(i) },
+    egresses        = (2 until 5).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(3, 3) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology22 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(7),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(7) }),
+    ingresses       = (0 until 7).map { i => UserIngressParams(i) },
+    egresses        = (6 until 13).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(7, 7) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology23 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(2),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(7) { UserVirtualChannelParams(7) }),
+    ingresses       = (0 until 2).map { i => UserIngressParams(i) },
+    egresses        = (1 until 3).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology24 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(3),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(9) }),
+    ingresses       = (0 until 3).map { i => UserIngressParams(i) },
+    egresses        = (2 until 5).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(3, 3) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology25 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(2),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(9) }),
+    ingresses       = (0 until 2).map { i => UserIngressParams(i) },
+    egresses        = (1 until 3).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology26 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(7) }),
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
+    egresses        = (4 until 9).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology27 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(7) }),
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
+    egresses        = (4 until 9).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology28 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(7),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(7) { UserVirtualChannelParams(7) }),
+    ingresses       = (0 until 7).map { i => UserIngressParams(i) },
+    egresses        = (6 until 13).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(7, 7) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology29 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(5) }),
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
+    egresses        = (4 until 9).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology30 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(7) }),
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
+    egresses        = (4 until 9).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology31 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(3),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(5) }),
+    ingresses       = (0 until 3).map { i => UserIngressParams(i) },
+    egresses        = (2 until 5).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(3, 3) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology32 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(7),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(7) { UserVirtualChannelParams(7) }),
+    ingresses       = (0 until 7).map { i => UserIngressParams(i) },
+    egresses        = (6 until 13).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(7, 7) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology33 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(2),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(7) { UserVirtualChannelParams(5) }),
+    ingresses       = (0 until 2).map { i => UserIngressParams(i) },
+    egresses        = (1 until 3).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology34 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(2),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(9) }),
+    ingresses       = (0 until 2).map { i => UserIngressParams(i) },
+    egresses        = (1 until 3).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology35 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(7),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(7) }),
+    ingresses       = (0 until 7).map { i => UserIngressParams(i) },
+    egresses        = (6 until 13).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(7, 7) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology36 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(7),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(9) }),
+    ingresses       = (0 until 7).map { i => UserIngressParams(i) },
+    egresses        = (6 until 13).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(7, 7) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology37 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(7),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(3) }),
+    ingresses       = (0 until 7).map { i => UserIngressParams(i) },
+    egresses        = (6 until 13).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(7, 7) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology38 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(9) }),
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
+    egresses        = (4 until 9).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology39 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(2),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(9) }),
+    ingresses       = (0 until 2).map { i => UserIngressParams(i) },
+    egresses        = (1 until 3).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology40 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(7),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(9) }),
+    ingresses       = (0 until 7).map { i => UserIngressParams(i) },
+    egresses        = (6 until 13).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(7, 7) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology41 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(9) }),
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
+    egresses        = (4 until 9).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology42 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(3) }),
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
+    egresses        = (4 until 9).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology43 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(9) }),
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
+    egresses        = (4 until 9).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology44 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(7),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(7) { UserVirtualChannelParams(5) }),
+    ingresses       = (0 until 7).map { i => UserIngressParams(i) },
+    egresses        = (6 until 13).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(7, 7) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology45 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(2),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(3) }),
+    ingresses       = (0 until 2).map { i => UserIngressParams(i) },
+    egresses        = (1 until 3).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology46 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(7),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(7) { UserVirtualChannelParams(5) }),
+    ingresses       = (0 until 7).map { i => UserIngressParams(i) },
+    egresses        = (6 until 13).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(7, 7) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology47 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(7),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(9) }),
+    ingresses       = (0 until 7).map { i => UserIngressParams(i) },
+    egresses        = (6 until 13).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(7, 7) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology48 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(2),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(3) }),
+    ingresses       = (0 until 2).map { i => UserIngressParams(i) },
+    egresses        = (1 until 3).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology49 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(3),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(3) }),
+    ingresses       = (0 until 3).map { i => UserIngressParams(i) },
+    egresses        = (2 until 5).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(3, 3) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology50 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(5) }),
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
+    egresses        = (4 until 9).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology51 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(3),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(9) }),
+    ingresses       = (0 until 3).map { i => UserIngressParams(i) },
+    egresses        = (2 until 5).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(3, 3) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology52 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(2),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(3) }),
+    ingresses       = (0 until 2).map { i => UserIngressParams(i) },
+    egresses        = (1 until 3).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology53 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(7) }),
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
+    egresses        = (4 until 9).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology54 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(2),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(7) { UserVirtualChannelParams(3) }),
+    ingresses       = (0 until 2).map { i => UserIngressParams(i) },
+    egresses        = (1 until 3).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology55 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(7),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(7) { UserVirtualChannelParams(3) }),
+    ingresses       = (0 until 7).map { i => UserIngressParams(i) },
+    egresses        = (6 until 13).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(7, 7) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology56 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(3),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(9) }),
+    ingresses       = (0 until 3).map { i => UserIngressParams(i) },
+    egresses        = (2 until 5).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(3, 3) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology57 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(5) }),
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
+    egresses        = (4 until 9).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology58 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(3) }),
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
+    egresses        = (4 until 9).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology59 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(2),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(5) }),
+    ingresses       = (0 until 2).map { i => UserIngressParams(i) },
+    egresses        = (1 until 3).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology60 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(2),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(7) }),
+    ingresses       = (0 until 2).map { i => UserIngressParams(i) },
+    egresses        = (1 until 3).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(2, 2) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology61 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(3) }),
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
+    egresses        = (4 until 9).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology62 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(7),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(5) { UserVirtualChannelParams(9) }),
+    ingresses       = (0 until 7).map { i => UserIngressParams(i) },
+    egresses        = (6 until 13).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(7, 7) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+  )
+))
+class ORIONPowerEvalTopology63 extends NoCEvalConfig(NoCEvalParams(
+  requiredThroughput = 0.1,
+  flows = (s, d) => 1.0,
+  nocParams = NoCParams(
+    topology        = PowerEvalTopology(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(9) }),
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
+    egresses        = (4 until 9).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
   )
 ))

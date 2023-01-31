@@ -33,10 +33,11 @@ case class UnidirectionalLine(n: Int, skips: Seq[(Int, Int)] = Nil) extends Phys
 
 /** A network where ingresses connect to nodes [0, nIngress - 1] and egresses connect to [nIngress, nIngress * 2 - 1].
     Power Eval node is at index nIngress
+    2 * (n - 1) + 1 = 2n - 2 + 1 = 2n - 1
     You should connect only 1 ingress/egress to each node. */
 case class PowerEvalTopology(nIngress: Int) extends PhysicalTopology {
-  val nNodes = nIngress * 2
-  val middleNode = nIngress
+  val nNodes = (nIngress * 2) - 1
+  val middleNode = nIngress - 1
   def topo(src: Int, dest: Int) = src < dest && (dest == middleNode || src == middleNode)
   val plotter = new LinePlotter(this)
 }
