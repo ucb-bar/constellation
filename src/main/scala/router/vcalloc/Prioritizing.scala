@@ -55,7 +55,7 @@ trait Prioritizing { this: VCAllocator =>
           val inId = e.inId << (ingressIdBits + egressIdBits)
           val ingress = e.flow.ingressId << egressIdBits
           val egress = e.flow.egressId
-          (BitPat((inVId | inId | ingress | egress).U), BitPat((1 << e.prio).U))
+          (BitPat((inVId | inId | ingress | egress).U), BitPat((1 << e.prio).U(nPrios.W)))
         }
         Mux(in(i)(j), DecodeLogic(addr, BitPat.dontCare(nPrios), lookup), 0.U(nPrios.W))
       }}
