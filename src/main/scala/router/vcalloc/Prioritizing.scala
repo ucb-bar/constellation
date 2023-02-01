@@ -48,14 +48,22 @@ trait Prioritizing { this: VCAllocator =>
         }}
       }}.flatten.flatten.flatten.flatten
 
-      val addr = (((inVId << (log2Ceil(allInParams.size))) | inId) << flow.getWidth) | flow.asUInt
+      class LookupBundle extends Bundle {
+        val vid = UInt((inVId.getWidth max 1).W)
+        val id = UInt((inId.getWidth max 1).W)
+        val flow = new FlowRoutingBundle
+      }
+
+      val addr_bundle = Wire(new LookupBundle)
+      val addr = addr_bundle.asUInt
+      addr_bundle.vid := inVId
+      addr_bundle.id := inId
+      addr_bundle.flow := flow
+
       val in_prio = (0 until allOutParams.size).map { i => (0 until allOutParams(i).nVirtualChannels).map { j =>
         val lookup = prio_map.filter(t => t.outId == i && t.outVId == j).map { e =>
-          val inVId = e.inVId << (log2Ceil(allInParams.size) + ingressIdBits + egressIdBits)
-          val inId = e.inId << (ingressIdBits + egressIdBits)
-          val ingress = e.flow.ingressId << egressIdBits
-          val egress = e.flow.egressId
-          (BitPat((inVId | inId | ingress | egress).U), BitPat((1 << e.prio).U(nPrios.W)))
+          val ref = (((e.inVId << addr_bundle.id.getWidth) | e.inId) << addr_bundle.flow.getWidth) | e.flow.asLiteral(flow)
+          (BitPat(ref.U), BitPat((1 << e.prio).U(nPrios.W)))
         }
         Mux(in(i)(j), DecodeLogic(addr, BitPat.dontCare(nPrios), lookup), 0.U(nPrios.W))
       }}

@@ -55,6 +55,17 @@ case class FlowRoutingInfo(
       f.ingress_node_id === ingressNodeId.U &&
       f.egress_node_id === egressNodeId.U)
   }
+  def asLiteral(b: FlowRoutingBundle): BigInt = {
+    Seq(
+      (vNetId        , b.vnet_id),
+      (ingressNode   , b.ingress_node),
+      (ingressNodeId , b.ingress_node_id),
+      (egressNode    , b.egress_node),
+      (egressNodeId  , b.egress_node_id)
+    ).foldLeft(0)((l, t) => {
+      (l << t._2.getWidth) | t._1
+    })
+  }
 }
 
 class FlowRoutingBundle(implicit val p: Parameters) extends Bundle with HasNoCParams {
