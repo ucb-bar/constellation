@@ -49,7 +49,8 @@ class TLNoCTester(implicit p: Parameters) extends LazyModule {
     DisableMonitors { implicit p => ram.node := TLFragmenter(4, 256) } := TLDelayer(tParams.delay) := noc.node
   }
 
-  lazy val module = new LazyModuleImp(this) {
+  lazy val module = new Impl
+  class Impl extends LazyModuleImp(this) {
     val io = IO(new Bundle {
       val finished = Output(Bool())
     })

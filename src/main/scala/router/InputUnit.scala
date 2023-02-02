@@ -164,9 +164,11 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   val nVirtualChannels = cParam.nVirtualChannels
   val virtualChannelParams = cParam.virtualChannelParams
 
-  val io = IO(new AbstractInputUnitIO(cParam, outParams, egressParams) {
+  class InputUnitIO extends AbstractInputUnitIO(cParam, outParams, egressParams) {
     val in = Flipped(new Channel(cParam.asInstanceOf[ChannelParams]))
-  })
+  }
+  val io = IO(new InputUnitIO)
+
   val g_i :: g_r :: g_v :: g_a :: g_c :: Nil = Enum(5)
 
   class InputState extends Bundle {
@@ -329,8 +331,8 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     salloc_out.valid := salloc_arb.io.out(i).fire()
     salloc_out.vid := OHToUInt(salloc_arb.io.chosen_oh(i))
     val vc_sel = Mux1H(salloc_arb.io.chosen_oh(i), states.map(_.vc_sel))
-    val channel_oh = vc_sel.map(_.reduce(_||_))
-    val virt_channel = Mux1H(channel_oh, vc_sel.map(v => OHToUInt(v)))
+    val channel_oh = vc_sel.map(_.reduce(_||_)).toSeq
+    val virt_channel = Mux1H(channel_oh, vc_sel.map(v => OHToUInt(v)).toSeq)
     when (salloc_arb.io.out(i).fire()) {
       salloc_out.out_vid := virt_channel
       salloc_out.flit.payload := Mux1H(salloc_arb.io.chosen_oh(i), input_buffer.io.deq.map(_.bits.payload))

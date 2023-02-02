@@ -1,9 +1,8 @@
 name := "constellation"
 version := "0.1"
-scalaVersion := "2.12.12"
+scalaVersion := "2.13.10"
 
 scalacOptions ++= Seq(
-  "-Xsource:2.11",
   "-language:reflectiveCalls",
   "-deprecation",
   "-feature"
@@ -14,9 +13,9 @@ val standalone = sys.env.get("CONSTELLATION_STANDALONE").isDefined
 // SNAPSHOT repositories
 libraryDependencies ++= (if (standalone) {
   Seq(
-    "edu.berkeley.cs" %% "rocketchip" % "1.2-SNAPSHOT",
-    "edu.berkeley.cs" %% "api-config-chipsalliance" % "1.2-SNAPSHOT",
-    "edu.berkeley.cs" %% "rocket-macros" % "1.2-SNAPSHOT",
+    "edu.berkeley.cs" %% "rocketchip" % "1.6.0",
+    "edu.berkeley.cs" %% "api-config-chipsalliance" % "1.6.0",
+    "edu.berkeley.cs" %% "rocket-macros" % "1.6.0",
     "edu.berkeley.cs" %% "chiseltest" % "0.5.4" % "test"
   )
 } else {
@@ -24,7 +23,7 @@ libraryDependencies ++= (if (standalone) {
 })
 
 addCompilerPlugin("edu.berkeley.cs" % "chisel3-plugin"
-  % (if (standalone) "3.5.2" else "3.5.1") cross CrossVersion.full)
+  % (if (standalone) "3.5.5" else "3.5.5") cross CrossVersion.full)
 
 import Tests._
 
