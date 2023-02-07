@@ -52,9 +52,10 @@ abstract class AbstractOutputUnit(
 class OutputUnit(inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannelParams], cParam: ChannelParams)
   (implicit p: Parameters) extends AbstractOutputUnit(inParams, ingressParams, cParam)(p) {
 
-  val io = IO(new AbstractOutputUnitIO(inParams, ingressParams, cParam) {
+  class OutputUnitIO extends AbstractOutputUnitIO(inParams, ingressParams, cParam) {
     val out = new Channel(cParam.asInstanceOf[ChannelParams])
-  })
+  }
+  val io = IO(new OutputUnitIO)
 
   class OutputState(val bufferSize: Int) extends Bundle {
     val occupied = Bool()

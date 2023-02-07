@@ -337,7 +337,16 @@ case class TileLinkProtocolParams(
           nif_master.io.tilelink.a.valid := false.B
           nif_master.io.tilelink.c.valid := false.B
           nif_master.io.tilelink.e.valid := false.B
-          nif_master.io.tilelink <> protocol.in(i)
+
+          nif_master.io.tilelink.a <> protocol.in(i).a
+          protocol.in(i).d <> nif_master.io.tilelink.d
+
+          if (protocol.in(i).params.hasBCE) {
+            protocol.in(i).b <> nif_master.io.tilelink.b
+            nif_master.io.tilelink.c <> protocol.in(i).c
+            protocol.in(i).e <> nif_master.io.tilelink.e
+          }
+
           ingresses(i * 3 + 0).flit <> nif_master.io.flits.a
           ingresses(i * 3 + 1).flit <> nif_master.io.flits.c
           ingresses(i * 3 + 2).flit <> nif_master.io.flits.e
@@ -354,7 +363,16 @@ case class TileLinkProtocolParams(
           nif_slave.io.tilelink := DontCare
           nif_slave.io.tilelink.b.valid := false.B
           nif_slave.io.tilelink.d.valid := false.B
-          nif_slave.io.tilelink <> protocol.out(i)
+
+          protocol.out(i).a <> nif_slave.io.tilelink.a
+          nif_slave.io.tilelink.d <> protocol.out(i).d
+
+          if (protocol.out(i).params.hasBCE) {
+            nif_slave.io.tilelink.b <> protocol.out(i).b
+            protocol.out(i).c <> nif_slave.io.tilelink.c
+            nif_slave.io.tilelink.e <> protocol.out(i).e
+          }
+
           ingresses(i * 2 + 0 + edgesIn.size * 3).flit <> nif_slave.io.flits.b
           ingresses(i * 2 + 1 + edgesIn.size * 3).flit <> nif_slave.io.flits.d
           nif_slave.io.flits.a <> egresses(i * 3 + 0 + edgesIn.size * 2).flit

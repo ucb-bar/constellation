@@ -203,7 +203,8 @@ class Router(
       util_ctr := util_ctr + fire
       fired := fired || fire
       when (sample_rate =/= 0.U && debug_sample === sample_rate - 1.U && fired) {
-        printf(s"nocsample %d $s %d\n", debug_tsc, util_ctr);
+        val fmtStr = s"nocsample %d $s %d\n"
+        printf(fmtStr, debug_tsc, util_ctr);
         fired := fire
       }
     }

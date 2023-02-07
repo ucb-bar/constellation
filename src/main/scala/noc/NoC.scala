@@ -81,8 +81,8 @@ class NoC(nocParams: NoCParams)(implicit p: Parameters) extends LazyModule {
     val routerI = routers.find(_.nodeId == i)
     val routerJ = routers.find(_.nodeId == j)
     if (routerI.isDefined && routerJ.isDefined) {
-      val sourceNodes = routerI.get.sourceNodes.find(_.destId == j)
-      val destNodes = routerJ.get.destNodes.filter(_.destParams.srcId == i)
+      val sourceNodes: Seq[ChannelSourceNode] = routerI.get.sourceNodes.filter(_.destId == j)
+      val destNodes: Seq[ChannelDestNode] = routerJ.get.destNodes.filter(_.destParams.srcId == i)
       require (sourceNodes.size == destNodes.size)
       (sourceNodes zip destNodes).foreach { case (src, dst) =>
         val channelParam = allChannelParams.find(c => c.srcId == i && c.destId == j).get
@@ -136,7 +136,8 @@ class NoC(nocParams: NoCParams)(implicit p: Parameters) extends LazyModule {
   }
 
   println(s"Constellation: $nocName Finished parameter validation")
-  lazy val module = new LazyModuleImp(this) {
+  lazy val module = new Impl
+  class Impl extends LazyModuleImp(this) {
     println(s"Constellation: $nocName Starting NoC RTL generation")
     val io = IO(new NoCTerminalIO(allIngressParams, allEgressParams)(iP) {
       val router_clocks = Vec(nNodes, Input(new ClockBundle(ClockBundleParameters())))

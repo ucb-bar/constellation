@@ -44,7 +44,7 @@ For a **Minimal-Standalone** installation, Rocketchip must be manually installed
 
    git clone https://github.com/chipsalliance/rocket-chip.git
    cd rocket-chip
-   git checkout 045d03c54bce7636401b1b4b17d6a3677356dfe0
+   git checkout 3b5fb3c043ccc2cea81ed7a44b295f4652d0ba02
    git submodule update --init --recursive
    sbt "publishLocal"
    sbt "project api-config-chipsalliance; set publishArtifact := true; publishLocal"

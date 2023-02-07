@@ -35,6 +35,7 @@ class TrafficEvalIngress(ingress_id: Int, config_str: String) extends BlackBox(M
     }
   })
   addResource("/csrc/netrace/netrace.h")
+  addResource("/csrc/netrace/netrace.c")
   addResource("/vsrc/TrafficEval.v")
   addResource("/csrc/TrafficEval.cpp")
   addResource("/csrc/TrafficEval.h")
@@ -61,6 +62,7 @@ class TrafficEvalEgress(egress_id: Int, config_str: String) extends BlackBox(Map
     val fatal = Output(Bool())
   })
   addResource("/csrc/netrace/netrace.h")
+  addResource("/csrc/netrace/netrace.c")
   addResource("/vsrc/TrafficEval.v")
   addResource("/csrc/TrafficEval.cpp")
   addResource("/csrc/TrafficEval.h")
