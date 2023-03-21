@@ -23,7 +23,7 @@ libraryDependencies ++= (if (standalone) {
 })
 
 addCompilerPlugin("edu.berkeley.cs" % "chisel3-plugin"
-  % (if (standalone) "3.5.5" else "3.5.5") cross CrossVersion.full)
+  % (if (standalone) "3.5.6" else "3.5.6") cross CrossVersion.full)
 
 import Tests._
 

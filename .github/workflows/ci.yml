@@ -36,10 +36,10 @@ jobs:
         git submodule update --init --recursive
         git clone https://github.com/chipsalliance/rocket-chip.git
         cd rocket-chip
-        git checkout 3b5fb3c043ccc2cea81ed7a44b295f4652d0ba02
+        git checkout 4fbd2f238db36b2862319e94c2f96d63bd52c98b
         git submodule update --init --recursive
         sbt "publishLocal"
-        sbt "project api-config-chipsalliance; set publishArtifact := true; publishLocal"
+        sbt "project cde; set publishArtifact := true; publishLocal"
         sbt "project rocket-macros; set publishArtifact := true; publishLocal"
         sbt "project hardfloat; set publishArtifact := true; publishLocal"
         cd ../
