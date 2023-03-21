@@ -2,7 +2,7 @@ package constellation.channel
 
 import chisel3._
 import chisel3.internal.sourceinfo.SourceInfo
-import freechips.rocketchip.config.{Parameters, Field}
+import org.chipsalliance.cde.config.{Parameters, Field}
 import freechips.rocketchip.diplomacy._
 
 case class EmptyParams()

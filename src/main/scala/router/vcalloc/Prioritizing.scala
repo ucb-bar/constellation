@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import chisel3.util.random.{LFSR}
 
-import freechips.rocketchip.config.{Field, Parameters}
+import org.chipsalliance.cde.config.{Field, Parameters}
 import freechips.rocketchip.rocket.{DecodeLogic}
 import freechips.rocketchip.util._
 

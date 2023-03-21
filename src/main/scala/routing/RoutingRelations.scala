@@ -2,7 +2,7 @@ package constellation.routing
 
 import scala.math.{min, max, pow}
 import scala.collection.mutable.HashMap
-import freechips.rocketchip.config.{Parameters}
+import org.chipsalliance.cde.config.{Parameters}
 import scala.collection.immutable.ListMap
 import constellation.topology.{PhysicalTopology, Mesh2DLikePhysicalTopology, HierarchicalTopology}
 

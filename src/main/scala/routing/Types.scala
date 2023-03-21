@@ -2,7 +2,7 @@ package constellation.routing
 
 import chisel3._
 import chisel3.util._
-import freechips.rocketchip.config.{Parameters}
+import org.chipsalliance.cde.config.{Parameters}
 
 import constellation.noc.{HasNoCParams}
 import constellation.channel.{Flit}

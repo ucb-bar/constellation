@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 
 
-import freechips.rocketchip.config.{Field, Parameters}
+import org.chipsalliance.cde.config.{Field, Parameters}
 import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp, BundleBridgeSink, InModuleBody}
 import freechips.rocketchip.util.ElaborationArtefacts
 import freechips.rocketchip.prci._

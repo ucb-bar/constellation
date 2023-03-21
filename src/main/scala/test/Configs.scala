@@ -1,6 +1,6 @@
 package constellation.test
 
-import freechips.rocketchip.config.{Field, Parameters, Config}
+import org.chipsalliance.cde.config.{Field, Parameters, Config}
 import constellation.routing._
 import constellation.topology._
 import constellation.noc.{NoCParams}
