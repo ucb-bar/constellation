@@ -65,7 +65,11 @@ trait Prioritizing { this: VCAllocator =>
           val ref = (((e.inVId << addr_bundle.id.getWidth) | e.inId) << addr_bundle.flow.getWidth) | e.flow.asLiteral(flow)
           (BitPat(ref.U), BitPat((1 << e.prio).U(nPrios.W)))
         }
-        Mux(in(i)(j), DecodeLogic(addr, BitPat.dontCare(nPrios), lookup), 0.U(nPrios.W))
+        if (lookup.map(_._2).distinct.size == 1) {
+          Mux(in(i)(j), BitPat.bitPatToUInt(lookup.head._2), 0.U(nPrios.W))
+        } else {
+          Mux(in(i)(j), DecodeLogic(addr, BitPat.dontCare(nPrios), lookup), 0.U(nPrios.W))
+        }
       }}
 
       val mask = RegInit(0.U(w.W))
