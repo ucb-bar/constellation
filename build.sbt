@@ -14,7 +14,7 @@ val standalone = sys.env.get("CONSTELLATION_STANDALONE").isDefined
 libraryDependencies ++= (if (standalone) {
   Seq(
     "edu.berkeley.cs" %% "rocketchip" % "1.6.0",
-    "edu.berkeley.cs" %% "api-config-chipsalliance" % "1.6.0",
+    "edu.berkeley.cs" %% "cde" % "1.6.0",
     "edu.berkeley.cs" %% "rocket-macros" % "1.6.0",
     "edu.berkeley.cs" %% "chiseltest" % "0.5.4" % "test"
   )
@@ -23,7 +23,7 @@ libraryDependencies ++= (if (standalone) {
 })
 
 addCompilerPlugin("edu.berkeley.cs" % "chisel3-plugin"
-  % (if (standalone) "3.5.5" else "3.5.5") cross CrossVersion.full)
+  % (if (standalone) "3.5.6" else "3.5.6") cross CrossVersion.full)
 
 import Tests._
 

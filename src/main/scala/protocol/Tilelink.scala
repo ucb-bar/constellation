@@ -7,7 +7,7 @@ import constellation.channel._
 import constellation.noc._
 import constellation.soc.{CanAttachToGlobalNoC}
 
-import freechips.rocketchip.config._
+import org.chipsalliance.cde.config._
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.util._
 import freechips.rocketchip.tilelink._

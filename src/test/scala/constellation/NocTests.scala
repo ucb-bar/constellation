@@ -1,6 +1,6 @@
 package constellation
 
-import chipsalliance.rocketchip.config.{Config, Parameters}
+import org.chipsalliance.cde.config.{Config, Parameters}
 import chiseltest._
 import chiseltest.simulator.{VerilatorFlags, VerilatorCFlags, SimulatorDebugAnnotation, VerilatorLinkFlags}
 import org.scalatest.flatspec.AnyFlatSpec
