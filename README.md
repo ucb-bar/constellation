@@ -14,6 +14,20 @@ Constellation is a Chisel NoC RTL generator framework designed to provide the co
 
 ![Constellation SoC](docs/source/diagrams/bigsoc.svg?raw=true)
 
+Publications
+--------------
+
+[Constellation: An Open-Source SoC-Capable NoC Generator](https://ieeexplore.ieee.org/abstract/document/9911299/)
+```
+@inproceedings{zhao2022constellation,
+  title={Constellation: An Open-Source SoC-Capable NoC Generator},
+  author={Zhao, Jerry and Agrawal, Animesh and Nikolic, Borivoje and Asanovi{\'c}, Krste},
+  booktitle={2022 15th IEEE/ACM International Workshop on Network on Chip Architectures (NoCArc)},
+  pages={1--7},
+  year={2022},
+  organization={IEEE}
+}
+```
 
 Acknowledgements
 ------------------
