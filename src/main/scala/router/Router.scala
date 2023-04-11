@@ -2,6 +2,7 @@ package constellation.router
 
 import chisel3._
 import chisel3.util._
+// import chiseltest._
 
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.diplomacy._
@@ -202,11 +203,16 @@ class Router(
       val fired = RegInit(false.B)
       util_ctr := util_ctr + fire
       fired := fired || fire
-      when (sample_rate =/= 0.U && debug_sample === sample_rate - 1.U && fired) {
+      when (sample_rate =/= 0.U && debug_sample === sample_rate - 1.U) {
         val fmtStr = s"nocsample %d $s %d\n"
         printf(fmtStr, debug_tsc, util_ctr);
         fired := fire
       }
+      val fvrst_0_force_reset = RegInit(0.U(1.W))
+      fvrst_0_force_reset := fvrst_0_force_reset | reset.asBool.asUInt
+      dontTouch(fvrst_0_force_reset)
+      chisel3.cover(util_ctr === 2.U && fvrst_0_force_reset > 0.U)
+      // assert(util_ctr === 0.U || util_ctr >= past(util_ctr))
     }
 
     destNodes.map(_.in(0)).foreach { case (in, edge) => in.flit.map { f =>
