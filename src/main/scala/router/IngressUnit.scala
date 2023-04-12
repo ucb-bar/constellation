@@ -74,7 +74,7 @@ class IngressUnit(
 
   val vcalloc_buffer = Module(new Queue(new Flit(cParam.payloadBits), 2))
   val vcalloc_q = Module(new Queue(new VCAllocResp(outParams, egressParams),
-    1, pipe=true))
+    2, pipe=true))
 
   vcalloc_buffer.io.enq.bits := route_buffer.io.deq.bits
 

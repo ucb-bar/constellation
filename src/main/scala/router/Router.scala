@@ -88,6 +88,8 @@ class Router(
   def egressParams = module.egressParams
 
   lazy val module = new LazyModuleImp(this) with HasRouterInputParams with HasRouterOutputParams {
+    val fvrst_0_force_reset = RegInit(1.U(1.W))
+    dontTouch(fvrst_0_force_reset)
 
     val (io_in, edgesIn) = destNodes.map(_.in(0)).unzip
     val (io_out, edgesOut) = sourceNodes.map(_.out(0)).unzip
@@ -198,7 +200,7 @@ class Router(
     val sample_rate = PlusArg("noc_util_sample_rate", width=20)
     when (debug_sample === sample_rate - 1.U) { debug_sample := 0.U }
 
-    def sample(fire: Bool, s: String) = {
+    def sample(fire: Bool, s: String) : UInt = {
       val util_ctr = RegInit(0.U(64.W))
       val fired = RegInit(false.B)
       util_ctr := util_ctr + fire
@@ -208,22 +210,53 @@ class Router(
         printf(fmtStr, debug_tsc, util_ctr);
         fired := fire
       }
-      val fvrst_0_force_reset = RegInit(0.U(1.W))
-      fvrst_0_force_reset := fvrst_0_force_reset | reset.asBool.asUInt
-      dontTouch(fvrst_0_force_reset)
-      chisel3.cover(util_ctr === 2.U && fvrst_0_force_reset > 0.U)
-      // assert(util_ctr === 0.U || util_ctr >= past(util_ctr))
+      // chisel3.cover(util_ctr === 2.U && fvrst_0_force_reset > 0.U)
+      util_ctr
     }
 
-    destNodes.map(_.in(0)).foreach { case (in, edge) => in.flit.map { f =>
+    val in_ctrs = destNodes.map(_.in(0)).map { case (in, edge) => in.flit.map { f =>
       sample(f.fire(), s"${edge.cp.srcId} $nodeId")
     } }
-    ingressNodes.map(_.in(0)).foreach { case (in, edge) =>
+    val ingress_ctrs = ingressNodes.map(_.in(0)).map { case (in, edge) =>
       sample(in.flit.fire(), s"i${edge.cp.asInstanceOf[IngressChannelParams].ingressId} $nodeId")
     }
-    egressNodes.map(_.out(0)).foreach { case (out, edge) =>
+    val egress_ctrs = egressNodes.map(_.out(0)).map { case (out, edge) =>
       sample(out.flit.fire(), s"$nodeId e${edge.cp.asInstanceOf[EgressChannelParams].egressId}")
     }
+    val aggregate_in_ctr = in_ctrs.flatten.foldLeft(0.U(64.W))(_ + _)
+    val aggregate_ingress_ctr = ingress_ctrs.foldLeft(0.U(64.W))(_ + _)
+    val aggregate_egress_ctr = egress_ctrs.foldLeft(0.U(64.W))(_ + _)
+
+    // Calculate and cover the desired utilization rate
+    val desired_util_ctrs = RegInit(VecInit(Seq.fill(10)(0.U(32.W))))
+    def pulse(n: UInt) = {
+      def ctr(max: UInt) = {
+        val ctr = RegInit(1.asUInt(max.getWidth.W))
+        ctr := Mux(ctr === max, 0.U, ctr + 1.U)
+        ctr
+      }
+      ctr(n - 1.U) === 0.U
+    }
+    val pulse_10 = pulse(10.U)
+    //if (!in_ctrs.isEmpty && !ingress_ctrs.isEmpty && !egress_ctrs.isEmpty) { // TODO: this is rlly hacky way of only selecting middle node in power eval topology
+      for (a <- 1 to 10 ) {
+        desired_util_ctrs(a - 1) := Mux(pulse_10,
+                                        desired_util_ctrs(a-1) + a.U,
+                                        desired_util_ctrs(a-1))
+        if (!in_ctrs.isEmpty) {
+          chisel3.cover(aggregate_in_ctr === desired_util_ctrs(a-1)
+                        && desired_util_ctrs(a-1) > 0.U
+                        && fvrst_0_force_reset > 0.U
+                        && pulse_10, s"vighnesh")
+        }
+        if (!ingress_ctrs.isEmpty) {
+          chisel3.cover(aggregate_ingress_ctr === desired_util_ctrs(a-1)
+                        && desired_util_ctrs(a-1) > 0.U
+                        && fvrst_0_force_reset > 0.U
+                        && pulse_10, s"cover_ingress_util_$a")
+        }
+      }
+    //}
 
   }
 }

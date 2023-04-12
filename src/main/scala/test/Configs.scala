@@ -35,6 +35,15 @@ class TestSingleNode extends NoCTesterConfig(NoCTesterParams(NoCParams(
   routingRelation = UnidirectionalLineRouting()
 )))
 
+class ThORIONPowerEvalTopology0 extends NoCTesterConfig(NoCTesterParams(NoCParams(
+    topology        = PowerEvalTopology(5),
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(3) }),
+    ingresses       = (0 until 5).map { i => UserIngressParams(i) },
+    egresses        = (4 until 9).map { i => UserEgressParams(i) },
+    flows           = Seq.tabulate(5, 5) { (s, d) => FlowParams(s, d, 0) }.flatten,
+    routingRelation = PowerEvalTopologyRouting()
+)))
+
 class TestThreeNodeLine extends NoCTesterConfig(NoCTesterParams(NoCParams(
   topology        = UnidirectionalLine(3),
   channelParamGen = (a, b) => UserChannelParams(Seq.fill(1) { UserVirtualChannelParams(1) }),
