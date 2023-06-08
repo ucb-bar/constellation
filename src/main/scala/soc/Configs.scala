@@ -13,6 +13,7 @@ import constellation.noc.NoCParams
 import constellation.protocol.TLNoCParams
 import scala.collection.immutable.{ListMap}
 
+/** System bus */
 class WithSbusNoC(tlnocParams: TLNoCParams, globalNoC: Boolean = false) extends Config((site, here, up) => {
   case TLNetworkTopologyLocated(InSubsystem) => {
     up(TLNetworkTopologyLocated(InSubsystem), site).map(topo => {
@@ -30,6 +31,7 @@ class WithSbusNoC(tlnocParams: TLNoCParams, globalNoC: Boolean = false) extends 
   }
 })
 
+/** Memory bus */
 class WithMbusNoC(tlnocParams: TLNoCParams, globalNoC: Boolean = false) extends Config((site, here, up) => {
   case TLNetworkTopologyLocated(InSubsystem) => {
     up(TLNetworkTopologyLocated(InSubsystem), site).map(topo => {
@@ -47,6 +49,7 @@ class WithMbusNoC(tlnocParams: TLNoCParams, globalNoC: Boolean = false) extends 
   }
 })
 
+/** Control bus */
 class WithCbusNoC(tlnocParams: TLNoCParams) extends Config((site, here, up) => {
   case TLNetworkTopologyLocated(InSubsystem) => {
     up(TLNetworkTopologyLocated(InSubsystem), site).map(topo => {
@@ -64,6 +67,7 @@ class WithCbusNoC(tlnocParams: TLNoCParams) extends Config((site, here, up) => {
   }
 })
 
+/** Peripheral bus */
 class WithPbusNoC(tlnocParams: TLNoCParams, globalNoC: Boolean = false) extends Config((site, here, up) => {
   case TLNetworkTopologyLocated(InSubsystem) => {
     up(TLNetworkTopologyLocated(InSubsystem), site).map(topo => {
