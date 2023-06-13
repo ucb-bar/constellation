@@ -12,7 +12,8 @@ import constellation.noc.{HasNoCParams}
 case class FlowParams(
   ingressId: Int,
   egressId: Int,
-  vNetId: Int
+  vNetId: Int,
+  fifo: Boolean = false
 )
 // END: FlowParams
 

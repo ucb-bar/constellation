@@ -175,6 +175,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
     val g = UInt(3.W)
     val vc_sel = MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) })
     val flow = new FlowRoutingBundle
+    val fifo_deps = UInt(nVirtualChannels.W)
   }
 
   val input_buffer = Module(new InputBuffer(cParam))
@@ -190,6 +191,16 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
 
   val states = Reg(Vec(nVirtualChannels, new InputState))
 
+  val anyFifo = cParam.possibleFlows.map(_.fifo).reduce(_||_)
+  val allFifo = cParam.possibleFlows.map(_.fifo).reduce(_&&_)
+
+  if (anyFifo) {
+    val idle_mask = VecInit(states.map(_.g === g_i)).asUInt
+    for (s <- states)
+      for (i <- 0 until nVirtualChannels)
+        s.fifo_deps := s.fifo_deps & ~idle_mask
+  }
+
   for (i <- 0 until cParam.srcSpeedup) {
     when (io.in.flit(i).fire() && io.in.flit(i).bits.head) {
       val id = io.in.flit(i).bits.virt_channel_id
@@ -204,6 +215,12 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
         }
       }
       states(id).flow := io.in.flit(i).bits.flow
+      if (anyFifo) {
+        val fifo = cParam.possibleFlows.filter(_.fifo).map(_.isFlow(io.in.flit(i).bits.flow)).toSeq.orR
+        states(id).fifo_deps := VecInit(states.zipWithIndex.map { case (s, j) =>
+          s.g =/= g_i && s.flow.asUInt === io.in.flit(i).bits.flow.asUInt && j.U =/= id
+        }).asUInt
+      }
     }
   }
 
@@ -246,7 +263,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
 
   states.zipWithIndex.map { case (s,idx) =>
     if (virtualChannelParams(idx).traversable) {
-      vcalloc_vals(idx) := s.g === g_v
+      vcalloc_vals(idx) := s.g === g_v && s.fifo_deps === 0.U
       vcalloc_reqs(idx).in_vc := idx.U
       vcalloc_reqs(idx).vc_sel := s.vc_sel
       vcalloc_reqs(idx).flow := s.flow
@@ -298,6 +315,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
       r.bits := DontCare
     }
   }
+
   io.debug.sa_stall := PopCount(salloc_arb.io.in.map(r => r.valid && !r.ready))
   io.salloc_req <> salloc_arb.io.out
   when (io.block) {
