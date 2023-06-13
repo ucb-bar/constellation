@@ -409,10 +409,8 @@ abstract class TLNoCLike(implicit p: Parameters) extends LazyModule {
         managers = seq.flatMap { port =>
           require (port.beatBytes == seq(0).beatBytes,
             s"TLNoC (data widths don't match: ${port.managers.map(_.name)} has ${port.beatBytes}B vs ${seq(0).managers.map(_.name)} has ${seq(0).beatBytes}B")
-          val fifoIdMapper = fifoIdFactory()
-          port.managers map { manager => manager.v1copy(
-            fifoId = manager.fifoId.map(fifoIdMapper(_))
-          )}
+          // TileLink NoC does not preserve FIFO-ness, masters to this NoC should instantiate FIFOFixers
+          port.managers map { manager => manager.v1copy(fifoId = None) }
         }
       )
     }

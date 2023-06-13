@@ -49,7 +49,8 @@ case object NoCTesterKey extends Field[NoCTesterParams](NoCTesterParams())
 
 class Payload extends Bundle {
   val tsc         = UInt(32.W)
-  val rob_idx     = UInt(16.W)
+  val rob_idx     = UInt(8.W)
+  val flow_idx    = UInt(8.W)
   val flits_fired = UInt(16.W)
 }
 
@@ -71,6 +72,7 @@ class InputGen(idx: Int, cParams: IngressChannelParams)
   val flits_left = RegInit(0.U(flitIdBits.W))
   val flits_fired = RegInit(0.U(flitIdBits.W))
   val egress = Reg(UInt(log2Ceil(nEgresses).W))
+  val flow = Reg(UInt(log2Ceil(cParams.possibleFlows.size).W))
   val payload = Reg(new Payload)
 
   val can_fire = (flits_left === 0.U) && io.rob_ready
@@ -78,14 +80,17 @@ class InputGen(idx: Int, cParams: IngressChannelParams)
   val packet_remaining = if (p(NoCTesterKey).constPacketSize) maxFlits.U else (LFSR(20) % maxFlits.U)
   val random_flit_delay = (LFSR(20) < (inputFlitStallProbability * (1 << 20)).toInt.U)
   val random_packet_delay = (LFSR(20) < (inputPacketStallProbability * (1 << 20)).toInt.U)
+  val flow_idx = LFSR(20) % cParams.possibleFlows.size.U
+  val flow_ctrs = RegInit(VecInit.fill(cParams.possibleFlows.size) { 0.U(8.W) })
   io.out.valid := !random_packet_delay && flits_left === 0.U && io.rob_ready
   io.out.bits.head := true.B
   io.out.bits.tail := packet_remaining === 0.U
-  io.out.bits.egress_id := VecInit(cParams.possibleFlows.toSeq.map(_.egressId.U))(LFSR(20) % cParams.possibleFlows.size.U)
+  io.out.bits.egress_id := VecInit(cParams.possibleFlows.toSeq.map(_.egressId.U))(flow_idx)
   val out_payload = Wire(new Payload)
   io.out.bits.payload := out_payload.asUInt
   out_payload.tsc := io.tsc
   out_payload.rob_idx := io.rob_idx
+  out_payload.flow_idx := flow_ctrs(flow_idx)
   out_payload.flits_fired := 0.U
 
   io.n_flits := packet_remaining + 1.U
@@ -95,6 +100,7 @@ class InputGen(idx: Int, cParams: IngressChannelParams)
     flits_left := packet_remaining
     payload := out_payload
     egress := io.out.bits.egress_id
+    flow := flow_idx
     flits_fired := 1.U
   }
   when (flits_left =/= 0.U) {
@@ -110,7 +116,10 @@ class InputGen(idx: Int, cParams: IngressChannelParams)
       flits_left := flits_left - 1.U
     }
   }
-
+  when (io.out.fire && io.out.bits.tail) {
+    val idx = Mux(io.out.bits.head, flow_idx, flow)
+    flow_ctrs(idx) := flow_ctrs(idx) + 1.U
+  }
 }
 
 class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[EgressChannelParams])(implicit val p: Parameters) extends Module with HasNoCParams {
@@ -196,7 +205,13 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
     val packet_valid = RegInit(false.B)
     val packet_rob_idx = Reg(UInt(log2Ceil(robSz).W))
 
+    val flow_ctrs = RegInit(VecInit.fill(outputParams(i).possibleFlows.size) { 0.U(8.W) })
     when (o.flit.fire()) {
+      val flows = outputParams(i).possibleFlows.toSeq
+      val fifo = flows.filter(_.fifo).map(_.ingressId.U === o.flit.bits.ingress_id).orR
+      val flow_id = flows.zipWithIndex.map { case (f, fid) =>
+        Mux(f.ingressId.U === o.flit.bits.ingress_id, fid.U, 0.U)
+      }.reduce(_|_)
 
       assert(rob_valids(rob_idx), cf"out[${i.toString}] unexpected response")
       assert(rob_payload(rob_idx).asUInt === o.flit.bits.payload.asUInt, cf"out[${i.toString}] incorrect payload");
@@ -204,6 +219,12 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
       assert(i.U === rob_egress_id(rob_idx), cf"out[${i.toString}] incorrect destination")
       assert(rob_flits_returned(rob_idx) < rob_n_flits(rob_idx), cf"out[${i.toString}] too many flits returned")
       assert((!packet_valid && o.flit.bits.head) || rob_idx === packet_rob_idx)
+      when (fifo && o.flit.bits.tail) {
+        assert(flow_ctrs(flow_id) === o.flit.bits.payload.asTypeOf(new Payload).flow_idx,
+          cf"out[${i.toString}] not fifo")
+        flow_ctrs(flow_id) := flow_ctrs(flow_id) + 1.U
+      }
+
 
       when (o.flit.bits.head && enable_print_latency) {
         val fmtStr = s"%d, $i, %d\n"

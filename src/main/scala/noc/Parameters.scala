@@ -112,7 +112,8 @@ object InternalNoCParams {
         ingressNode=ingressNode,
         egressNode=egressNode,
         ingressNodeId=nocParams.ingresses.take(f.ingressId).count(_.destId == ingressNode),
-        egressNodeId=nocParams.egresses.take(f.egressId).count(_.srcId == egressNode)
+        egressNodeId=nocParams.egresses.take(f.egressId).count(_.srcId == egressNode),
+        fifo = f.fifo
       )
     }
     val ingressParams = nocParams.ingresses.zipWithIndex.map { case (u,i) => {
@@ -174,6 +175,8 @@ object InternalNoCParams {
                   s"Failed to route $flow at $head \n  $stack \n  ${nextChannelParamMap(head.dst)}")
                 require((nexts.toSet & stack.toSet).size == 0,
                   s"$flow, $nexts, $stack")
+                require(!(flow.fifo && nexts.map(_.dst).distinct.size != 1),
+                  s"FIFO flow $flow at $head routes to multiple possible next-nodes \n $nexts")
                 stack = Seq(nexts.head) ++ stack
                 unexplored = nexts.tail.filter(n => !unexplored.contains(n)) ++ unexplored
               } else {

@@ -46,7 +46,8 @@ case class FlowRoutingInfo(
   ingressNode: Int,
   ingressNodeId: Int,
   egressNode: Int,
-  egressNodeId: Int
+  egressNodeId: Int,
+  fifo: Boolean
 ) {
 // END: FlowRoutingInfo
   def isFlow(f: FlowRoutingBundle): Bool = {
