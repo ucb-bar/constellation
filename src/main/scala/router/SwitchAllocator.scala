@@ -27,7 +27,7 @@ class SwitchArbiter(inN: Int, outN: Int, outParams: Seq[ChannelParams], egressPa
   val mask = RegInit(0.U(inN.W))
   val choices = Wire(Vec(outN, UInt(inN.W)))
 
-  var sel = PriorityEncoderOH(Cat(unassigned, unassigned & !mask))
+  var sel = PriorityEncoderOH(Cat(unassigned, unassigned & ~mask))
   for (i <- 0 until outN) {
     choices(i) := sel | (sel >> inN)
     sel = PriorityEncoderOH(unassigned & ~choices(i))
