@@ -43,7 +43,6 @@ abstract class TLChannelToNoC[T <: TLChannel](gen: => T, edge: TLEdge, idToEgres
 
   // convert decoupled to irrevocable
   val q = Module(new Queue(gen, 1, pipe=true, flow=true))
-  q.io.enq <> io.protocol
   val protocol = q.io.deq
 
   val has_body = Wire(Bool())
@@ -78,15 +77,18 @@ abstract class TLChannelFromNoC[T <: TLChannel](gen: => T)(implicit val p: Param
     val flit = Flipped(Decoupled(new EgressFlit(flitWidth)))
   })
 
-  val protocol = io.protocol
+  // Handle size = 1 gracefully (Chisel3 empty range is broken)
+  def trim(id: UInt, size: Int): UInt = if (size <= 1) 0.U else id(log2Ceil(size)-1, 0)
+
+  val protocol = Wire(Decoupled(gen))
   val body_fields = getBodyFields(protocol.bits)
   val const_fields = getConstFields(protocol.bits)
 
   val is_const = RegInit(true.B)
   val const_reg = Reg(UInt(const_fields.map(_.getWidth).sum.W))
   val const = Mux(io.flit.bits.head, io.flit.bits.payload, const_reg)
-  io.flit.ready := (is_const && !io.flit.bits.tail) || io.protocol.ready
-  io.protocol.valid := (!is_const || io.flit.bits.tail) && io.flit.valid
+  io.flit.ready := (is_const && !io.flit.bits.tail) || protocol.ready
+  protocol.valid := (!is_const || io.flit.bits.tail) && io.flit.valid
 
   def assign(i: UInt, sigs: Seq[Data]) = {
     var t = i
@@ -130,16 +132,20 @@ class TLAToNoC(
   val edgeIn: TLEdge,
   val edgesOut: Seq[TLEdge],
   bundle: TLBundleParameters,
-  slaveToAEgress: Int => Int
+  slaveToAEgress: Int => Int,
+  sourceStart: Int
 )(implicit p: Parameters) extends TLChannelToNoC(new TLBundleA(bundle), edgeIn, slaveToAEgress)(p) with HasAddressDecoder {
   has_body := edgeIn.hasData(protocol.bits) || (~protocol.bits.mask =/= 0.U)
   lazy val connectAIO = reacheableIO
   lazy val requestOH = outputPortFn(connectAIO).zipWithIndex.map { case (o, j) =>
     connectAIO(j).B && (unique(connectAIO) || o(protocol.bits.address))
   }
+  q.io.enq <> io.protocol
+  q.io.enq.bits.source := io.protocol.bits.source | sourceStart.U
 }
 
 class TLAFromNoC(edgeOut: TLEdge, bundle: TLBundleParameters)(implicit p: Parameters) extends TLChannelFromNoC(new TLBundleA(bundle))(p) {
+  io.protocol <> protocol
   when (io.flit.bits.head) { io.protocol.bits.mask := ~(0.U(io.protocol.bits.mask.getWidth.W)) }
 }
 
@@ -152,9 +158,12 @@ class TLBToNoC(
   has_body := edgeOut.hasData(protocol.bits) || (~protocol.bits.mask =/= 0.U)
   lazy val inputIdRanges = TLXbar.mapInputIds(edgesIn.map(_.client))
   lazy val requestOH = inputIdRanges.map { i => i.contains(protocol.bits.source) }
+  q.io.enq <> io.protocol
 }
 
-class TLBFromNoC(edgeIn: TLEdge, bundle: TLBundleParameters)(implicit p: Parameters) extends TLChannelFromNoC(new TLBundleB(bundle))(p) {
+class TLBFromNoC(edgeIn: TLEdge, bundle: TLBundleParameters, sourceSize: Int)(implicit p: Parameters) extends TLChannelFromNoC(new TLBundleB(bundle))(p) {
+  io.protocol <> protocol
+  io.protocol.bits.source := trim(protocol.bits.source, sourceSize)
   when (io.flit.bits.head) { io.protocol.bits.mask := ~(0.U(io.protocol.bits.mask.getWidth.W)) }
 }
 
@@ -162,29 +171,41 @@ class TLCToNoC(
   val edgeIn: TLEdge,
   val edgesOut: Seq[TLEdge],
   bundle: TLBundleParameters,
-  slaveToCEgress: Int => Int
+  slaveToCEgress: Int => Int,
+  sourceStart: Int
 )(implicit p: Parameters) extends TLChannelToNoC(new TLBundleC(bundle), edgeIn, slaveToCEgress)(p) with HasAddressDecoder {
   has_body := edgeIn.hasData(protocol.bits)
   lazy val connectCIO = releaseIO
   lazy val requestOH = outputPortFn(connectCIO).zipWithIndex.map {
     case (o, j) => connectCIO(j).B && (unique(connectCIO) || o(protocol.bits.address))
   }
+  q.io.enq <> io.protocol
+  q.io.enq.bits.source := io.protocol.bits.source | sourceStart.U
 }
 
-class TLCFromNoC(edgeOut: TLEdge, bundle: TLBundleParameters)(implicit p: Parameters) extends TLChannelFromNoC(new TLBundleC(bundle))(p)
+class TLCFromNoC(edgeOut: TLEdge, bundle: TLBundleParameters)(implicit p: Parameters) extends TLChannelFromNoC(new TLBundleC(bundle))(p) {
+  io.protocol <> protocol
+}
 
 class TLDToNoC(
   edgeOut: TLEdge,
   edgesIn: Seq[TLEdge],
   bundle: TLBundleParameters,
-  masterToDIngress: Int => Int
+  masterToDIngress: Int => Int,
+  sourceStart: Int
 )(implicit p: Parameters) extends TLChannelToNoC(new TLBundleD(bundle), edgeOut, masterToDIngress)(p) {
   has_body := edgeOut.hasData(protocol.bits)
   lazy val inputIdRanges = TLXbar.mapInputIds(edgesIn.map(_.client))
   lazy val requestOH = inputIdRanges.map { i => i.contains(protocol.bits.source) }
+  q.io.enq <> io.protocol
+  q.io.enq.bits.sink := io.protocol.bits.sink | sourceStart.U
 }
 
-class TLDFromNoC(edgeIn: TLEdge, bundle: TLBundleParameters)(implicit p: Parameters) extends TLChannelFromNoC(new TLBundleD(bundle))(p)
+class TLDFromNoC(edgeIn: TLEdge, bundle: TLBundleParameters, sourceSize: Int)(implicit p: Parameters) extends TLChannelFromNoC(new TLBundleD(bundle))(p)
+{
+  io.protocol <> protocol
+  io.protocol.bits.source := trim(protocol.bits.source, sourceSize)
+}
 
 class TLEToNoC(
   val edgeIn: TLEdge,
@@ -195,8 +216,12 @@ class TLEToNoC(
   has_body := edgeIn.hasData(protocol.bits)
   lazy val outputIdRanges = TLXbar.mapOutputIds(edgesOut.map(_.manager))
   lazy val requestOH = outputIdRanges.map { o => o.contains(protocol.bits.sink) }
+  q.io.enq <> io.protocol
 }
-class TLEFromNoC(edgeOut: TLEdge, bundle: TLBundleParameters)(implicit p: Parameters) extends TLChannelFromNoC(new TLBundleE(bundle))(p)
+class TLEFromNoC(edgeOut: TLEdge, bundle: TLBundleParameters, sourceSize: Int)(implicit p: Parameters) extends TLChannelFromNoC(new TLBundleE(bundle))(p) {
+  io.protocol <> protocol
+  io.protocol.bits.sink := trim(protocol.bits.sink, sourceSize)
+}
 
 class TLMasterToNoC(
   edgeIn: TLEdge, edgesOut: Seq[TLEdge],
@@ -215,22 +240,15 @@ class TLMasterToNoC(
       val e = Decoupled(new IngressFlit(flitWidth))
     }
   })
-  // Handle size = 1 gracefully (Chisel3 empty range is broken)
-  def trim(id: UInt, size: Int): UInt = if (size <= 1) 0.U else id(log2Ceil(size)-1, 0)
-
-  val a = Module(new TLAToNoC(edgeIn, edgesOut, wideBundle, (i) => slaveToEgressOffset(i) + 0))
-  val b = Module(new TLBFromNoC(edgeIn, wideBundle))
-  val c = Module(new TLCToNoC(edgeIn, edgesOut, wideBundle, (i) => slaveToEgressOffset(i) + 1))
-  val d = Module(new TLDFromNoC(edgeIn, wideBundle))
+  val a = Module(new TLAToNoC(edgeIn, edgesOut, wideBundle, (i) => slaveToEgressOffset(i) + 0, sourceStart))
+  val b = Module(new TLBFromNoC(edgeIn, wideBundle, sourceSize))
+  val c = Module(new TLCToNoC(edgeIn, edgesOut, wideBundle, (i) => slaveToEgressOffset(i) + 1, sourceStart))
+  val d = Module(new TLDFromNoC(edgeIn, wideBundle, sourceSize))
   val e = Module(new TLEToNoC(edgeIn, edgesOut, wideBundle, (i) => slaveToEgressOffset(i) + 2))
   a.io.protocol <> io.tilelink.a
-  a.io.protocol.bits.source := io.tilelink.a.bits.source | sourceStart.U
   io.tilelink.b <> b.io.protocol
-  io.tilelink.b.bits.source := trim(b.io.protocol.bits.source, sourceSize)
   c.io.protocol <> io.tilelink.c
-  c.io.protocol.bits.source := io.tilelink.c.bits.source | sourceStart.U
   io.tilelink.d <> d.io.protocol
-  io.tilelink.d.bits.source := trim(d.io.protocol.bits.source, sourceSize)
   e.io.protocol <> io.tilelink.e
 
   io.flits.a <> a.io.flit
@@ -258,21 +276,16 @@ class TLSlaveToNoC(
     }
   })
 
-  // Handle size = 1 gracefully (Chisel3 empty range is broken)
-  def trim(id: UInt, size: Int): UInt = if (size <= 1) 0.U else id(log2Ceil(size)-1, 0)
-
   val a = Module(new TLAFromNoC(edgeOut, wideBundle))
   val b = Module(new TLBToNoC(edgeOut, edgesIn, wideBundle, (i) => masterToEgressOffset(i) + 0))
   val c = Module(new TLCFromNoC(edgeOut, wideBundle))
-  val d = Module(new TLDToNoC(edgeOut, edgesIn, wideBundle, (i) => masterToEgressOffset(i) + 1))
-  val e = Module(new TLEFromNoC(edgeOut, wideBundle))
+  val d = Module(new TLDToNoC(edgeOut, edgesIn, wideBundle, (i) => masterToEgressOffset(i) + 1, sourceStart))
+  val e = Module(new TLEFromNoC(edgeOut, wideBundle, sourceSize))
   io.tilelink.a <> a.io.protocol
   b.io.protocol <> io.tilelink.b
   io.tilelink.c <> c.io.protocol
   d.io.protocol <> io.tilelink.d
-  d.io.protocol.bits.sink := io.tilelink.d.bits.sink | sourceStart.U
   io.tilelink.e <> e.io.protocol
-  io.tilelink.e.bits.sink := trim(e.io.protocol.bits.sink, sourceSize)
 
   a.io.flit  <> io.flits.a
   io.flits.b <> b.io.flit
