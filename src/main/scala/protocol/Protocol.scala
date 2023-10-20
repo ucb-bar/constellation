@@ -63,7 +63,8 @@ trait ProtocolParams {
 // BEGIN: ProtocolNoC
 case class ProtocolNoCParams(
   nocParams: NoCParams,
-  protocolParams: Seq[ProtocolParams]
+  protocolParams: Seq[ProtocolParams],
+  widthDivision: Int = 1
 )
 class ProtocolNoC(params: ProtocolNoCParams)(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
@@ -71,18 +72,20 @@ class ProtocolNoC(params: ProtocolNoCParams)(implicit p: Parameters) extends Mod
     val protocol = MixedVec(params.protocolParams.map { u => u.genIO() })
   })
   // END: ProtocolNoC
-  val protocolParams  = params.protocolParams
-  val minPayloadWidth = protocolParams.map(_.minPayloadWidth).max
+  val protocolParams       = params.protocolParams
+  val minPayloadWidth      = protocolParams.map(_.minPayloadWidth).max
+  val nocPayloadWidth      = math.ceil(minPayloadWidth.toDouble / params.widthDivision).toInt
+  val terminalPayloadWidth = nocPayloadWidth * params.widthDivision
   val ingressOffsets  = protocolParams.map(_.ingressNodes.size).scanLeft(0)(_+_)
   val egressOffsets   = protocolParams.map(_.egressNodes.size).scanLeft(0)(_+_)
   val vNetOffsets     = protocolParams.map(_.nVirtualNetworks).scanLeft(0)(_+_)
 
   val nocParams = params.nocParams.copy(
     ingresses = protocolParams.map(_.ingressNodes).flatten.map(i =>
-      UserIngressParams(i, payloadBits=minPayloadWidth)),
+      UserIngressParams(i, payloadBits=terminalPayloadWidth)),
     egresses = protocolParams.map(_.egressNodes).flatten.map(i =>
-      UserEgressParams(i, payloadBits=minPayloadWidth)),
-    routerParams = (i) => params.nocParams.routerParams(i).copy(payloadBits=minPayloadWidth),
+      UserEgressParams(i, payloadBits=terminalPayloadWidth)),
+    routerParams = (i) => params.nocParams.routerParams(i).copy(payloadBits=nocPayloadWidth),
     vNetBlocking = (blocker, blockee) => {
       def protocolId(i: Int) = vNetOffsets.drop(1).indexWhere(_ > i)
       if (protocolId(blocker) == protocolId(blockee)) {

@@ -565,7 +565,8 @@ class TLNoC(params: SimpleTLNoCParams, name: String = "test")(implicit p: Parame
 case class SplitACDxBETLNoCParams(
   nodeMappings: DiplomaticNetworkNodeMapping,
   acdNoCParams: NoCParams = NoCParams(),
-  beNoCParams: NoCParams = NoCParams()
+  beNoCParams: NoCParams = NoCParams(),
+  beDivision: Int = 2
 ) extends TLNoCParams
 class TLSplitACDxBENoC(params: SplitACDxBETLNoCParams, name: String = "test")(implicit p: Parameters) extends TLNoCLike {
   lazy val module = new TLNoCModuleImp(this) {
@@ -595,7 +596,8 @@ class TLSplitACDxBENoC(params: SplitACDxBETLNoCParams, name: String = "test")(im
     )))
     val be_noc = Module(new ProtocolNoC(ProtocolNoCParams(
       params.beNoCParams.copy(hasCtrl = false, nocName=s"${name}_be"),
-      Seq(beProtocolParams)
+      Seq(beProtocolParams),
+      widthDivision = params.beDivision
     )))
 
     acd_noc.io.protocol(0) match { case protocol: TileLinkInterconnectInterface => {
