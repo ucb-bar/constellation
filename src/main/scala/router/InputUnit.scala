@@ -70,7 +70,7 @@ class InputBuffer(cParam: ChannelParams)(implicit p: Parameters) extends Module 
   val fullSize = delims.last
 
   // Ugly case. Use multiple queues
-  if (cParam.srcSpeedup > 1 || cParam.destSpeedup > 1 || fullSize <= 1) {
+  if ((cParam.srcSpeedup > 1 || cParam.destSpeedup > 1 || fullSize <= 1) || !cParam.unifiedBuffer) {
     require(useOutputQueues)
     val qs = cParam.virtualChannelParams.map(v => Module(new Queue(new BaseFlit(cParam.payloadBits), v.bufferSize)))
     qs.zipWithIndex.foreach { case (q,i) =>
