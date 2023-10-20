@@ -39,13 +39,13 @@ class ConstellationSystemBus(
     addressPrefixNexusNode
   }
 
-  private val system_bus_noc = LazyModule(noc_params match {
+  private val system_bus_noc = noc_params match {
     case params: GlobalTLNoCParams => context.asInstanceOf[CanHaveGlobalNoC].globalNoCDomain {
-      new TLGlobalNoC(params, name)
+      LazyModule(new TLGlobalNoC(params, name))
     }
-    case params: SimpleTLNoCParams => new TLNoC(params, name)
-    case params: SplitACDxBETLNoCParams => new TLSplitACDxBENoC(params, name)
-  })
+    case params: SimpleTLNoCParams => LazyModule(new TLNoC(params, name))
+    case params: SplitACDxBETLNoCParams => LazyModule(new TLSplitACDxBENoC(params, name))
+  }
 
   val inwardNode: TLInwardNode = (system_bus_noc.node :=* TLFIFOFixer(TLFIFOFixer.allVolatile)
     :=* replicator.map(_.node).getOrElse(TLTempNode()))
@@ -78,13 +78,13 @@ class ConstellationMemoryBus(mbus_params: MemoryBusParams, noc_params: TLNoCPara
     addressPrefixNexusNode
   }
 
-  private val memory_bus_noc = LazyModule(noc_params match {
+  private val memory_bus_noc = noc_params match {
     case params: GlobalTLNoCParams => context.asInstanceOf[CanHaveGlobalNoC].globalNoCDomain {
-      new TLGlobalNoC(params, name)
+      LazyModule(new TLGlobalNoC(params, name))
     }
-    case params: SimpleTLNoCParams => new TLNoC(params, name)
-    case params: SplitACDxBETLNoCParams => new TLSplitACDxBENoC(params, name)
-  })
+    case params: SimpleTLNoCParams => LazyModule(new TLNoC(params, name))
+    case params: SplitACDxBETLNoCParams => LazyModule(new TLSplitACDxBENoC(params, name))
+  }
 
   val inwardNode: TLInwardNode =
     replicator.map(memory_bus_noc.node :*=* TLFIFOFixer(TLFIFOFixer.all) :*=* _.node)
@@ -119,13 +119,13 @@ class ConstellationPeripheryBus(pbus_params: PeripheryBusParams, noc_params: TLN
     addressPrefixNexusNode
   }
 
-  def genNoC()(implicit valName: ValName): TLNoCLike = LazyModule(noc_params match {
+  def genNoC()(implicit valName: ValName): TLNoCLike = noc_params match {
     case params: GlobalTLNoCParams => context.asInstanceOf[CanHaveGlobalNoC].globalNoCDomain {
-      new TLGlobalNoC(params, name)
+      LazyModule(new TLGlobalNoC(params, name))
     }
-    case params: SimpleTLNoCParams => new TLNoC(params, name)
-    case params: SplitACDxBETLNoCParams => new TLSplitACDxBENoC(params, name)
-  })
+    case params: SimpleTLNoCParams => LazyModule(new TLNoC(params, name))
+    case params: SplitACDxBETLNoCParams => LazyModule(new TLSplitACDxBENoC(params, name))
+  }
 
   private val fixer = LazyModule(new TLFIFOFixer(TLFIFOFixer.all))
   private val node: TLNode = pbus_params.atomics.map { pa =>
