@@ -9,7 +9,7 @@ import freechips.rocketchip.util._
 import constellation.channel._
 import constellation.routing.{FlowRoutingBundle}
 
-class EgressUnit(coupleSAVA: Boolean, inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannelParams], cParam: EgressChannelParams)
+class EgressUnit(coupleSAVA: Boolean, combineSAST: Boolean, inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannelParams], cParam: EgressChannelParams)
   (implicit p: Parameters) extends AbstractOutputUnit(inParams, ingressParams, cParam)(p) {
 
   class EgressUnitIO extends AbstractOutputUnitIO(inParams, ingressParams, cParam) {
@@ -19,7 +19,7 @@ class EgressUnit(coupleSAVA: Boolean, inParams: Seq[ChannelParams], ingressParam
 
   val channel_empty = RegInit(true.B)
   val flow = Reg(new FlowRoutingBundle)
-  val q = Module(new Queue(new EgressFlit(cParam.payloadBits), 3, flow=true))
+  val q = Module(new Queue(new EgressFlit(cParam.payloadBits), 3 - (if (combineSAST) 1 else 0), flow=true))
   q.io.enq.valid := io.in(0).valid
   q.io.enq.bits.head := io.in(0).bits.head
   q.io.enq.bits.tail := io.in(0).bits.tail
