@@ -31,6 +31,8 @@ jobs:
     - name: Compile
       run: |
         mkdir -p .tools_cache
+        which cmake
+        cmake --version
         scripts/install-espresso.sh ${{ github.workspace }}/tools_cache
 
         git submodule update --init --recursive
