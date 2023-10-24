@@ -33,6 +33,7 @@ jobs:
         mkdir -p .tools_cache
         which cmake
         cmake --version
+        export PATH=/usr/bin:${PATH}
         scripts/install-espresso.sh ${{ github.workspace }}/tools_cache
 
         git submodule update --init --recursive
