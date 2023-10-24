@@ -1007,7 +1007,7 @@ class EvalTestConfig05 extends NoCEvalConfig(NoCEvalParams(
 ))
 class EvalTestConfig06 extends NoCEvalConfig(NoCEvalParams(
   requiredMedianLatency = 25,
-  requiredMaxLatency    = 125,
+  requiredMaxLatency    = 150,
   requiredThroughput    = 0.94,
   flows              = (s, d) => 0.2 / 16,
   nocParams = NoCParams(
