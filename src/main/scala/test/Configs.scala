@@ -722,7 +722,7 @@ class TestConfig67 extends NoCTesterConfig(NoCTesterParams(
       )
     )
   ),
-  inputPacketStallProbability = 0.97
+  inputPacketStallProbability = 0.98
 ))
 class TestConfig68 extends NoCTesterConfig(NoCTesterParams(
   NoCParams(
@@ -965,7 +965,7 @@ class EvalTestConfig02 extends NoCEvalConfig(NoCEvalParams(
 class EvalTestConfig03 extends NoCEvalConfig(NoCEvalParams(
   requiredThroughput    = 0.9,
   requiredMedianLatency = 30,
-  requiredMaxLatency    = 175,
+  requiredMaxLatency    = 210,
   flows              = (s, d) => 0.1 / 10,
   nocParams = NoCParams(
     topology         = UnidirectionalTorus1D(10),
@@ -977,11 +977,13 @@ class EvalTestConfig03 extends NoCEvalConfig(NoCEvalParams(
   )
 ))
 class EvalTestConfig04 extends NoCEvalConfig(NoCEvalParams(
-  requiredThroughput    = 0.69,
-  flows              = (s, d) => 0.05,
+  requiredThroughput    = 0.99,
+  flows                 = (s, d) => 0.04,
+  requiredMedianLatency = 25,
+  requiredMaxLatency    = 140,
   nocParams = NoCParams(
     topology         = Butterfly(2, 3),
-    channelParamGen  = (a, b) => UserChannelParams(Seq.fill(1) { UserVirtualChannelParams(5) }),
+    channelParamGen  = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(5) }),
     ingresses        = (0 until 8).map { i => UserIngressParams(i % 4) },
     egresses         = (0 until 8).map { i => UserEgressParams((i % 4) + 4 * 2) },
     flows            = Seq.tabulate(8, 8) { (s, d) => FlowParams(s, d, 0) }.flatten,
@@ -1006,10 +1008,10 @@ class EvalTestConfig05 extends NoCEvalConfig(NoCEvalParams(
   )
 ))
 class EvalTestConfig06 extends NoCEvalConfig(NoCEvalParams(
-  requiredMedianLatency = 25,
+  requiredMedianLatency = 20,
   requiredMaxLatency    = 150,
-  requiredThroughput    = 0.94,
-  flows              = (s, d) => 0.2 / 16,
+  requiredThroughput    = 0.95,
+  flows              = (s, d) => 0.15 / 16,
   nocParams = NoCParams(
     topology         = Mesh2D(4, 4),
     channelParamGen  = (a, b) => UserChannelParams(Seq.fill(1) { UserVirtualChannelParams(4) }),
@@ -1021,12 +1023,12 @@ class EvalTestConfig06 extends NoCEvalConfig(NoCEvalParams(
 ))
 class EvalTestConfig07 extends NoCEvalConfig(NoCEvalParams(
   requiredMedianLatency = 20,
-  requiredMaxLatency    = 75,
+  requiredMaxLatency    = 80,
   requiredThroughput    = 0.95,
   flows              = (s, d) => 0.2 / 16,
   nocParams = NoCParams(
     topology         = Mesh2D(4, 4),
-    channelParamGen  = (a, b) => UserChannelParams(Seq.fill(2) { UserVirtualChannelParams(4) }),
+    channelParamGen  = (a, b) => UserChannelParams(Seq.fill(3) { UserVirtualChannelParams(4) }),
     ingresses        = (0 until 16).map { i => UserIngressParams(i) },
     egresses         = (0 until 16).map { i => UserEgressParams(i) },
     flows            = Seq.tabulate(16, 16) { (s, d) => FlowParams(s, d, 0) }.flatten,

@@ -74,7 +74,6 @@ class OutputUnit(inParams: Seq[ChannelParams], ingressParams: Seq[IngressChannel
     when (io.out.vc_free(i)) {
       assert(s.occupied)
       s.occupied := false.B
-      io.channel_status(i).occupied := false.B
     }
   } }
 
