@@ -136,7 +136,7 @@ class Router(
     val route_computer = Module(new RouteComputer(routerParams, inParams, outParams, ingressParams, egressParams))
 
 
-    val fires_count = WireInit(PopCount(vc_allocator.io.req.map(_.fire())))
+    val fires_count = WireInit(PopCount(vc_allocator.io.req.map(_.fire)))
     dontTouch(fires_count)
 
 
@@ -212,13 +212,13 @@ class Router(
     }
 
     destNodes.map(_.in(0)).foreach { case (in, edge) => in.flit.map { f =>
-      sample(f.fire(), s"${edge.cp.srcId} $nodeId")
+      sample(f.fire, s"${edge.cp.srcId} $nodeId")
     } }
     ingressNodes.map(_.in(0)).foreach { case (in, edge) =>
-      sample(in.flit.fire(), s"i${edge.cp.asInstanceOf[IngressChannelParams].ingressId} $nodeId")
+      sample(in.flit.fire, s"i${edge.cp.asInstanceOf[IngressChannelParams].ingressId} $nodeId")
     }
     egressNodes.map(_.out(0)).foreach { case (out, edge) =>
-      sample(out.flit.fire(), s"$nodeId e${edge.cp.asInstanceOf[EgressChannelParams].egressId}")
+      sample(out.flit.fire, s"$nodeId e${edge.cp.asInstanceOf[EgressChannelParams].egressId}")
     }
 
   }

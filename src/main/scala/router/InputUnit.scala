@@ -136,7 +136,7 @@ class InputBuffer(cParam: ChannelParams)(implicit p: Parameters) extends Module 
     } else {
       qs.map(_.io.deq.ready := false.B)
       val ready_sel = io.deq.map(_.ready)
-      val fire = io.deq.map(_.fire())
+      val fire = io.deq.map(_.fire)
       assert(PopCount(fire) <= 1.U)
       val head = Mux1H(fire, heads)
       when (fire.orR) {
@@ -202,7 +202,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   }
 
   for (i <- 0 until cParam.srcSpeedup) {
-    when (io.in.flit(i).fire() && io.in.flit(i).bits.head) {
+    when (io.in.flit(i).fire && io.in.flit(i).bits.head) {
       val id = io.in.flit(i).bits.virt_channel_id
       assert(id < nVirtualChannels.U)
       assert(states(id).g === g_i)
@@ -229,14 +229,14 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
       i.valid := s.g === g_r
       i.bits.flow := s.flow
       i.bits.src_virt_id := idx.U
-      when (i.fire()) { s.g := g_v }
+      when (i.fire) { s.g := g_v }
     } else {
       i.valid := false.B
       i.bits := DontCare
     }
   }
 
-  when (io.router_req.fire()) {
+  when (io.router_req.fire) {
     val id = io.router_req.bits.src_virt_id
     assert(states(id).g === g_r)
     states(id).g := g_v
@@ -253,7 +253,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   val vcalloc_filter = PriorityEncoderOH(Cat(vcalloc_vals.asUInt, vcalloc_vals.asUInt & ~mask))
   val vcalloc_sel = vcalloc_filter(nVirtualChannels-1,0) | (vcalloc_filter >> nVirtualChannels)
   // Prioritize incoming packetes
-  when (io.router_req.fire()) {
+  when (io.router_req.fire) {
     mask := (1.U << io.router_req.bits.src_virt_id) - 1.U
   } .elsewhen (vcalloc_vals.orR) {
     mask := Mux1H(vcalloc_sel, (0 until nVirtualChannels).map { w => ~(0.U((w+1).W)) })
@@ -269,7 +269,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
       vcalloc_reqs(idx).flow := s.flow
       when (vcalloc_vals(idx) && vcalloc_sel(idx) && io.vcalloc_req.ready) { s.g := g_a }
       if (combineRCVA) {
-        when (route_arbiter.io.in(idx).fire()) {
+        when (route_arbiter.io.in(idx).fire) {
           vcalloc_vals(idx) := true.B
           vcalloc_reqs(idx).vc_sel := io.router_resp.vc_sel
         }
@@ -282,7 +282,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
 
   io.debug.va_stall := PopCount(vcalloc_vals) - io.vcalloc_req.ready
 
-  when (io.vcalloc_req.fire()) {
+  when (io.vcalloc_req.fire) {
     for (i <- 0 until nVirtualChannels) {
       when (vcalloc_sel(i)) {
         states(i).vc_sel := io.vcalloc_resp.vc_sel
@@ -306,7 +306,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
       r.bits.vc_sel := s.vc_sel
       val deq_tail = input_buffer.io.deq(i).bits.tail
       r.bits.tail := deq_tail
-      when (r.fire() && deq_tail) {
+      when (r.fire && deq_tail) {
         s.g := g_i
       }
       input_buffer.io.deq(i).ready := r.ready
@@ -337,21 +337,21 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
   }
 
   io.in.credit_return := salloc_arb.io.out.zipWithIndex.map { case (o, i) =>
-    Mux(o.fire(), salloc_arb.io.chosen_oh(i), 0.U)
+    Mux(o.fire, salloc_arb.io.chosen_oh(i), 0.U)
   }.reduce(_|_)
   io.in.vc_free := salloc_arb.io.out.zipWithIndex.map { case (o, i) =>
-    Mux(o.fire() && Mux1H(salloc_arb.io.chosen_oh(i), input_buffer.io.deq.map(_.bits.tail)),
+    Mux(o.fire && Mux1H(salloc_arb.io.chosen_oh(i), input_buffer.io.deq.map(_.bits.tail)),
       salloc_arb.io.chosen_oh(i), 0.U)
   }.reduce(_|_)
 
   for (i <- 0 until cParam.destSpeedup) {
     val salloc_out = salloc_outs(i)
-    salloc_out.valid := salloc_arb.io.out(i).fire()
+    salloc_out.valid := salloc_arb.io.out(i).fire
     salloc_out.vid := OHToUInt(salloc_arb.io.chosen_oh(i))
     val vc_sel = Mux1H(salloc_arb.io.chosen_oh(i), states.map(_.vc_sel))
     val channel_oh = vc_sel.map(_.reduce(_||_)).toSeq
     val virt_channel = Mux1H(channel_oh, vc_sel.map(v => OHToUInt(v)).toSeq)
-    when (salloc_arb.io.out(i).fire()) {
+    when (salloc_arb.io.out(i).fire) {
       salloc_out.out_vid := virt_channel
       salloc_out.flit.payload := Mux1H(salloc_arb.io.chosen_oh(i), input_buffer.io.deq.map(_.bits.payload))
       salloc_out.flit.head    := Mux1H(salloc_arb.io.chosen_oh(i), input_buffer.io.deq.map(_.bits.head))

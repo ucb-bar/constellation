@@ -94,7 +94,7 @@ class InputGen(idx: Int, cParams: IngressChannelParams)
   out_payload.flits_fired := 0.U
 
   io.n_flits := packet_remaining + 1.U
-  io.fire := can_fire && io.out.fire()
+  io.fire := can_fire && io.out.fire
 
   when (io.fire && !io.out.bits.tail) {
     flits_left := packet_remaining
@@ -111,7 +111,7 @@ class InputGen(idx: Int, cParams: IngressChannelParams)
     out_payload := payload
     out_payload.flits_fired := flits_fired
 
-    when (io.out.fire()) {
+    when (io.out.fire) {
       flits_fired := flits_fired + 1.U
       flits_left := flits_left - 1.U
     }
@@ -206,7 +206,7 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
     val packet_rob_idx = Reg(UInt(log2Ceil(robSz).W))
 
     val flow_ctrs = RegInit(VecInit.fill(outputParams(i).possibleFlows.size) { 0.U(8.W) })
-    when (o.flit.fire()) {
+    when (o.flit.fire) {
       val flows = outputParams(i).possibleFlows.toSeq
       val fifo = flows.filter(_.fifo).map(_.ingressId.U === o.flit.bits.ingress_id).orR
       val flow_id = flows.zipWithIndex.map { case (f, fid) =>
@@ -236,13 +236,13 @@ class NoCTester(inputParams: Seq[IngressChannelParams], outputParams: Seq[Egress
       when (o.flit.bits.head) { packet_valid := true.B; packet_rob_idx := rob_idx }
       when (o.flit.bits.tail) { packet_valid := false.B }
     }
-    rob_frees = rob_frees | ((o.flit.fire() && o.flit.bits.tail) << rob_idx)
+    rob_frees = rob_frees | ((o.flit.fire && o.flit.bits.tail) << rob_idx)
   }
 
 
   rob_valids := (rob_valids | rob_allocs) & ~rob_frees
   idle := rob_allocs === 0.U && rob_frees === 0.U
-  flits := flits + io.from_noc.map(_.flit.fire().asUInt).reduce(_+&_)
+  flits := flits + io.from_noc.map(_.flit.fire.asUInt).reduce(_+&_)
   txs := txs + PopCount(tx_fire)
 
   for (i <- 0 until robSz) {

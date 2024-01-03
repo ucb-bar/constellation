@@ -49,12 +49,12 @@ class SwitchArbiter(inN: Int, outN: Int, outParams: Seq[ChannelParams], egressPa
       }
     }
     chosens = chosens | chosen
-    when (io.out(i).fire()) {
+    when (io.out(i).fire) {
       lock(i) := chosen & ~in_tails
     }
   }
 
-  when (io.out(0).fire()) {
+  when (io.out(0).fire) {
     mask := (0 until inN).map { i => (io.chosen_oh(0) >> i) }.reduce(_|_)
   } .otherwise {
     mask := Mux(~mask === 0.U, 0.U, (mask << 1) | 1.U(1.W))
@@ -94,7 +94,7 @@ class SwitchAllocator(
     arbs.zipWithIndex.foreach { case (a,i) =>
       a.io.in(idx).valid := o.valid && o.bits.vc_sel(i).reduce(_||_)
       a.io.in(idx).bits := o.bits
-      fires(i) := a.io.in(idx).fire()
+      fires(i) := a.io.in(idx).fire
     }
     o.ready := fires.reduce(_||_)
     idx += 1
