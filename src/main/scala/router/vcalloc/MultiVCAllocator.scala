@@ -17,7 +17,7 @@ abstract class MultiVCAllocator(vP: VCAllocatorParams)(implicit p: Parameters) e
   val in_allocs = allInParams.zipWithIndex.map { case (iP,i) =>
     val a = Wire(MixedVec(allOutParams.map { u => Vec(u.nVirtualChannels, Bool()) }))
     a := Mux(io.req(i).valid,
-      inputAllocPolicy(io.req(i).bits.flow, io.req(i).bits.vc_sel, i.U, io.req(i).bits.in_vc, io.req(i).fire()),
+      inputAllocPolicy(io.req(i).bits.flow, io.req(i).bits.vc_sel, i.U, io.req(i).bits.in_vc, io.req(i).fire),
       0.U.asTypeOf(a))
     a
   }

@@ -103,12 +103,12 @@ class AXI4MasterToNoC(
     for (id <- master.id.start until master.id.end) {
       arFIFOMap(id) := idTracker(
         arTag,
-        arSel(id) && io.axi4.ar.fire(),
-        rSel(id) && io.axi4.r.fire() && io.axi4.r.bits.last)
+        arSel(id) && io.axi4.ar.fire,
+        rSel(id) && io.axi4.r.fire && io.axi4.r.bits.last)
       awFIFOMap(id) := idTracker(
         awTag,
-        awSel(id) && io.axi4.aw.fire(),
-        bSel(id) && io.axi4.b.fire())
+        awSel(id) && io.axi4.aw.fire,
+        bSel(id) && io.axi4.b.fire)
     }
   }
 
@@ -145,7 +145,7 @@ class AXI4MasterToNoC(
   io.flits.w.bits.egress_id := Mux1H(requestWIO.zipWithIndex.map { case (r, i) =>
     r -> (slaveToEgressOffset(i) + 1).U
   })
-  when (io.flits.w.fire()) { w_first := in.w.bits.last }
+  when (io.flits.w.fire) { w_first := in.w.bits.last }
 
   io.flits.ar.valid := in.ar.valid
   in.ar.ready := io.flits.ar.ready
@@ -203,14 +203,14 @@ class AXI4SlaveToNoC(
   io.axi4.aw <> aw_q.io.deq
 
   out.aw.ready       := !aw_val(out.aw.bits.id)
-  when (out.aw.fire()) {
+  when (out.aw.fire) {
     aw_val(out.aw.bits.id) := true.B
     aw_buf(out.aw.bits.id) := out.aw.bits
   }
 
   aw_q.io.enq.valid := out.w.valid && Mux1H(out_w_in_id, aw_val) && out_w_in_head
   aw_q.io.enq.bits  :=                Mux1H(out_w_in_id, aw_buf)
-  when (aw_q.io.enq.fire()) {
+  when (aw_q.io.enq.fire) {
     aw_val(OHToUInt(out_w_in_id)) := false.B
     w_fire := true.B
   }
@@ -223,7 +223,7 @@ class AXI4SlaveToNoC(
     w_fire || (out_w_in_head && aw_q.io.enq.ready && Mux1H(out_w_in_id, aw_val))
   )
 
-  when (out.w.fire() && out.w.bits.last) { w_fire := false.B }
+  when (out.w.fire && out.w.bits.last) { w_fire := false.B }
 
   val r_first = RegInit(true.B)
   io.flits.r.valid := out.r.valid
@@ -234,7 +234,7 @@ class AXI4SlaveToNoC(
   io.flits.r.bits.egress_id := Mux1H(requestROI.zipWithIndex.map { case (r, i) =>
     r -> (masterToEgressOffset(i) + 0).U
   })
-  when (io.flits.r.fire()) { r_first := out.r.bits.last }
+  when (io.flits.r.fire) { r_first := out.r.bits.last }
 
   io.flits.b.valid := out.b.valid
   out.b.ready := io.flits.b.ready

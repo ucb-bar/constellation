@@ -29,8 +29,8 @@ abstract class TLChannelToNoC[T <: TLChannel](gen: => T, edge: TLEdge, idToEgres
   val has_body = Wire(Bool())
   val body_fields = getBodyFields(protocol.bits)
   val const_fields = getConstFields(protocol.bits)
-  val head = edge.first(protocol.bits, protocol.fire())
-  val tail = edge.last(protocol.bits, protocol.fire())
+  val head = edge.first(protocol.bits, protocol.fire)
+  val tail = edge.last(protocol.bits, protocol.fire)
   def requestOH: Seq[Bool]
 
   val body  = Cat( body_fields.filter(_.getWidth > 0).map(_.asUInt))
@@ -47,8 +47,8 @@ abstract class TLChannelToNoC[T <: TLChannel](gen: => T, edge: TLEdge, idToEgres
   })
   io.flit.bits.payload    := Mux(is_body, body, const)
 
-  when (io.flit.fire() && io.flit.bits.head) { is_body := true.B }
-  when (io.flit.fire() && io.flit.bits.tail) { is_body := false.B }
+  when (io.flit.fire && io.flit.bits.head) { is_body := true.B }
+  when (io.flit.fire && io.flit.bits.tail) { is_body := false.B }
 }
 
 abstract class TLChannelFromNoC[T <: TLChannel](gen: => T)(implicit val p: Parameters) extends Module with TLFieldHelper {
@@ -81,8 +81,8 @@ abstract class TLChannelFromNoC[T <: TLChannel](gen: => T)(implicit val p: Param
   assign(const, const_fields)
   assign(io.flit.bits.payload, body_fields)
 
-  when (io.flit.fire() && io.flit.bits.head) { is_const := false.B; const_reg := io.flit.bits.payload }
-  when (io.flit.fire() && io.flit.bits.tail) { is_const := true.B }
+  when (io.flit.fire && io.flit.bits.head) { is_const := false.B; const_reg := io.flit.bits.payload }
+  when (io.flit.fire && io.flit.bits.tail) { is_const := true.B }
 }
 
 trait HasAddressDecoder {

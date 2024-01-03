@@ -59,9 +59,9 @@ class IngressUnit(
   io.in.ready := route_buffer.io.enq.ready && (
     io.router_req.ready || !io.in.bits.head || at_dest)
 
-  route_q.io.enq.valid := io.router_req.fire()
+  route_q.io.enq.valid := io.router_req.fire
   route_q.io.enq.bits := io.router_resp
-  when (io.in.fire() && io.in.bits.head && at_dest) {
+  when (io.in.fire && io.in.bits.head && at_dest) {
     route_q.io.enq.valid := true.B
     route_q.io.enq.bits.vc_sel.foreach(_.foreach(_ := false.B))
     for (o <- 0 until nEgress) {
@@ -94,10 +94,10 @@ class IngressUnit(
     (route_q.io.deq.valid || !head) &&
     (io.vcalloc_req.ready || !head) &&
     (vcalloc_q.io.enq.ready || !head))
-  route_q.io.deq.ready := (route_buffer.io.deq.fire() && tail)
+  route_q.io.deq.ready := (route_buffer.io.deq.fire && tail)
 
 
-  vcalloc_q.io.enq.valid := io.vcalloc_req.fire()
+  vcalloc_q.io.enq.valid := io.vcalloc_req.fire
   vcalloc_q.io.enq.bits := io.vcalloc_resp
   assert(!(vcalloc_q.io.enq.valid && !vcalloc_q.io.enq.ready))
 
@@ -108,7 +108,7 @@ class IngressUnit(
   val vcalloc_tail = vcalloc_buffer.io.deq.bits.tail
   io.salloc_req(0).valid := vcalloc_buffer.io.deq.valid && vcalloc_q.io.deq.valid && c && !io.block
   vcalloc_buffer.io.deq.ready := io.salloc_req(0).ready && vcalloc_q.io.deq.valid && c && !io.block
-  vcalloc_q.io.deq.ready := vcalloc_tail && vcalloc_buffer.io.deq.fire()
+  vcalloc_q.io.deq.ready := vcalloc_tail && vcalloc_buffer.io.deq.fire
 
   val out_bundle = if (combineSAST) {
     Wire(Valid(new SwitchBundle(outParams, egressParams)))
@@ -117,7 +117,7 @@ class IngressUnit(
   }
   io.out(0) := out_bundle
 
-  out_bundle.valid := vcalloc_buffer.io.deq.fire()
+  out_bundle.valid := vcalloc_buffer.io.deq.fire
   out_bundle.bits.flit := vcalloc_buffer.io.deq.bits
   out_bundle.bits.flit.virt_channel_id := 0.U
   val out_channel_oh = vcalloc_q.io.deq.bits.vc_sel.map(_.reduce(_||_)).toSeq

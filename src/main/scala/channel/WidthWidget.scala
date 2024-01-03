@@ -23,7 +23,7 @@ object WidthWidget {
     out.bits.tail := in.bits.tail && last
     out.bits.payload := Mux(first, in.bits.payload, stored)
     in.ready := last && out.ready
-    when (out.fire()) {
+    when (out.fire) {
       count := Mux(last, 0.U, count + 1.U)
       stored := Mux(first, in.bits.payload, stored) >> outBits
     }
@@ -45,7 +45,7 @@ object WidthWidget {
     out.bits.tail := last && in.bits.tail
     out.bits.payload := Cat(in.bits.payload, payload.asUInt)
     in.ready := !last || out.ready
-    when (in.fire()) {
+    when (in.fire) {
       count := Mux(last, 0.U, count + 1.U)
       payload(count) := in.bits.payload
       when (first) {
