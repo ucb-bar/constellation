@@ -33,6 +33,7 @@ case class NoCParams(
   nocName: String = "test",
   skipValidationChecks: Boolean = false,
   hasCtrl: Boolean = false,
+  inlineNoC: Boolean = false
 )
 // END: NoC Parameters
 

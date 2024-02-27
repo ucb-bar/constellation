@@ -22,6 +22,9 @@ class NoCTerminalIO(
 }
 
 class NoC(nocParams: NoCParams)(implicit p: Parameters) extends LazyModule {
+
+  override def shouldBeInlined = nocParams.inlineNoC
+
   val internalParams = InternalNoCParams(nocParams)
   val allChannelParams = internalParams.channelParams
   val allIngressParams = internalParams.ingressParams

@@ -531,8 +531,10 @@ case class SimpleTLNoCParams(
   nodeMappings: DiplomaticNetworkNodeMapping,
   nocParams: NoCParams = NoCParams(),
 ) extends TLNoCParams
-class TLNoC(params: SimpleTLNoCParams, name: String = "test")(implicit p: Parameters) extends TLNoCLike {
+class TLNoC(params: SimpleTLNoCParams, name: String = "test", inlineNoC: Boolean = false)(implicit p: Parameters) extends TLNoCLike {
   // END: TLNoCParams
+
+  override def shouldBeInlined = inlineNoC
   lazy val module = new TLNoCModuleImp(this) {
     val (io_in, edgesIn) = node.in.unzip
     val (io_out, edgesOut) = node.out.unzip
@@ -549,8 +551,9 @@ class TLNoC(params: SimpleTLNoCParams, name: String = "test")(implicit p: Parame
 
     printNodeMappings()
     val noc = Module(new ProtocolNoC(ProtocolNoCParams(
-      params.nocParams.copy(hasCtrl = false, nocName=name),
-      Seq(protocolParams)
+      params.nocParams.copy(hasCtrl = false, nocName=name, inlineNoC = inlineNoC),
+      Seq(protocolParams),
+      inlineNoC = inlineNoC
     )))
 
     noc.io.protocol(0) match {
@@ -568,7 +571,8 @@ case class SplitACDxBETLNoCParams(
   beNoCParams: NoCParams = NoCParams(),
   beDivision: Int = 2
 ) extends TLNoCParams
-class TLSplitACDxBENoC(params: SplitACDxBETLNoCParams, name: String = "test")(implicit p: Parameters) extends TLNoCLike {
+class TLSplitACDxBENoC(params: SplitACDxBETLNoCParams, name: String = "test", inlineNoC: Boolean = false)(implicit p: Parameters) extends TLNoCLike {
+  override def shouldBeInlined = inlineNoC
   lazy val module = new TLNoCModuleImp(this) {
     val (io_in, edgesIn) = node.in.unzip
     val (io_out, edgesOut) = node.out.unzip
@@ -591,13 +595,15 @@ class TLSplitACDxBENoC(params: SplitACDxBETLNoCParams, name: String = "test")(im
     )
 
     val acd_noc = Module(new ProtocolNoC(ProtocolNoCParams(
-      params.acdNoCParams.copy(hasCtrl = false, nocName=s"${name}_acd"),
-      Seq(acdProtocolParams)
+      params.acdNoCParams.copy(hasCtrl = false, nocName=s"${name}_acd", inlineNoC = inlineNoC),
+      Seq(acdProtocolParams),
+      inlineNoC = inlineNoC
     )))
     val be_noc = Module(new ProtocolNoC(ProtocolNoCParams(
-      params.beNoCParams.copy(hasCtrl = false, nocName=s"${name}_be"),
+      params.beNoCParams.copy(hasCtrl = false, nocName=s"${name}_be", inlineNoC = inlineNoC),
       Seq(beProtocolParams),
-      widthDivision = params.beDivision
+      widthDivision = params.beDivision,
+      inlineNoC = inlineNoC
     )))
 
     acd_noc.io.protocol(0) match { case protocol: TileLinkInterconnectInterface => {
