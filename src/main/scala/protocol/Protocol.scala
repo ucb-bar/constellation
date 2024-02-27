@@ -65,27 +65,20 @@ case class ProtocolNoCParams(
   nocParams: NoCParams,
   protocolParams: Seq[ProtocolParams],
   widthDivision: Int = 1
-)
-class ProtocolNoC(params: ProtocolNoCParams)(implicit p: Parameters) extends Module {
-  val io = IO(new Bundle {
-    val ctrl = if (params.nocParams.hasCtrl) Vec(params.nocParams.topology.nNodes, new RouterCtrlBundle) else Nil
-    val protocol = MixedVec(params.protocolParams.map { u => u.genIO() })
-  })
-  // END: ProtocolNoC
-  val protocolParams       = params.protocolParams
+) {
   val minPayloadWidth      = protocolParams.map(_.minPayloadWidth).max
-  val nocPayloadWidth      = math.ceil(minPayloadWidth.toDouble / params.widthDivision).toInt
-  val terminalPayloadWidth = nocPayloadWidth * params.widthDivision
+  val nocPayloadWidth      = math.ceil(minPayloadWidth.toDouble / widthDivision).toInt
+  val terminalPayloadWidth = nocPayloadWidth * widthDivision
   val ingressOffsets  = protocolParams.map(_.ingressNodes.size).scanLeft(0)(_+_)
   val egressOffsets   = protocolParams.map(_.egressNodes.size).scanLeft(0)(_+_)
   val vNetOffsets     = protocolParams.map(_.nVirtualNetworks).scanLeft(0)(_+_)
 
-  val nocParams = params.nocParams.copy(
+  def getNoCParams = nocParams.copy(
     ingresses = protocolParams.map(_.ingressNodes).flatten.map(i =>
       UserIngressParams(i, payloadBits=terminalPayloadWidth)),
     egresses = protocolParams.map(_.egressNodes).flatten.map(i =>
       UserEgressParams(i, payloadBits=terminalPayloadWidth)),
-    routerParams = (i) => params.nocParams.routerParams(i).copy(payloadBits=nocPayloadWidth),
+    routerParams = (i) => nocParams.routerParams(i).copy(payloadBits=nocPayloadWidth),
     vNetBlocking = (blocker, blockee) => {
       def protocolId(i: Int) = vNetOffsets.drop(1).indexWhere(_ > i)
       if (protocolId(blocker) == protocolId(blockee)) {
@@ -105,21 +98,30 @@ class ProtocolNoC(params: ProtocolNoCParams)(implicit p: Parameters) extends Mod
       ))
     }.flatten
   )
-  val noc = Module(LazyModule(new NoC(nocParams)).module)
+}
+class ProtocolNoC(params: ProtocolNoCParams)(implicit p: Parameters) extends Module {
+  val io = IO(new Bundle {
+    val ctrl = if (params.nocParams.hasCtrl) Vec(params.nocParams.topology.nNodes, new RouterCtrlBundle) else Nil
+    val protocol = MixedVec(params.protocolParams.map { u => u.genIO() })
+  })
+  // END: ProtocolNoC
+
+  val noc = Module(LazyModule(new NoC(params.getNoCParams)).module)
   noc.io.router_clocks.foreach(_.clock := clock)
   noc.io.router_clocks.foreach(_.reset := reset)
   (noc.io.router_ctrl zip io.ctrl).foreach { case (l, r) => l <> r }
-  (protocolParams zip io.protocol).zipWithIndex.foreach { case ((u, io), x) =>
+  (params.protocolParams zip io.protocol).zipWithIndex.foreach { case ((u, io), x) =>
     val terminals = Wire(new NoCTerminalIO(
-      noc.io.ingressParams.drop(ingressOffsets(x)).take(u.ingressNodes.size),
-      noc.io.egressParams .drop(egressOffsets(x)) .take(u.egressNodes.size)
+      noc.io.ingressParams.drop(params.ingressOffsets(x)).take(u.ingressNodes.size),
+      noc.io.egressParams .drop(params.egressOffsets(x)) .take(u.egressNodes.size)
     ))
-    (terminals.ingress zip noc.io.ingress.drop(ingressOffsets(x))).map { case (l,r) => l <> r }
-    (terminals.egress  zip  noc.io.egress.drop (egressOffsets(x))).map { case (l,r) => l <> r }
+    (terminals.ingress zip noc.io.ingress.drop(params.ingressOffsets(x))).map { case (l,r) => l <> r }
+    (terminals.egress  zip  noc.io.egress.drop(params.egressOffsets(x) )).map { case (l,r) => l <> r }
     u.interface(
       terminals,
-      ingressOffsets(x),
-      egressOffsets(x),
+      params.ingressOffsets(x),
+      params.egressOffsets(x),
       io)
   }
 }
+
