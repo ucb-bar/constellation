@@ -14,14 +14,14 @@ import constellation.protocol.TLNoCParams
 import scala.collection.immutable.{ListMap}
 
 /** System bus */
-class WithSbusNoC(tlnocParams: TLNoCParams) extends Config((site, here, up) => {
+class WithSbusNoC(tlnocParams: TLNoCParams, inlineNoC: Boolean = false) extends Config((site, here, up) => {
   case TLNetworkTopologyLocated(InSubsystem) => {
     up(TLNetworkTopologyLocated(InSubsystem), site).map(topo => {
       topo match {
         case j: TLBusWrapperTopology => {
           new TLBusWrapperTopology(j.instantiations.map(inst => inst match {
             case (SBUS, sbus_params: SystemBusParams) =>
-              (SBUS, ConstellationSystemBusParams(sbus_params, tlnocParams))
+              (SBUS, ConstellationSystemBusParams(sbus_params, tlnocParams, inlineNoC))
             case a => a
           }), j.connections)
         }
@@ -32,14 +32,14 @@ class WithSbusNoC(tlnocParams: TLNoCParams) extends Config((site, here, up) => {
 })
 
 /** Memory bus */
-class WithMbusNoC(tlnocParams: TLNoCParams) extends Config((site, here, up) => {
+class WithMbusNoC(tlnocParams: TLNoCParams, inlineNoC: Boolean = false) extends Config((site, here, up) => {
   case TLNetworkTopologyLocated(InSubsystem) => {
     up(TLNetworkTopologyLocated(InSubsystem), site).map(topo => {
       topo match {
         case j: TLBusWrapperTopology => {
           new TLBusWrapperTopology(j.instantiations.map(inst => inst match {
             case (MBUS, mbus_params: MemoryBusParams) =>
-              (MBUS, ConstellationMemoryBusParams(mbus_params, tlnocParams))
+              (MBUS, ConstellationMemoryBusParams(mbus_params, tlnocParams, inlineNoC))
             case a => a
           }), j.connections)
         }
@@ -50,14 +50,14 @@ class WithMbusNoC(tlnocParams: TLNoCParams) extends Config((site, here, up) => {
 })
 
 /** Control bus */
-class WithCbusNoC(tlnocParams: TLNoCParams) extends Config((site, here, up) => {
+class WithCbusNoC(tlnocParams: TLNoCParams, inlineNoC: Boolean = false) extends Config((site, here, up) => {
   case TLNetworkTopologyLocated(InSubsystem) => {
     up(TLNetworkTopologyLocated(InSubsystem), site).map(topo => {
       topo match {
         case j: TLBusWrapperTopology => {
           new TLBusWrapperTopology(j.instantiations.map(inst => inst match {
             case (CBUS, cbus_params: PeripheryBusParams) =>
-              (CBUS, ConstellationPeripheryBusParams(cbus_params, tlnocParams))
+              (CBUS, ConstellationPeripheryBusParams(cbus_params, tlnocParams, inlineNoC))
             case a => a
           }), j.connections)
         }
@@ -68,14 +68,14 @@ class WithCbusNoC(tlnocParams: TLNoCParams) extends Config((site, here, up) => {
 })
 
 /** Peripheral bus */
-class WithPbusNoC(tlnocParams: TLNoCParams) extends Config((site, here, up) => {
+class WithPbusNoC(tlnocParams: TLNoCParams, inlineNoC: Boolean = false) extends Config((site, here, up) => {
   case TLNetworkTopologyLocated(InSubsystem) => {
     up(TLNetworkTopologyLocated(InSubsystem), site).map(topo => {
       topo match {
         case j: TLBusWrapperTopology => {
           new TLBusWrapperTopology(j.instantiations.map(inst => inst match {
             case (PBUS, pbus_params: PeripheryBusParams) =>
-              (PBUS, ConstellationPeripheryBusParams(pbus_params, tlnocParams))
+              (PBUS, ConstellationPeripheryBusParams(pbus_params, tlnocParams, inlineNoC))
             case a => a
           }), j.connections)
         }

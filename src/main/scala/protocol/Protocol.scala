@@ -64,7 +64,8 @@ trait ProtocolParams {
 case class ProtocolNoCParams(
   nocParams: NoCParams,
   protocolParams: Seq[ProtocolParams],
-  widthDivision: Int = 1
+  widthDivision: Int = 1,
+  inlineNoC: Boolean = false
 )
 class ProtocolNoC(params: ProtocolNoCParams)(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
@@ -72,6 +73,13 @@ class ProtocolNoC(params: ProtocolNoCParams)(implicit p: Parameters) extends Mod
     val protocol = MixedVec(params.protocolParams.map { u => u.genIO() })
   })
   // END: ProtocolNoC
+
+  if (params.inlineNoC) chisel3.experimental.annotate(
+    new chisel3.experimental.ChiselAnnotation {
+      def toFirrtl: firrtl.annotations.Annotation = firrtl.passes.InlineAnnotation(toNamed)
+    }
+  )
+
   val protocolParams       = params.protocolParams
   val minPayloadWidth      = protocolParams.map(_.minPayloadWidth).max
   val nocPayloadWidth      = math.ceil(minPayloadWidth.toDouble / params.widthDivision).toInt
