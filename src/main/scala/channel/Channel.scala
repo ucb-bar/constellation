@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 
 import org.chipsalliance.cde.config.{Field, Parameters}
-import freechips.rocketchip.diplomacy.{ClockCrossingType, NoCrossing}
+import freechips.rocketchip.prci.{ClockCrossingType, NoCrossing}
 import constellation.routing.{ChannelRoutingInfo}
 import constellation.noc.{HasNoCParams}
 
