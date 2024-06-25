@@ -79,7 +79,7 @@ To use Constellation in **Minimal-Standalone** mode, it is sufficient to clone t
 Installing with Chipyard
 ------------------------
 
-To use Constellation in **Chipyard-Standalone** or **Chipyard-SoC** mode, follow the instructions for installing Chipyard `here <https://chipyard.readthedocs.io>`_. You must use Chipyard 1.8 or later.
+To use Constellation in **Chipyard-Standalone** or **Chipyard-SoC** mode, follow the instructions for installing Chipyard `here <https://chipyard.readthedocs.io>`_. You must use the most recent Chipyard version
 
 After following those steps, run the following
 
