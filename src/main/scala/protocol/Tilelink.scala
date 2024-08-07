@@ -231,6 +231,14 @@ trait TileLinkProtocolParams extends ProtocolParams with TLFieldHelper {
   def genIO()(implicit p: Parameters): Data = new TileLinkInterconnectInterface(edgesIn, edgesOut)
 }
 
+object TLConnect {
+  def apply[T <: TLBundleBase](l: DecoupledIO[T], r: DecoupledIO[T]) = {
+    l.valid := r.valid
+    r.ready := l.ready
+    l.bits.squeezeAll.waiveAll :<>= r.bits.squeezeAll.waiveAll
+  }
+}
+
 // BEGIN: TileLinkProtocolParams
 case class TileLinkABCDEProtocolParams(
   edgesIn: Seq[TLEdge],
@@ -276,13 +284,13 @@ case class TileLinkABCDEProtocolParams(
         nif_master.io.tilelink.c.valid := false.B
         nif_master.io.tilelink.e.valid := false.B
 
-        nif_master.io.tilelink.a <> protocol.in(i).a
-        protocol.in(i).d <> nif_master.io.tilelink.d
+        TLConnect(nif_master.io.tilelink.a, protocol.in(i).a)
+        TLConnect(protocol.in(i).d, nif_master.io.tilelink.d)
 
         if (protocol.in(i).params.hasBCE) {
-          protocol.in(i).b <> nif_master.io.tilelink.b
-          nif_master.io.tilelink.c <> protocol.in(i).c
-          protocol.in(i).e <> nif_master.io.tilelink.e
+          TLConnect(protocol.in(i).b, nif_master.io.tilelink.b)
+          TLConnect(nif_master.io.tilelink.c, protocol.in(i).c)
+          TLConnect(nif_master.io.tilelink.e, protocol.in(i).e)
         }
 
         ingresses(i * 3 + 0).flit <> nif_master.io.flits.a
@@ -302,13 +310,13 @@ case class TileLinkABCDEProtocolParams(
         nif_slave.io.tilelink.b.valid := false.B
         nif_slave.io.tilelink.d.valid := false.B
 
-        protocol.out(i).a <> nif_slave.io.tilelink.a
-        nif_slave.io.tilelink.d <> protocol.out(i).d
+        TLConnect(protocol.out(i).a, nif_slave.io.tilelink.a)
+        TLConnect(nif_slave.io.tilelink.d, protocol.out(i).d)
 
         if (protocol.out(i).params.hasBCE) {
-          nif_slave.io.tilelink.b <> protocol.out(i).b
-          protocol.out(i).c <> nif_slave.io.tilelink.c
-          nif_slave.io.tilelink.e <> protocol.out(i).e
+          TLConnect(nif_slave.io.tilelink.b, protocol.out(i).b)
+          TLConnect(protocol.out(i).c, nif_slave.io.tilelink.c)
+          TLConnect(protocol.out(i).e, nif_slave.io.tilelink.e)
         }
 
         ingresses(i * 2 + 0 + edgesIn.size * 3).flit <> nif_slave.io.flits.b
@@ -363,11 +371,11 @@ case class TileLinkACDProtocolParams(
         nif_master_acd.io.tilelink.c.valid := false.B
         nif_master_acd.io.tilelink.e.valid := false.B
 
-        nif_master_acd.io.tilelink.a <> protocol.in(i).a
-        protocol.in(i).d <> nif_master_acd.io.tilelink.d
+        TLConnect(nif_master_acd.io.tilelink.a, protocol.in(i).a)
+        TLConnect(protocol.in(i).d, nif_master_acd.io.tilelink.d)
 
         if (protocol.in(i).params.hasBCE) {
-          nif_master_acd.io.tilelink.c <> protocol.in(i).c
+          TLConnect(nif_master_acd.io.tilelink.c, protocol.in(i).c)
         }
 
         ingresses(i * 2 + 0).flit <> nif_master_acd.io.flits.a
@@ -385,11 +393,11 @@ case class TileLinkACDProtocolParams(
         nif_slave_acd.io.tilelink.b.valid := false.B
         nif_slave_acd.io.tilelink.d.valid := false.B
 
-        protocol.out(i).a <> nif_slave_acd.io.tilelink.a
-        nif_slave_acd.io.tilelink.d <> protocol.out(i).d
+        TLConnect(protocol.out(i).a, nif_slave_acd.io.tilelink.a)
+        TLConnect(nif_slave_acd.io.tilelink.d, protocol.out(i).d)
 
         if (protocol.out(i).params.hasBCE) {
-          protocol.out(i).c <> nif_slave_acd.io.tilelink.c
+          TLConnect(protocol.out(i).c, nif_slave_acd.io.tilelink.c)
         }
 
         ingresses(i * 1 + 0 + edgesIn.size * 2).flit <> nif_slave_acd.io.flits.d
@@ -436,8 +444,8 @@ case class TileLinkBEProtocolParams(
         nif_master_be.io.tilelink.e.valid := false.B
 
         if (protocol.in(i).params.hasBCE) {
-          protocol.in(i).b <> nif_master_be.io.tilelink.b
-          nif_master_be.io.tilelink.e <> protocol.in(i).e
+          TLConnect(protocol.in(i).b, nif_master_be.io.tilelink.b)
+          TLConnect(nif_master_be.io.tilelink.e, protocol.in(i).e)
         }
 
         ingresses(i * 1 + 0).flit <> nif_master_be.io.flits.e
@@ -455,8 +463,8 @@ case class TileLinkBEProtocolParams(
         nif_slave_be.io.tilelink.d.valid := false.B
 
         if (protocol.out(i).params.hasBCE) {
-          protocol.out(i).e <> nif_slave_be.io.tilelink.e
-          nif_slave_be.io.tilelink.b <> protocol.out(i).b
+          TLConnect(protocol.out(i).e, nif_slave_be.io.tilelink.e)
+          TLConnect(nif_slave_be.io.tilelink.b, protocol.out(i).b)
         }
 
         ingresses(i * 1 + 0 + edgesIn.size * 1).flit <> nif_slave_be.io.flits.b
@@ -541,6 +549,8 @@ class TLNoC(params: SimpleTLNoCParams, name: String = "test", inlineNoC: Boolean
     val nodeMapping = params.nodeMappings
     val nocName = name
 
+    printNodeMappings()
+
     val protocolParams = TileLinkABCDEProtocolParams(
       edgesIn = edgesIn,
       edgesOut = edgesOut,
@@ -548,8 +558,6 @@ class TLNoC(params: SimpleTLNoCParams, name: String = "test", inlineNoC: Boolean
       edgeOutNodes = edgeOutNodes.flatten
     )
 
-
-    printNodeMappings()
     val noc = Module(new ProtocolNoC(ProtocolNoCParams(
       params.nocParams.copy(hasCtrl = false, nocName=name, inlineNoC = inlineNoC),
       Seq(protocolParams),
