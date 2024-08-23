@@ -39,25 +39,6 @@ These configs fall into four categories, delineated by the prefix of the Config 
      - Functional correctness for AXI4 transport
 
 
-Minimal-Standalone Testing
---------------------------
-
-In minimal-standalone mode, predefined testing configurations can be generated and simulated.
-The list of testing configurations is described in `src/test/scala/constellation/NocTests.scala <https://github.com/ucb-bar/constellation/blob/master/src/test/scala/constellation/NocTests.scala>`_. Each Test configuration corresponds to a NoC configuration.
-
-.. code-block:: shell
-
-   cd constellation
-   CONSTELLATION_STANDALONE=1 sbt "testOnly constellation.NoCTest00"
-
-When running the above command, the NoC verilog will be generated in ``test_run_dir``.
-
-.. code-block:: shell
-
-   cd test_run_dir
-   cd NoC_should_pass_test_with_config_constellationtestTestConfig00
-   cat NoCChiselTester.sv
-
 Chipyard-Standalone Testing
 ---------------------------
 
