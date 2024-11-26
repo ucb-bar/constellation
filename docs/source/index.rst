@@ -20,7 +20,7 @@ Constellation is a Chisel NoC RTL generator framework designed from the ground u
 
 .. image:: diagrams/bigsoc.svg
    :width: 600px
-   
+
 .. toctree::
    :maxdepth: 4
    :caption: Contents:
