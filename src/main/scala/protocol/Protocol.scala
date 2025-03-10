@@ -74,11 +74,9 @@ class ProtocolNoC(params: ProtocolNoCParams)(implicit p: Parameters) extends Mod
   })
   // END: ProtocolNoC
 
-  if (params.inlineNoC) chisel3.experimental.annotate(
-    new chisel3.experimental.ChiselAnnotation {
-      def toFirrtl: firrtl.annotations.Annotation = firrtl.passes.InlineAnnotation(toNamed)
-    }
-  )
+  if (params.inlineNoC) {
+    chisel3.experimental.annotate(this)(Seq(firrtl.passes.InlineAnnotation(toNamed)))
+  }
 
   val protocolParams       = params.protocolParams
   val minPayloadWidth      = protocolParams.map(_.minPayloadWidth).max
