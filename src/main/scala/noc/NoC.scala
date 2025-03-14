@@ -13,6 +13,8 @@ import constellation.channel._
 import constellation.routing.{RoutingRelation, ChannelRoutingInfo}
 import constellation.topology.{PhysicalTopology, UnidirectionalLine}
 
+import play.api.libs.json._
+
 
 class NoCTerminalIO(
   val ingressParams: Seq[IngressChannelParams],
@@ -213,6 +215,8 @@ class NoC(nocParams: NoCParams)(implicit p: Parameters) extends LazyModule {
       (outs ++ egresses ++ ingresses).mkString("\n")
     }.mkString("\n")
     ElaborationArtefacts.add(prepend("noc.edgeprops"), edgeProps)
+    import JSONConverters._
+    ElaborationArtefacts.add(prepend("noc_cfg.json"), Json.toJson(nocParams).toString())
 
     println(s"Constellation: $nocName Finished NoC RTL generation")
   }
