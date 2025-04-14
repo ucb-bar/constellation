@@ -1,10 +1,10 @@
 package constellation
 
 import org.chipsalliance.cde.config.{Config, Parameters}
-import chiseltest._
-import chiseltest.simulator.{VerilatorFlags, VerilatorCFlags, SimulatorDebugAnnotation, VerilatorLinkFlags}
 import org.scalatest.flatspec.AnyFlatSpec
 import chisel3._
+import chisel3.simulator.scalatest.ChiselSim
+import chisel3.simulator.stimulus.RunUntilFinished
 import constellation.test._
 
 class NoCChiselTester(implicit val p: Parameters) extends Module {
@@ -30,26 +30,13 @@ class EvalNoCChiselTester(implicit val p: Parameters) extends Module {
 abstract class BaseNoCTest(
   gen: Parameters => Module,
   configs: Seq[Config],
-  extraVerilatorFlags: Seq[String] = Nil) extends AnyFlatSpec with ChiselScalatestTester {
+  extraVerilatorFlags: Seq[String] = Nil) extends AnyFlatSpec with ChiselSim {
   behavior of "NoC"
 
   configs.foreach { config =>
     it should s"pass test with config ${config.getClass.getName}" in {
       implicit val p: Parameters = config
-      test(gen(p))
-        .withAnnotations(Seq(
-          SimulatorDebugAnnotation,
-          VerilatorBackendAnnotation,
-          VerilatorFlags(extraVerilatorFlags),
-          VerilatorLinkFlags(Seq(
-            "-Wl,--allow-multiple-definition",
-            "-fcommon")),
-          VerilatorCFlags(Seq(
-            "-DNO_VPI",
-            "-fcommon",
-            "-fpermissive"))
-        ))
-        .runUntilStop(timeout = 1000 * 1000)
+      simulate(gen(p))(RunUntilFinished(1000 * 1000))
     }
   }
 }
