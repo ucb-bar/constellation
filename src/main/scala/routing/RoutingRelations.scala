@@ -715,7 +715,33 @@ object HierarchicalRouting {
 }
 
 
-// Shortest path routing + a Single Dateline escape priority
+/**
+ * ShortestPathSingleDatelineRouting: This is a routing relation that combines shortest-path 
+ * routing with a single escape virtual channel (VC) to handle potential deadlocks
+ * caused by dateline crossings. It is currently only capable of using one escape channel.
+ * [This may be adjusted in the future to use a parametrizable number of dateline channels]
+ *
+ * Core Strategy:
+ * - Uses BFS to precompute the first hop for all source-destination node pairs along shortest paths.
+ * - Enforces that packets strictly follow the shortest path from source to destination.
+ * - Introduces a dateline halfway through the topology (by node index), where any crossing of
+ *   the dateline requires routing on an escape VC (VC 0). 
+ * - All other hops must use a normal VC (VC 1).
+ *
+ * Functions:
+ * - rel(): The main routing scheme that:
+ *    - Validates if the next hop corresponds to the shortest path from current node to destination.
+ *    - Enforces use of the escape VC if and only if the packet crosses the dateline.
+ * - getNPrios(): Returns 2, representing one escape VC and one normal VC.
+ * - getPrio(): Assigns higher priority (1) to non-dateline hops, and lower (0) to dateline hops.
+ * - isEscape(): Identifies ingress/egress hops and VC 0 as escape paths.
+ *
+ * Intended Use:
+ * This routing policy is designed for topologies like UnidirectionalTorus1D + simple bypass schemes, 
+ * so that we can mainly utilize shortest path routing with a simple dateline crossing which wont lose
+ * much performance.
+ */
+
 object ShortestPathSingleDatelineRouting {
   def apply() = (topo: PhysicalTopology) => new RoutingRelation(topo) {
     // Build adjacency list
@@ -842,6 +868,23 @@ object EscapeIDOrderRouting {
   }
 }
 
+/*
+ * CustomLayeredRouting: This is a a generalized deadlock-free routing policy for arbitrary
+ * topologies. 
+ * 
+ * This routing relation assigns each flow (src, dst) a dedicated virtual channel (VC) layer
+ * such that all paths in the same layer do not introduce cyclic dependencies. This is done by:
+ *   1. Finding all shortest paths between flow pairs
+ *   2. Deduplicating and pruning strict subpaths
+ *   3. Packing flow paths into the minimum number of layers while preserving DAG constraints
+ *   4. Assigning a VC layer to each flow based on its path
+ * 
+ * The rel() function enforces this policy by:
+ *   - Ensuring packets flow only along the assigned VC
+ *   - Ensuring only legal hops in the assigned flow path are taken
+ *   - Ensuring the hop is within the assigned VC layer
+ */
+
 object CustomLayeredRouting {
   
   def apply() = (topo: PhysicalTopology) => topo match {
@@ -876,7 +919,7 @@ object CustomLayeredRouting {
       }
       println(s"[CustomLayeredRouting] Required VCs: ${packed.length}")
 
-      // === VC assignment for all flows based on first matching layer ===
+      // VC assignment for all flows based on first matching layer
       val allFlowAssignments: Map[(Int, Int), Int] = allSSPs.map { case ((src, dst), path) =>
         val assignedLayer = packed.indexWhere(layer => path.toSet.subsetOf(layer.flatMap(_._2).toSet))
         require(assignedLayer >= 0, s"[CustomLayeredRouting] ERROR: Could not find a layer covering path for flow ($src->$dst)")
@@ -893,7 +936,7 @@ object CustomLayeredRouting {
         val nhs = mutable.Map[(Int, Int), Int]()
 
         for (((src, dst), path) <- layer) {
-          val nodes = path.map(_._1) :+ path.last._2  // all nodes in order
+          val nodes = path.map(_._1) :+ path.last._2
           for (i <- 0 until nodes.length - 1) {
             nhs((nodes(i), dst)) = nodes(i + 1)
           }
@@ -933,7 +976,6 @@ object CustomLayeredRouting {
         val nextNode = nxtC.dst
 
         // Step 4: Determine if the hop is allowed
-        // val edgeOk = assignedEdgeSet.contains((curNode, nextNode))
         val edgeOk = flowPathEdges.contains((curNode, nextNode))
 
         // val edgeOk = assignedEdgeSet.contains((curNode, nextNode)) && flowPathEdges.contains((curNode, nextNode))
@@ -954,8 +996,8 @@ object CustomLayeredRouting {
       override def isEscape(c: ChannelRoutingInfo, v: Int): Boolean =
         c.isIngress || c.isEgress
 
-      val guAssignedLayer = allFlowAssignments  // synonym for clarity
-      val nVirtualLayers = vcToEdges.length     // number of packed layers
+      val guAssignedLayer = allFlowAssignments
+      val nVirtualLayers = vcToEdges.length
 
       override def getNPrios(c: ChannelRoutingInfo): Int = nVirtualLayers
 
@@ -971,6 +1013,19 @@ object CustomLayeredRouting {
 
 }
 
+
+/**
+ * CustomGraph: A utility class for layered routing over an arbitrary directed topology
+ * 
+ * This class helps perform some computations to generate a deadlock-free routing configuration:
+ *   - generateSSPs: Computes all-pairs single-source shortest paths using BFS.
+ *   - deduplicateSSPs: Removes duplicate paths with the same edge sequences.
+ *   - pruneSubpaths: Eliminates paths that are strict subsets of other paths.
+ *   - packLayersMinimal: Packs flows into the minimum number of VC layers ensuring each layer is a DAG.
+ * 
+ * The final output is a list of layers (each a list of flows and their edge paths) which are suitable for safe routing.
+ * These layers are then enforced through VC constraints during path traversal.
+ */
 class CustomGraph(val nNodes: Int, val edges: Seq[(Int, Int)]) {
 
   def generateSSPs(): List[((Int, Int), List[(Int, Int)])] = {
@@ -1006,7 +1061,7 @@ class CustomGraph(val nNodes: Int, val edges: Seq[(Int, Int)]) {
         val edgePath: List[(Int, Int)] = path.sliding(2).toList.map { pair =>
           pair.toSeq match {
             case Seq(a, b) => (a, b)
-            case other => throw new RuntimeException(s"Unexpected sliding window: $other")
+            case other => throw new RuntimeException(s"Custom Graph Error: $other")
           }
         }
 
@@ -1016,7 +1071,6 @@ class CustomGraph(val nNodes: Int, val edges: Seq[(Int, Int)]) {
 
     result.toList
   }
-
 
   def deduplicateSSPs(ssps: List[((Int, Int), List[(Int, Int)])]): List[((Int, Int), List[(Int, Int)])] = {
     val seen = mutable.HashSet[Seq[(Int, Int)]]()
@@ -1034,7 +1088,6 @@ class CustomGraph(val nNodes: Int, val edges: Seq[(Int, Int)]) {
 
     result.toList
   }
-
 
   def pruneSubpaths(ssps: List[((Int, Int), List[(Int, Int)])]): List[((Int, Int), List[(Int, Int)])] = {
     val edgeSets = ssps.map { case (_, path) => path.toSet }
@@ -1071,7 +1124,8 @@ class CustomGraph(val nNodes: Int, val edges: Seq[(Int, Int)]) {
     val dagGraphs = Array.fill(k)(mutable.Map[Int, mutable.Set[Int]]())
 
     def isDAG(g: Map[Int, Set[Int]]): Boolean = {
-      val visited = mutable.Map[Int, Int]() // 0 = unvisited, 1 = visiting, 2 = visited
+      // 0 = unvisited, 1 = visiting, 2 = visited
+      val visited = mutable.Map[Int, Int]()
 
       def dfs(u: Int): Boolean = {
         visited.get(u) match {
@@ -1095,7 +1149,6 @@ class CustomGraph(val nNodes: Int, val edges: Seq[(Int, Int)]) {
       val g = dagGraphs(layer)
       val edgeCount = dags(layer)
 
-      // Tentatively add
       val newlyAdded = mutable.ListBuffer[(Int, Int)]()
       for ((u, v) <- path) {
         if (!g.contains(u)) g(u) = mutable.Set()
@@ -1107,7 +1160,6 @@ class CustomGraph(val nNodes: Int, val edges: Seq[(Int, Int)]) {
       // Check DAG
       val snapshot = g.map { case (k, v) => (k, v.toSet) }.toMap
       if (!isDAG(snapshot)) {
-        // Revert
         for ((u, v) <- newlyAdded) g(u).remove(v)
         for ((u, v) <- path) {
           edgeCount((u, v)) -= 1
