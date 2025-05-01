@@ -205,3 +205,9 @@ case class HierarchicalTopology(val base: PhysicalTopology, val children: Seq[Hi
   val plotter = new LinePlotter(this)
 }
 
+case class TopologyEdge(src: Int, dst: Int)
+case class CustomTopology(n: Int, edgeList: Seq[TopologyEdge]) extends PhysicalTopology {
+  val nNodes = n
+  def topo(src: Int, dst: Int): Boolean = edgeList.contains(TopologyEdge(src, dst))
+  val plotter = new LinePlotter(this)
+}
