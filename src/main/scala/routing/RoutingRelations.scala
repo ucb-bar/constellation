@@ -713,58 +713,52 @@ object HierarchicalRouting {
 
 
 /**
- * ShortestPathSingleDatelineRouting: This is a routing relation that combines shortest-path 
- * routing with a single escape virtual channel (VC) to handle potential deadlocks
- * caused by dateline crossings. It is currently only capable of using one escape channel.
- * [This may be adjusted in the future to use a parametrizable number of dateline channels]
+ * Pure shortest-path routing strategy with some VC-based load balancing.
  *
- * Core Strategy:
- * - Uses BFS to precompute the first hop for all source-destination node pairs along shortest paths.
- * - Enforces that packets strictly follow the shortest path from source to destination.
- * - Introduces a dateline halfway through the topology (by node index), where any crossing of
- *   the dateline requires routing on an escape VC (VC 0). 
- * - All other hops must use a normal VC (VC 1).
+ * This routing relation computes single-path shortest routes between all node pairs
+ * using BFS and restricts flow transitions to only those that follow the precomputed
+ * shortest-path next hop. No deadlock avoidance mechanism is enforced.
  *
- * Functions:
- * - rel(): The main routing scheme that:
- *    - Validates if the next hop corresponds to the shortest path from current node to destination.
- *    - Enforces use of the escape VC if and only if the packet crosses the dateline.
- * - getNPrios(): Returns 2, representing one escape VC and one normal VC.
- * - getPrio(): Assigns higher priority (1) to non-dateline hops, and lower (0) to dateline hops.
- * - isEscape(): Identifies ingress/egress hops and VC 0 as escape paths.
+ * If multiple virtual channels (VCs) are available, this router assigns flows to
+ * VCs using a deterministic hash of (src, dst), which can help balance load across
+ * VCs during arbitration. However, VC transitions are not enforced and per-hop—flows 
+ * are allowed to use any VC as long as the edge is on the shortest path.
  *
- * Intended Use:
- * This routing policy is designed for topologies like UnidirectionalTorus1D + simple bypass schemes, 
- * so that we can mainly utilize shortest path routing with a simple dateline crossing which wont lose
- * much performance.
+ * This routing strategy is best for minimal-hop designs, and 
+ * scenarios where higher-level deadlock prevention is handled 
+ * externally such as through EscapeChannelRouting.
+ *
+ * maxVCs: The number of virtual channels available per physical channel.
+ *         This must be >= 1. Defaults to 1 (no VC usage).
+ * 
  */
 
-object ShortestPathSingleDatelineRouting {
-  def apply() = (topo: PhysicalTopology) => new RoutingRelation(topo) {
+object ShortestPathRouting {
+  def apply(maxVCs: Int = 1) = (topo: PhysicalTopology) => new RoutingRelation(topo) {
+    require(maxVCs >= 1, s"[ShortestPathRouting] maxVCs must be >= 1 (got $maxVCs)")
+
     // Build adjacency list
     val adjList: Map[Int, Seq[Int]] = (0 until topo.nNodes).map { src =>
       src -> (0 until topo.nNodes).filter(dst => topo.topo(src, dst))
     }.toMap
 
-    // Precompute next hops
+    // Precompute shortest-path next hops using BFS
     val nextHop: Map[(Int, Int), Int] = {
       val paths = for (src <- 0 until topo.nNodes; dst <- 0 until topo.nNodes if src != dst) yield {
         val next = bfsNextHop(src, dst)
         (src, dst) -> next
       }
-      paths.collect { case ((s,d), Some(n)) => (s,d) -> n }.toMap
+      paths.collect { case ((s, d), Some(n)) => (s, d) -> n }.toMap
     }
 
-    // Helper: BFS to find next hop
+    // BFS shortest-path helper
     private def bfsNextHop(src: Int, dst: Int): Option[Int] = {
       val visited = scala.collection.mutable.Set[Int]()
       val queue = scala.collection.mutable.Queue[(Int, List[Int])]()
       queue.enqueue((src, List()))
       while (queue.nonEmpty) {
         val (node, path) = queue.dequeue()
-        if (node == dst) {
-          return path.headOption
-        }
+        if (node == dst) return path.headOption
         if (!visited.contains(node)) {
           visited += node
           adjList(node).foreach { neighbor =>
@@ -775,83 +769,44 @@ object ShortestPathSingleDatelineRouting {
       None
     }
 
-    // Dateline definition
-    val dateline = topo.nNodes / 2
     def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo): Boolean = {
+      val flowKey = (flow.ingressNode, flow.egressNode)
+
       if (srcC.src == -1) {
-        true
-      } else if (flow.egressNode == srcC.dst) {
-        false // Already at destination
-      } else {
-        // Must follow shortest path
-        val correctNext = nextHop.get((srcC.dst, flow.egressNode)).contains(nxtC.dst)
-
-        // Must use correct VC if crossing dateline
-        val needsEscape = crossesDateline(srcC.dst, nxtC.dst)
-        val correctVC = if (needsEscape) {
-          nxtC.vc == 0 // escape VC
-        } else {
-          nxtC.vc != 0 // normal VC
+        // Ingress: only inject into first hop of shortest path
+        val expected = nextHop.get((flow.ingressNode, flow.egressNode))
+        val legal = nxtC.src == flow.ingressNode && expected.contains(nxtC.dst)
+        if (!legal) {
+          println(s"[rel BLOCKED][Inject] Flow $flowKey: Illegal injection into (${nxtC.src} -> ${nxtC.dst})")
         }
-
-        correctNext && correctVC
+        return legal
       }
+
+      if (srcC.dst == flow.egressNode) return false
+
+      val expected = nextHop.get((srcC.dst, flow.egressNode))
+      val legal = expected.contains(nxtC.dst)
+      if (!legal) {
+        println(s"[rel BLOCKED] Flow $flowKey: (${srcC.dst} -> ${nxtC.dst}) not on shortest path")
+      }
+
+      legal
     }
 
-
-    // VC Priority logic
-    override def getNPrios(src: ChannelRoutingInfo): Int = 2 // Two VCs: escape VC and normal VC
+    // VC configuration
+    override def getNPrios(src: ChannelRoutingInfo): Int = maxVCs
 
     override def getPrio(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo): Int = {
-      if (srcC.src == -1) {
-        1
-      } else if (crossesDateline(srcC.dst, nxtC.dst)) {
-        0
-      } else {
-        1
-      }
+      (flow.ingressNode * 31 + flow.egressNode) % maxVCs
     }
 
-    override def isEscape(c: ChannelRoutingInfo, vNetId: Int): Boolean = {
-      c.isIngress || c.isEgress || c.vc == 0
-    }
+    override def isEscape(c: ChannelRoutingInfo, vNetId: Int): Boolean = c.isIngress || c.isEgress
 
-    // Define dateline crossing
-    private def crossesDateline(src: Int, dst: Int): Boolean = {
-      (src < dateline && dst >= dateline) || (src >= dateline && dst < dateline)
-    }
-
-    // Debug output for verification
-    println("[Constellation] === ShortestPathRouting Debug Output ===")
-    for (src <- 0 until topo.nNodes) {
-      for (dst <- 0 until topo.nNodes if src != dst) {
-        val path = buildFullPath(src, dst)
-        if (path.nonEmpty) {
-          println(s"[Path] $src -> $dst : ${path.mkString(" -> ")}")
-        } else {
-          println(s"[WARNING] No path from $src -> $dst")
-        }
-      }
-    }
-    println("[Constellation] === End ofShortestPathRouting Debug Output ===")
-
-    // Helper to build full path
-    private def buildFullPath(src: Int, dst: Int): Seq[Int] = {
-      var path = Seq(src)
-      var current = src
-      while (current != dst) {
-        nextHop.get((current, dst)) match {
-          case Some(nxt) =>
-            path = path :+ nxt
-            current = nxt
-          case None =>
-            return Seq()
-        }
-      }
-      path
-    }
+    println(s"[ShortestPathRouting] Initialized with maxVCs = $maxVCs")
+    // println("[ShortestPathRouting] =======================")
   }
 }
+
 
 object EscapeIDOrderRouting {
   def apply() = (topo: PhysicalTopology) => new RoutingRelation(topo) {
