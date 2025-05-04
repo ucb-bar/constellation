@@ -7,9 +7,6 @@ import scala.collection.immutable.ListMap
 import constellation.topology.{PhysicalTopology, Mesh2DLikePhysicalTopology, HierarchicalTopology, CustomTopology}
 
 import scala.collection.mutable
-import scala.collection.mutable.{HashMap, HashSet, Queue}
-import constellation.topology.TopologyEdge
-import scala.collection.mutable.{Set => MSet, Map => MMap}
 
 /** Routing and channel allocation policy
  *
@@ -953,45 +950,52 @@ object CustomLayeredRouting {
 
         // Step 1: Lookup assigned VC
         val assignedVC = allFlowAssignments.getOrElse(flowKey, {
-          println(s"[rel ERROR] No VC assigned to flow $flowKey")
+          // println(s"[rel ERROR] No VC assigned to flow $flowKey")
           return false
         })
 
-        // Step 2: Lookup full path and check it lies entirely within assigned VC layer
-        val flowPathEdges = flowPaths.getOrElse(flowKey, {
-          println(s"[rel ERROR] No path found for flow $flowKey")
+        // Step 2: Lookup full path and verify layer correctness
+        val flowPath = flowPaths.getOrElse(flowKey, {
+          // println(s"[rel ERROR] No path found for flow $flowKey")
           return false
-        }).toSet
+        })
 
+        val flowPathEdges = flowPath.toSet
         val assignedEdgeSet = vcToEdges(assignedVC)
 
         val fullPathOk = flowPathEdges.subsetOf(assignedEdgeSet)
         if (!fullPathOk) {
-          println(s"[rel ERROR] Full path for flow $flowKey is NOT entirely in VC=$assignedVC")
+          // println(s"[rel ERROR] Full path for flow $flowKey is NOT entirely in VC=$assignedVC")
+          // println(s"  Path: ${flowPath.mkString(" -> ")}")
+          // println(s"  Layer edges: ${assignedEdgeSet.mkString(", ")}")
           return false
         }
 
-        // Step 3: Determine the current and next node
+        // Step 3: Current and next node
         val curNode  = if (srcC.src == -1) flow.ingressNode else srcC.dst
         val nextNode = nxtC.dst
+        val edge     = (curNode, nextNode)
 
-        // Step 4: Determine if the hop is allowed
-        val edgeOk = flowPathEdges.contains((curNode, nextNode))
-
-        // val edgeOk = assignedEdgeSet.contains((curNode, nextNode)) && flowPathEdges.contains((curNode, nextNode))
-
+        // Step 4: Legal check
+        val edgeOk = flowPathEdges.contains(edge)
         val vcOk   = nxtC.vc == assignedVC && (srcC.src == -1 || srcC.vc == assignedVC)
 
         val legal = edgeOk && vcOk
 
+        // === DEBUG ===
+
         if (!legal) {
-          println(s"[rel BLOCKED] Flow $flowKey: hop ($curNode -> $nextNode) with VC=${nxtC.vc} invalid for assigned VC=$assignedVC")
+          // println(s"[rel BLOCKED] Flow $flowKey: hop ($curNode -> $nextNode) with VC=${nxtC.vc} invalid for assigned VC=$assignedVC")
         } else {
+          println(s"[rel CHECK] Flow $flowKey | Assigned VC: $assignedVC")
+          println(s"  Full path: ${flowPath.mkString(" -> ")}")
+          println(s"  Checking hop: $edge | VC=${nxtC.vc} | EdgeOK=$edgeOk | VcOK=$vcOk")
           println(s"[rel ALLOWED] Flow $flowKey: hop ($curNode -> $nextNode) with VC=${nxtC.vc} valid for assigned VC=$assignedVC")
         }
 
         legal
       }
+
 
       override def isEscape(c: ChannelRoutingInfo, v: Int): Boolean =
         c.isIngress || c.isEgress
@@ -1014,194 +1018,77 @@ object CustomLayeredRouting {
 }
 
 
-/**
- * CustomGraph: A utility class for layered routing over an arbitrary directed topology
- * 
- * This class helps perform some computations to generate a deadlock-free routing configuration:
- *   - generateSSPs: Computes all-pairs single-source shortest paths using BFS.
- *   - deduplicateSSPs: Removes duplicate paths with the same edge sequences.
- *   - pruneSubpaths: Eliminates paths that are strict subsets of other paths.
- *   - packLayersMinimal: Packs flows into the minimum number of VC layers ensuring each layer is a DAG.
- * 
- * The final output is a list of layers (each a list of flows and their edge paths) which are suitable for safe routing.
- * These layers are then enforced through VC constraints during path traversal.
- */
-class CustomGraph(val nNodes: Int, val edges: Seq[(Int, Int)]) {
+object ShortestPathGeneralizedDatelineRouting {
+  def apply() = (topo: PhysicalTopology) => new RoutingRelation(topo) {
+    val result = DatelineAnalyzer.analyze(topo)
+    val datelineEdges = result.datelineEdges
+    val maxVC = result.vcCount
+    val nextHop = result.nextHop
 
-  def generateSSPs(): List[((Int, Int), List[(Int, Int)])] = {
-    val adj = Array.fill(nNodes)(mutable.ListBuffer[Int]())
-    edges.foreach { case (u, v) => adj(u) += v }
-
-    val result = mutable.ListBuffer[((Int, Int), List[(Int, Int)])]()
-
-    for (src <- 0 until nNodes; dst <- 0 until nNodes if src != dst) {
-      val visited = Array.fill(nNodes)(false)
-      val pred = Array.fill(nNodes)(-1)
-      val q = mutable.Queue[Int](src)
-      visited(src) = true
-
-      var found = false
-      while (q.nonEmpty && !found) {
-        val u = q.dequeue()
-        for (v <- adj(u) if !visited(v)) {
-          visited(v) = true
-          pred(v) = u
-          if (v == dst) found = true else q.enqueue(v)
-        }
+    // Recompute shortest paths and expected VC transitions
+    val (shortestPaths, pathVCs): (Map[(Int, Int), List[Int]], Map[(Int, Int), List[Int]]) = {
+      val g = new CustomGraph(topo.nNodes, (0 until topo.nNodes).flatMap(u => (0 until topo.nNodes).collect {
+        case v if topo.topo(u, v) => (u, v)
+      }))
+      val sspPaths = g.generateSSPs()
+      val pathMap = sspPaths.map { case ((src, dst), edges) => ((src, dst), src +: edges.map(_._2)) }.toMap
+      val vcMap = pathMap.map { case ((src, dst), path) =>
+        val vcs = path.sliding(2).scanLeft(0) { case (vc, Seq(u, v)) =>
+          if (datelineEdges.contains((u, v))) vc + 1 else vc
+        }.toList
+        ((src, dst), vcs) // vcs.length == path.length
       }
-
-      if (found) {
-        val path = mutable.ListBuffer[Int](dst)
-        var cur = dst
-        while (pred(cur) != -1) {
-          cur = pred(cur)
-          path.prepend(cur)
-        }
-
-        val edgePath: List[(Int, Int)] = path.sliding(2).toList.map { pair =>
-          pair.toSeq match {
-            case Seq(a, b) => (a, b)
-            case other => throw new RuntimeException(s"Custom Graph Error: $other")
-          }
-        }
-
-        result.append(((src, dst), edgePath))
-      }
+      (pathMap, vcMap)
     }
 
-    result.toList
-  }
+    println(s"[ShortestPathGeneralizedDatelineRouting] Initialized with ${datelineEdges.size} datelines and $maxVC VCs")
 
-  def deduplicateSSPs(ssps: List[((Int, Int), List[(Int, Int)])]): List[((Int, Int), List[(Int, Int)])] = {
-    val seen = mutable.HashSet[Seq[(Int, Int)]]()
-    val result = mutable.ListBuffer[((Int, Int), List[(Int, Int)])]()
+    def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo): Boolean = {
 
-    for ((label, path) <- ssps) {
-      val edgeSeq = path.toIndexedSeq  // Ordered sequence
-      if (!seen.contains(edgeSeq)) {
-        seen += edgeSeq
-        result.append((label, path))
+      val flowKey = (flow.ingressNode, flow.egressNode)
+      println(s"Flow Tested $flowKey")
+
+      val path = shortestPaths.getOrElse((flow.ingressNode, flow.egressNode), Nil)
+      val vcs  = pathVCs.getOrElse((flow.ingressNode, flow.egressNode), Nil)
+
+      println(s"[rel] src=(${srcC.src},${srcC.dst},vc=${srcC.vc}) -> nxt=(${nxtC.src},${nxtC.dst},vc=${nxtC.vc}) path=$path vcs=$vcs")
+
+      if (srcC.src == -1) {
+        nxtC.vc == 0 && path.headOption.contains(nxtC.src) && path.lift(1).contains(nxtC.dst)
+      } else if (flow.egressNode == srcC.dst) {
+        false
       } else {
-        println(s"[CustomLayeredRouting] Deduplicated: $label with path ${path.mkString("->")}")
+        val edge = (srcC.dst, nxtC.dst)
+        val pathEdges = path.sliding(2).toList
+        val idx = pathEdges.indexWhere { case Seq(a, b) => a == edge._1 && b == edge._2 }
+
+        val validEdge = idx != -1
+        val expectedVC = if (idx >= 0 && idx < vcs.length) vcs(idx + 1) else -1
+        val vcValid = nxtC.vc == expectedVC
+
+        // println(s"[rel] ValidEdge=$validEdge VCExpected=$expectedVC VCValid=$vcValid")
+
+        if (validEdge && vcValid){
+          println(s"[rel ALLOWED] ValidEdge=$validEdge VCExpected=$expectedVC VCValid=$vcValid")
+        } else {
+          println(s"[rel BLOCKED] ValidEdge=$validEdge VCExpected=$expectedVC VCValid=$vcValid")
+        }
+
+        validEdge && vcValid
       }
     }
 
-    result.toList
+    override def getNPrios(src: ChannelRoutingInfo): Int = {
+      maxVC
+    }
+
+    override def getPrio(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo): Int = {
+      // Priority is highest for lowest VC to prefer dateline avoidance
+      maxVC - nxtC.vc
+    }
+
+    override def isEscape(c: ChannelRoutingInfo, vNetId: Int): Boolean = {
+      c.isIngress || c.isEgress || c.vc == 0
+    }
   }
-
-  def pruneSubpaths(ssps: List[((Int, Int), List[(Int, Int)])]): List[((Int, Int), List[(Int, Int)])] = {
-    val edgeSets = ssps.map { case (_, path) => path.toSet }
-
-    val pruned = ssps.zipWithIndex.filterNot { case ((labelI, pathI), i) =>
-      val setI = pathI.toSet
-      val isSubpath = edgeSets.zipWithIndex.exists { case (setJ, j) =>
-        i != j && setI.subsetOf(setJ) && setI != setJ // strict subset only
-      }
-      if (isSubpath) {
-        println(s"[CustomLayeredRouting] Pruned subpath: $labelI with path ${pathI.mkString("->")}")
-      }
-      isSubpath
-    }.map(_._1)
-
-    pruned
-  }
-
-  def packLayersMinimal(ssps: List[((Int, Int), List[(Int, Int)])]): List[List[((Int, Int), List[(Int, Int)])]] = {
-    for (k <- 1 to ssps.length) {
-      println("[CustomLayeredRouting] === Flow Order Passed to solve() ===")
-      ssps.zipWithIndex.foreach { case (((src, dst), path), i) =>
-        println(f"  $i%02d: ($src->$dst) path: ${path.mkString("->")}")
-      }
-      val result = solve(ssps, k)
-      if (result.nonEmpty) return result
-    }
-    List()
-  }
-
-  def solve(ssps: List[((Int, Int), List[(Int, Int)])], k: Int): List[List[((Int, Int), List[(Int, Int)])]] = {
-    val layers = Array.fill(k)(mutable.ListBuffer[((Int, Int), List[(Int, Int)])]())
-    val dags = Array.fill(k)(mutable.Map[(Int, Int), Int]())
-    val dagGraphs = Array.fill(k)(mutable.Map[Int, mutable.Set[Int]]())
-
-    def isDAG(g: Map[Int, Set[Int]]): Boolean = {
-      // 0 = unvisited, 1 = visiting, 2 = visited
-      val visited = mutable.Map[Int, Int]()
-
-      def dfs(u: Int): Boolean = {
-        visited.get(u) match {
-          case Some(1) => return false // cycle
-          case Some(2) => return true
-          case _ => // proceed
-        }
-
-        visited(u) = 1
-        for (v <- g.getOrElse(u, Set())) {
-          if (!dfs(v)) return false
-        }
-        visited(u) = 2
-        true
-      }
-
-      g.keys.forall(dfs)
-    }
-
-    def addEdges(layer: Int, path: List[(Int, Int)]): Boolean = {
-      val g = dagGraphs(layer)
-      val edgeCount = dags(layer)
-
-      val newlyAdded = mutable.ListBuffer[(Int, Int)]()
-      for ((u, v) <- path) {
-        if (!g.contains(u)) g(u) = mutable.Set()
-        val added = g(u).add(v)
-        if (added) newlyAdded += ((u, v))
-        edgeCount((u, v)) = edgeCount.getOrElse((u, v), 0) + 1
-      }
-
-      // Check DAG
-      val snapshot = g.map { case (k, v) => (k, v.toSet) }.toMap
-      if (!isDAG(snapshot)) {
-        for ((u, v) <- newlyAdded) g(u).remove(v)
-        for ((u, v) <- path) {
-          edgeCount((u, v)) -= 1
-          if (edgeCount((u, v)) == 0) edgeCount.remove((u, v))
-        }
-        return false
-      }
-
-      true
-    }
-
-    def removeEdges(layer: Int, path: List[(Int, Int)]): Unit = {
-      val g = dagGraphs(layer)
-      val edgeCount = dags(layer)
-
-      for ((u, v) <- path) {
-        edgeCount((u, v)) -= 1
-        if (edgeCount((u, v)) == 0) {
-          edgeCount.remove((u, v))
-          g(u).remove(v)
-          if (g(u).isEmpty) g.remove(u)
-        }
-      }
-    }
-
-    def backtrack(i: Int): Boolean = {
-      if (i == ssps.length) return true
-      val (label, path) = ssps(i)
-
-      for (j <- 0 until k) {
-        if (addEdges(j, path)) {
-          layers(j) += ((label, path))
-          if (backtrack(i + 1)) return true
-          layers(j).remove(layers(j).length - 1)
-          removeEdges(j, path)
-        }
-      }
-      false
-    }
-
-    if (backtrack(0)) layers.map(_.toList).toList else List()
-  }
-
-
 }
