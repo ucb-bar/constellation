@@ -5,11 +5,10 @@ import constellation.routing._
 import constellation.topology._
 import constellation.channel._
 import org.chipsalliance.cde.config.Config
-import constellation.topology.{PhysicalTopology, CustomTopology}
 
 class CustomTestConfigBase(
   topology: PhysicalTopology,
-  routing: RoutingRelation,
+  routingFn: PhysicalTopology => RoutingRelation,
   name: String,
   nVC: Int = 4
 ) extends NoCTesterConfig(
@@ -20,14 +19,14 @@ class CustomTestConfigBase(
       ingresses = (0 until topology.nNodes).map(UserIngressParams(_)),
       egresses = (0 until topology.nNodes).map(UserEgressParams(_)),
       flows = Seq.tabulate(topology.nNodes, topology.nNodes) { (s, d) => FlowParams(s, d, 0) }.flatten,
-      routingRelation = routing
+      routingRelation = routingFn // Pass function, not result
     )
   )
 )
 
 class CustomTLTestConfigBase(
   topology: PhysicalTopology,
-  routing: RoutingRelation,
+  routingFn: PhysicalTopology => RoutingRelation,
   name: String,
   nVC: Int = 4
 ) extends TLNoCTesterConfig(
@@ -38,7 +37,7 @@ class CustomTLTestConfigBase(
       topology = topology,
       channelParamGen = (a, b) => UserChannelParams(Seq.fill(20) { UserVirtualChannelParams(nVC) }),
       vNetBlocking = (a, b) => true,
-      routingRelation = routing
+      routingRelation = routingFn // Pass function, not result
     )
   )
 )
@@ -73,29 +72,33 @@ object CustomTopologies {
     ("GD", ShortestPathGeneralizedDatelineRouting()),
     ("CL", CustomLayeredRouting())
   )
+
+  def makeRouting(f: PhysicalTopology => RoutingRelation, n: Int = 5, nDedicated: Int = 4): PhysicalTopology => RoutingRelation = {
+    topo => NonblockingVirtualSubnetworksRouting(f, n, nDedicated)(topo)
+  }
 }
 
-// import CustomTopologies._
+import CustomTopologies._
 
-class CustomTestConfigUniRingGD extends CustomTestConfigBase(uniRing, NonblockingVirtualSubnetworksRouting(ShortestPathGeneralizedDatelineRouting(), 5, 4), "UniRingGD")
-class CustomTestConfigUniRingCL extends CustomTestConfigBase(uniRing, NonblockingVirtualSubnetworksRouting(CustomLayeredRouting(), 5, 8), "UniRingCL")
+class CustomTestConfigUniRingGD extends CustomTestConfigBase(uniRing, makeRouting(ShortestPathGeneralizedDatelineRouting()), "UniRingGD")
+class CustomTestConfigUniRingCL extends CustomTestConfigBase(uniRing, makeRouting(CustomLayeredRouting()), "UniRingCL")
+class CustomTestConfigBiRingGD extends CustomTestConfigBase(biRing, makeRouting(ShortestPathGeneralizedDatelineRouting()), "BiRingGD")
+class CustomTestConfigBiRingCL extends CustomTestConfigBase(biRing, makeRouting(CustomLayeredRouting()), "BiRingCL")
+class CustomTestConfigBypassGD extends CustomTestConfigBase(bypass, makeRouting(ShortestPathGeneralizedDatelineRouting()), "BypassGD")
+class CustomTestConfigBypassCL extends CustomTestConfigBase(bypass, makeRouting(CustomLayeredRouting()), "BypassCL")
+class CustomTestConfigCrossbarGD extends CustomTestConfigBase(crossbar, makeRouting(ShortestPathGeneralizedDatelineRouting()), "CrossbarGD")
+class CustomTestConfigCrossbarCL extends CustomTestConfigBase(crossbar, makeRouting(CustomLayeredRouting()), "CrossbarCL")
+class CustomTestConfigMeshGD extends CustomTestConfigBase(fullMesh, makeRouting(ShortestPathGeneralizedDatelineRouting()), "MeshGD")
+class CustomTestConfigMeshCL extends CustomTestConfigBase(fullMesh, makeRouting(CustomLayeredRouting()), "MeshCL")
 
-class CustomTestConfigBiRingGD extends CustomTestConfigBase(biRing, NonblockingVirtualSubnetworksRouting(ShortestPathGeneralizedDatelineRouting(), 5, 4), "BiRingGD")
-class CustomTestConfigBiRingCL extends CustomTestConfigBase(biRing, NonblockingVirtualSubnetworksRouting(CustomLayeredRouting(), 5, 4), "BiRingCL")
-class CustomTestConfigBypassGD extends CustomTestConfigBase(bypass, NonblockingVirtualSubnetworksRouting(ShortestPathGeneralizedDatelineRouting(), 5, 4), "BypassGD")
-class CustomTestConfigBypassCL extends CustomTestConfigBase(bypass, NonblockingVirtualSubnetworksRouting(CustomLayeredRouting(), 5, 4), "BypassCL")
-class CustomTestConfigCrossbarGD extends CustomTestConfigBase(crossbar, NonblockingVirtualSubnetworksRouting(ShortestPathGeneralizedDatelineRouting(), 5, 4), "CrossbarGD")
-class CustomTestConfigCrossbarCL extends CustomTestConfigBase(crossbar, NonblockingVirtualSubnetworksRouting(CustomLayeredRouting(), 5, 4), "CrossbarCL")
-class CustomTestConfigMeshGD extends CustomTestConfigBase(fullMesh, NonblockingVirtualSubnetworksRouting(ShortestPathGeneralizedDatelineRouting(), 5, 4), "MeshGD")
-class CustomTestConfigMeshCL extends CustomTestConfigBase(fullMesh, NonblockingVirtualSubnetworksRouting(CustomLayeredRouting(), 5, 4), "MeshCL")
 
-class CustomTLTestConfigUniRingGD extends CustomTLTestConfigBase(uniRing, NonblockingVirtualSubnetworksRouting(ShortestPathGeneralizedDatelineRouting(), 5, 4), "TLUniRingGD")
-class CustomTLTestConfigUniRingCL extends CustomTLTestConfigBase(uniRing, NonblockingVirtualSubnetworksRouting(CustomLayeredRouting(), 5, 4), "TLUniRingCL")
-class CustomTLTestConfigBiRingGD extends CustomTLTestConfigBase(biRing, NonblockingVirtualSubnetworksRouting(ShortestPathGeneralizedDatelineRouting(), 5, 4), "TLBiRingGD")
-class CustomTLTestConfigBiRingCL extends CustomTLTestConfigBase(biRing, NonblockingVirtualSubnetworksRouting(CustomLayeredRouting(), 5, 4), "TLBiRingCL")
-class CustomTLTestConfigBypassGD extends CustomTLTestConfigBase(bypass, NonblockingVirtualSubnetworksRouting(ShortestPathGeneralizedDatelineRouting(), 5, 4), "TLBypassGD")
-class CustomTLTestConfigBypassCL extends CustomTLTestConfigBase(bypass, NonblockingVirtualSubnetworksRouting(CustomLayeredRouting(), 5, 4), "TLBypassCL")
-class CustomTLTestConfigCrossbarGD extends CustomTLTestConfigBase(crossbar, NonblockingVirtualSubnetworksRouting(ShortestPathGeneralizedDatelineRouting(), 5, 4), "TLCrossbarGD")
-class CustomTLTestConfigCrossbarCL extends CustomTLTestConfigBase(crossbar, NonblockingVirtualSubnetworksRouting(CustomLayeredRouting(), 5, 4), "TLCrossbarCL")
-class CustomTLTestConfigMeshGD extends CustomTLTestConfigBase(fullMesh, NonblockingVirtualSubnetworksRouting(ShortestPathGeneralizedDatelineRouting(), 5, 4), "TLMeshGD")
-class CustomTLTestConfigMeshCL extends CustomTLTestConfigBase(fullMesh, NonblockingVirtualSubnetworksRouting(CustomLayeredRouting(), 5, 4), "TLMeshCL")
+class CustomTLTestConfigUniRingGD extends CustomTLTestConfigBase(uniRing, makeRouting(ShortestPathGeneralizedDatelineRouting()), "TLUniRingGD")
+class CustomTLTestConfigUniRingCL extends CustomTLTestConfigBase(uniRing, makeRouting(CustomLayeredRouting()), "TLUniRingCL")
+class CustomTLTestConfigBiRingGD extends CustomTLTestConfigBase(biRing, makeRouting(ShortestPathGeneralizedDatelineRouting()), "TLBiRingGD")
+class CustomTLTestConfigBiRingCL extends CustomTLTestConfigBase(biRing, makeRouting(CustomLayeredRouting()), "TLBiRingCL")
+class CustomTLTestConfigBypassGD extends CustomTLTestConfigBase(bypass, makeRouting(ShortestPathGeneralizedDatelineRouting()), "TLBypassGD")
+class CustomTLTestConfigBypassCL extends CustomTLTestConfigBase(bypass, makeRouting(CustomLayeredRouting()), "TLBypassCL")
+class CustomTLTestConfigCrossbarGD extends CustomTLTestConfigBase(crossbar, makeRouting(ShortestPathGeneralizedDatelineRouting()), "TLCrossbarGD")
+class CustomTLTestConfigCrossbarCL extends CustomTLTestConfigBase(crossbar, makeRouting(CustomLayeredRouting()), "TLCrossbarCL")
+class CustomTLTestConfigMeshGD extends CustomTLTestConfigBase(fullMesh, makeRouting(ShortestPathGeneralizedDatelineRouting()), "TLMeshGD")
+class CustomTLTestConfigMeshCL extends CustomTLTestConfigBase(fullMesh, makeRouting(CustomLayeredRouting()), "TLMeshCL")
