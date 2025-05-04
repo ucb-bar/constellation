@@ -199,6 +199,25 @@ class CustomGraph(val nNodes: Int, val edges: Seq[(Int, Int)]) {
 
 }
 
+/**
+ * DatelineAnalyzer identifies cycles in the channel dependency graph (CDG)
+ * for a given physical topology and selects a minimal set of "dateline" edges
+ * to break these cycles, enabling deadlock-free routing.
+ *
+ * This is done by:
+ * 1. Computing all shortest paths between node pairs.
+ * 2. Building a CDG from edges used in shortest paths.
+ * 3. Detecting all simple cycles in the CDG.
+ * 4. Selecting one edge per cycle to act as a dateline (breaking the cycle).
+ * 5. Estimating the number of required virtual channels (VCs), based on the
+ *    maximum number of dateline crossings on any shortest path.
+ *
+ * It returns:
+ *  - datelineEdges: Set of selected (u, v) edges to act as datelines.
+ *  - vcCount: Minimum number of VCs needed to support these crossings.
+ *  - nextHop: Map from (src, dst) to possible next-hop nodes.
+ */
+
 object DatelineAnalyzer {
 
   case class DatelineResult(datelineEdges: Set[(Int, Int)], vcCount: Int, nextHop: Map[(Int, Int), Set[Int]])

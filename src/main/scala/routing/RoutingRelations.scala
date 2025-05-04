@@ -1017,7 +1017,28 @@ object CustomLayeredRouting {
 
 }
 
-
+/**
+ * ShortestPathGeneralizedDatelineRouting implements a deadlock-free routing relation
+ * based on identifying cycle-breaking datelines and the presence of virtual channels.
+ *
+ * This routing strategy:
+ * 1. Analyzes the given topology using DatelineAnalyzer to:
+ *    - Identify cycles in the channel dependency graph (CDG)
+ *    - Select a minimal set of "dateline" edges to break those cycles
+ *    - Compute the minimum number of virtual channels (VCs) needed to support
+ *      all shortest paths without deadlock
+ *
+ * 2. Recomputes all-pairs shortest paths and annotates each hop with the
+ *    required VC level. VC level increases only at dateline crossings,
+ *    and remains constant otherwise. This leads to an enforced acyclic traversal 
+ *    of the dependency graph.
+ *
+ * 3. rel()) only permits transitions which:
+ *    - Follow the exact shortest path between (ingress, egress) nodes
+ *    - Match the expected VC at each hop
+ *    - Begin from the ingress using VC 0
+ *
+ */
 object ShortestPathGeneralizedDatelineRouting {
   def apply() = (topo: PhysicalTopology) => new RoutingRelation(topo) {
     val result = DatelineAnalyzer.analyze(topo)
