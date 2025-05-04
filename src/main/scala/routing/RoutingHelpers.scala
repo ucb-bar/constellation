@@ -313,20 +313,51 @@ object DatelineAnalyzer {
       println(s"  Cycle $idx: ${cycle.map(e => s"(${e._1}->${e._2})").mkString(" -> ")}")
     }
 
-    val datelineEdges = MSet[(Int, Int)]()
-    val seenEdges = MSet[(Int, Int)]()
-    for (cycle <- cycles) {
-      val extended = cycle :+ cycle.head
-      val edgesInCycle = extended.sliding(2).map {
-        case Seq((_, _), (v1, v2)) => (v1, v2)
-      }.toList
+    // Non-Greedy Simple Strategy
+    // val datelineEdges = MSet[(Int, Int)]()
+    // val seenEdges = MSet[(Int, Int)]()
+    // for (cycle <- cycles) {
+    //   val extended = cycle :+ cycle.head
+    //   val edgesInCycle = extended.sliding(2).map {
+    //     case Seq((_, _), (v1, v2)) => (v1, v2)
+    //   }.toList
 
-      val newEdge = edgesInCycle.find(e => !datelineEdges.contains(e))
-      newEdge.foreach { e =>
-        datelineEdges += e
-        println(s"[DatelineAnalyzer] Selected dateline edge: (${e._1} -> ${e._2})")
-      }
+    //   val newEdge = edgesInCycle.find(e => !datelineEdges.contains(e))
+    //   newEdge.foreach { e =>
+    //     datelineEdges += e
+    //     println(s"[DatelineAnalyzer] Selected dateline edge: (${e._1} -> ${e._2})")
+    //   }
+    // }
+
+    // Greedy Approach for Minimum Datelines
+    val cycleEdgeSets = cycles.map { cycle =>
+      val extended = cycle :+ cycle.head
+      extended.sliding(2).map {
+        case Seq((_, _), (v1, v2)) => (v1, v2)
+      }.toSet
     }
+
+    val uncovered = mutable.Set() ++ cycleEdgeSets.indices
+    val datelineEdges = mutable.Set[(Int, Int)]()
+
+    while (uncovered.nonEmpty) {
+      val edgeCoverage = mutable.Map[(Int, Int), mutable.Set[Int]]()
+
+      for (i <- uncovered; e <- cycleEdgeSets(i)) {
+        val s = edgeCoverage.getOrElseUpdate(e, mutable.Set())
+        s += i
+      }
+
+      // Select the edge covering most uncovered cycles
+      val bestEdge = edgeCoverage.maxBy(_._2.size)._1
+      val hitCycles = edgeCoverage(bestEdge)
+
+      datelineEdges += bestEdge
+      uncovered --= hitCycles
+
+      println(s"[DatelineAnalyzer] Selected dateline edge: (${bestEdge._1} -> ${bestEdge._2})")
+    }
+
 
     val datelinePhysicalEdges = datelineEdges.toSet
 
