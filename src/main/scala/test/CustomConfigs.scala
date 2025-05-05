@@ -19,7 +19,7 @@ class CustomTestConfigBase(
       ingresses = (0 until topology.nNodes).map(UserIngressParams(_)),
       egresses = (0 until topology.nNodes).map(UserEgressParams(_)),
       flows = Seq.tabulate(topology.nNodes, topology.nNodes) { (s, d) => FlowParams(s, d, 0) }.flatten,
-      routingRelation = routingFn // Pass function, not result
+      routingRelation = routingFn
     )
   )
 )
@@ -37,7 +37,7 @@ class CustomTLTestConfigBase(
       topology = topology,
       channelParamGen = (a, b) => UserChannelParams(Seq.fill(20) { UserVirtualChannelParams(nVC) }),
       vNetBlocking = (a, b) => true,
-      routingRelation = routingFn // Pass function, not result
+      routingRelation = routingFn
     )
   )
 )
@@ -76,6 +76,17 @@ object CustomTopologies {
   def makeRouting(f: PhysicalTopology => RoutingRelation, n: Int = 5, nDedicated: Int = 4): PhysicalTopology => RoutingRelation = {
     topo => NonblockingVirtualSubnetworksRouting(f, n, nDedicated)(topo)
   }
+
+  def makeEscapeRouting(f: PhysicalTopology => RoutingRelation, n: Int = 5, nDedicated: Int = 4): PhysicalTopology => RoutingRelation = {
+    topo => NonblockingVirtualSubnetworksRouting(
+      EscapeChannelRouting(
+        escapeRouter = f,
+        normalRouter = ShortestPathRouting(maxVCs = 1),
+        nEscapeChannels = 3
+      ),
+      n, nDedicated
+    )(topo)
+  }
 }
 
 import CustomTopologies._
@@ -84,8 +95,12 @@ class CustomTestConfigUniRingGD extends CustomTestConfigBase(uniRing, makeRoutin
 class CustomTestConfigUniRingCL extends CustomTestConfigBase(uniRing, makeRouting(CustomLayeredRouting()), "UniRingCL")
 class CustomTestConfigBiRingGD extends CustomTestConfigBase(biRing, makeRouting(ShortestPathGeneralizedDatelineRouting()), "BiRingGD")
 class CustomTestConfigBiRingCL extends CustomTestConfigBase(biRing, makeRouting(CustomLayeredRouting()), "BiRingCL")
+
 class CustomTestConfigBypassGD extends CustomTestConfigBase(bypass, makeRouting(ShortestPathGeneralizedDatelineRouting()), "BypassGD")
 class CustomTestConfigBypassCL extends CustomTestConfigBase(bypass, makeRouting(CustomLayeredRouting()), "BypassCL")
+class CustomTestConfigBypassSP extends CustomTestConfigBase(bypass, makeRouting(ShortestPathRouting(maxVCs=4)), "BypassCL")
+
+
 class CustomTestConfigCrossbarGD extends CustomTestConfigBase(crossbar, makeRouting(ShortestPathGeneralizedDatelineRouting()), "CrossbarGD")
 class CustomTestConfigCrossbarCL extends CustomTestConfigBase(crossbar, makeRouting(CustomLayeredRouting()), "CrossbarCL")
 class CustomTestConfigMeshGD extends CustomTestConfigBase(fullMesh, makeRouting(ShortestPathGeneralizedDatelineRouting()), "MeshGD")
@@ -94,6 +109,7 @@ class CustomTestConfigMeshCL extends CustomTestConfigBase(fullMesh, makeRouting(
 
 class CustomTLTestConfigUniRingGD extends CustomTLTestConfigBase(uniRing, makeRouting(ShortestPathGeneralizedDatelineRouting()), "TLUniRingGD")
 class CustomTLTestConfigUniRingCL extends CustomTLTestConfigBase(uniRing, makeRouting(CustomLayeredRouting()), "TLUniRingCL")
+
 class CustomTLTestConfigBiRingGD extends CustomTLTestConfigBase(biRing, makeRouting(ShortestPathGeneralizedDatelineRouting()), "TLBiRingGD")
 class CustomTLTestConfigBiRingCL extends CustomTLTestConfigBase(biRing, makeRouting(CustomLayeredRouting()), "TLBiRingCL")
 class CustomTLTestConfigBypassGD extends CustomTLTestConfigBase(bypass, makeRouting(ShortestPathGeneralizedDatelineRouting()), "TLBypassGD")
@@ -102,3 +118,18 @@ class CustomTLTestConfigCrossbarGD extends CustomTLTestConfigBase(crossbar, make
 class CustomTLTestConfigCrossbarCL extends CustomTLTestConfigBase(crossbar, makeRouting(CustomLayeredRouting()), "TLCrossbarCL")
 class CustomTLTestConfigMeshGD extends CustomTLTestConfigBase(fullMesh, makeRouting(ShortestPathGeneralizedDatelineRouting()), "TLMeshGD")
 class CustomTLTestConfigMeshCL extends CustomTLTestConfigBase(fullMesh, makeRouting(CustomLayeredRouting()), "TLMeshCL")
+
+
+class TLTestCustomConfig00 extends TLNoCTesterConfig(TLNoCTesterParams(
+  inNodeMapping = Seq(8),
+  outNodeMapping = Seq(8),
+  nocParams = NoCParams(
+    topology        = uniRing,
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(20) { UserVirtualChannelParams(4) }),
+    vNetBlocking    = (blocker, blockee) => true,
+    routingRelation = NonblockingVirtualSubnetworksRouting(CustomLayeredRouting(), 5, 8)
+  )
+))
+
+class CustomTestConfigCrossbarEGD extends CustomTestConfigBase(crossbar, makeEscapeRouting(ShortestPathGeneralizedDatelineRouting()), "CrossbarCL")
+class CustomTestConfigCrossbarECL extends CustomTestConfigBase(crossbar, makeEscapeRouting(CustomLayeredRouting()), "CrossbarCL")
