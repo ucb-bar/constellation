@@ -994,8 +994,13 @@ object CustomLayeredRouting {
  *    - Begin from the ingress using VC 0
  *
  */
+
 object ShortestPathGeneralizedDatelineRouting {
-  def apply() = (topo: PhysicalTopology) => new RoutingRelation(topo) {
+  // def apply() = (topo: PhysicalTopology) => new RoutingRelation(topo) {
+  def apply(
+    useStaticVC0: Boolean = false,
+    vcHashCoeffs: (Int, Int) = (31, 17)
+  ) = (topo: PhysicalTopology) => new RoutingRelation(topo) {
     val result = DatelineAnalyzer.analyze(topo)
     val datelineEdges = result.datelineEdges
     val maxVC = result.vcCount
@@ -1009,10 +1014,20 @@ object ShortestPathGeneralizedDatelineRouting {
       val sspPaths = g.generateSSPs()
       val pathMap = sspPaths.map { case ((src, dst), edges) => ((src, dst), src +: edges.map(_._2)) }.toMap
       val vcMap = pathMap.map { case ((src, dst), path) =>
-        val vcs = path.sliding(2).scanLeft(0) { case (vc, Seq(u, v)) =>
-          if (datelineEdges.contains((u, v))) vc + 1 else vc
-        }.toList
-        ((src, dst), vcs) // vcs.length == path.length
+        val vcs = if (useStaticVC0) {
+          path.sliding(2).scanLeft(0) {
+            case (vc, Seq(u, v)) =>
+              if (datelineEdges.contains((u, v))) vc + 1 else vc
+          }.toList
+        } else {
+          val (a, b) = vcHashCoeffs
+          val baseVC = ((src * a + dst * b) % maxVC + maxVC) % maxVC
+          path.sliding(2).scanLeft(baseVC) {
+            case (vc, Seq(u, v)) =>
+              if (datelineEdges.contains((u, v))) (vc + 1) % maxVC else vc
+          }.toList
+        }
+        ((src, dst), vcs)
       }
       (pathMap, vcMap)
     }
