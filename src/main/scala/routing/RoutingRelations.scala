@@ -999,7 +999,7 @@ object ShortestPathGeneralizedDatelineRouting {
   // def apply() = (topo: PhysicalTopology) => new RoutingRelation(topo) {
   def apply(
     useStaticVC0: Boolean = false,
-    vcHashCoeffs: (Int, Int) = (31, 17)
+    vcHashCoeffs: (Int, Int) = (19, 4) //random number doesn't affect logic of the routing, can be anything (don't change)
   ) = (topo: PhysicalTopology) => new RoutingRelation(topo) {
     val result = DatelineAnalyzer.analyze(topo)
     val datelineEdges = result.datelineEdges
@@ -1045,7 +1045,16 @@ object ShortestPathGeneralizedDatelineRouting {
       println(s"[rel] src=(${srcC.src},${srcC.dst},vc=${srcC.vc}) -> nxt=(${nxtC.src},${nxtC.dst},vc=${nxtC.vc}) path=$path vcs=$vcs")
 
       if (srcC.src == -1) {
-        nxtC.vc == 0 && path.headOption.contains(nxtC.src) && path.lift(1).contains(nxtC.dst)
+          val validInjectionEdge = path.headOption.contains(nxtC.src) && path.lift(1).contains(nxtC.dst)
+          val expectedVC = vcs.lift(1).getOrElse(-1)
+          val vcValid = nxtC.vc == expectedVC
+
+          if (validInjectionEdge && vcValid) {
+            println(s"[rel INJECT ALLOWED] on VC $expectedVC")
+          } else {
+            println(s"[rel INJECT BLOCKED] Expected VC $expectedVC, Got VC ${nxtC.vc}")
+          }
+          validInjectionEdge && vcValid
       } else if (flow.egressNode == srcC.dst) {
         false
       } else {
