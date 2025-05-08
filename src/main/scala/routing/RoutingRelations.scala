@@ -968,7 +968,7 @@ object ShortestPathGeneralizedDatelineRouting {
           }.toList
         } else {
           val (a, b) = vcHashCoeffs
-          val baseVC = ((src * a + dst * b) % maxVC + maxVC) % maxVC
+          val baseVC = (src * a + dst * b) % maxVC 
           path.sliding(2).scanLeft(baseVC) {
             case (vc, Seq(u, v)) =>
               if (datelineEdges.contains((u, v))) (vc + 1) % maxVC else vc
