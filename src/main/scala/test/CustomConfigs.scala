@@ -15,11 +15,11 @@ class CustomTestConfigBase(
   NoCTesterParams(
     NoCParams(
       topology = topology,
-      channelParamGen = (a, b) => UserChannelParams(Seq.fill(20) { UserVirtualChannelParams(nVC) }),
+      channelParamGen = (a, b) => UserChannelParams(Seq.fill(15) { UserVirtualChannelParams(nVC) }),
       ingresses = (0 until topology.nNodes).map(UserIngressParams(_)),
       egresses = (0 until topology.nNodes).map(UserEgressParams(_)),
       flows = Seq.tabulate(topology.nNodes, topology.nNodes) { (s, d) => FlowParams(s, d, 0) }.flatten,
-      routingRelation = routingFn
+      routingRelation = routingFn // Pass function, not result
     )
   )
 )
@@ -33,14 +33,25 @@ class CustomTLTestConfigBase(
   TLNoCTesterParams(
     inNodeMapping = (0 until topology.nNodes by 2),
     outNodeMapping = (1 until topology.nNodes by 2),
-    nocParams = NoCParams(
-      topology = topology,
-      channelParamGen = (a, b) => UserChannelParams(Seq.fill(20) { UserVirtualChannelParams(nVC) }),
-      vNetBlocking = (a, b) => true,
-      routingRelation = routingFn
-    )
+    nocParams = {
+      val inNodes = (0 until topology.nNodes by 2)
+      val outNodes = (1 until topology.nNodes by 2)
+      NoCParams(
+        topology = topology,
+        channelParamGen = (a, b) => UserChannelParams(Seq.fill(20) { UserVirtualChannelParams(nVC) }),
+        ingresses = inNodes.map(UserIngressParams(_)),
+        egresses = outNodes.map(UserEgressParams(_)),
+        flows = for {
+          src <- inNodes
+          dst <- outNodes
+        } yield FlowParams(src, dst, 0),
+        vNetBlocking = (a, b) => true,
+        routingRelation = routingFn
+      )
+    }
   )
 )
+
 
 object CustomTopologies {
   val n = 8
@@ -73,7 +84,7 @@ object CustomTopologies {
     ("CL", CustomLayeredRouting())
   )
 
-  def makeRouting(f: PhysicalTopology => RoutingRelation, n: Int = 5, nDedicated: Int = 4): PhysicalTopology => RoutingRelation = {
+  def makeRouting(f: PhysicalTopology => RoutingRelation, n: Int = 5, nDedicated: Int = 3): PhysicalTopology => RoutingRelation = {
     topo => NonblockingVirtualSubnetworksRouting(f, n, nDedicated)(topo)
   }
 
@@ -121,15 +132,40 @@ class CustomTLTestConfigMeshCL extends CustomTLTestConfigBase(fullMesh, makeRout
 
 
 class TLTestCustomConfig00 extends TLNoCTesterConfig(TLNoCTesterParams(
-  inNodeMapping = Seq(8),
-  outNodeMapping = Seq(8),
+  inNodeMapping = Seq(0, 1, 2, 3),
+  outNodeMapping = Seq(4, 5, 6, 7),
   nocParams = NoCParams(
-    topology        = uniRing,
-    channelParamGen = (a, b) => UserChannelParams(Seq.fill(20) { UserVirtualChannelParams(4) }),
-    vNetBlocking    = (blocker, blockee) => true,
-    routingRelation = NonblockingVirtualSubnetworksRouting(CustomLayeredRouting(), 5, 8)
+    topology        = bypass,
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(15) { UserVirtualChannelParams(4) }),
+    vNetBlocking    = (blocker, blockee) => blocker < blockee,
+    routingRelation = NonblockingVirtualSubnetworksRouting(ShortestPathGeneralizedDatelineRouting(), 5, 3)
   )
 ))
 
 class CustomTestConfigCrossbarEGD extends CustomTestConfigBase(crossbar, makeEscapeRouting(ShortestPathGeneralizedDatelineRouting()), "CrossbarCL")
 class CustomTestConfigCrossbarECL extends CustomTestConfigBase(crossbar, makeEscapeRouting(CustomLayeredRouting()), "CrossbarCL")
+
+
+class TLTapeout25v2blocking1 extends TLNoCTesterConfig(TLNoCTesterParams(
+  inNodeMapping = Seq(0, 3, 5),
+  outNodeMapping = Seq(1, 2, 4, 5, 6, 7), 
+  nocParams = NoCParams(
+    topology        = bypass,
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(15) { UserVirtualChannelParams(4) }),
+    vNetBlocking    = (blocker, blockee) => true,
+    routingRelation = NonblockingVirtualSubnetworksRouting(ShortestPathRouting(maxVCs=3), 5, 3)
+  )
+))
+
+class TLTapeout25v2blocking2 extends TLNoCTesterConfig(TLNoCTesterParams(
+  inNodeMapping = Seq(0, 3, 5),
+  outNodeMapping = Seq(1, 2, 4, 5, 6, 7),
+  nocParams = NoCParams(
+    topology        = bypass,
+    channelParamGen = (a, b) => UserChannelParams(Seq.fill(15) { UserVirtualChannelParams(4) }),
+    vNetBlocking    = (blocker, blockee) => blocker < blockee,
+    routingRelation = NonblockingVirtualSubnetworksRouting(ShortestPathRouting(maxVCs=3), 5, 3)
+  )
+))
+
+class TestTapeout25v2 extends CustomTestConfigBase(bypass, makeRouting(ShortestPathRouting(maxVCs=3)), "TapeoutBypassSP")

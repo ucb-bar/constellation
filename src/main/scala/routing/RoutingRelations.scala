@@ -991,7 +991,9 @@ object CustomLayeredRouting {
  * 3. rel()) only permits transitions which:
  *    - Follow the exact shortest path between (ingress, egress) nodes
  *    - Match the expected VC at each hop
- *    - Begin from the ingress using VC 0
+ *    - Begin from the ingress using an assigned VC
+ *        - If useStaticVC0 is true then injections are only allowed on VC 0
+ *        - Otherwise there is a hashing scheme used to calculate the injection VC
  *
  */
 
