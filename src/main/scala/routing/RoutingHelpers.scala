@@ -75,8 +75,6 @@ class CustomGraph(val nNodes: Int, val edges: Seq[(Int, Int)]) {
       if (!seen.contains(edgeSeq)) {
         seen += edgeSeq
         result.append((label, path))
-      } else {
-        println(s"[CustomLayeredRouting] Deduplicated: $label with path ${path.mkString("->")}")
       }
     }
 
@@ -91,9 +89,6 @@ class CustomGraph(val nNodes: Int, val edges: Seq[(Int, Int)]) {
       val isSubpath = edgeSets.zipWithIndex.exists { case (setJ, j) =>
         i != j && setI.subsetOf(setJ) && setI != setJ // strict subset only
       }
-      if (isSubpath) {
-        println(s"[CustomLayeredRouting] Pruned subpath: $labelI with path ${pathI.mkString("->")}")
-      }
       isSubpath
     }.map(_._1)
 
@@ -102,10 +97,6 @@ class CustomGraph(val nNodes: Int, val edges: Seq[(Int, Int)]) {
 
   def packLayersMinimal(ssps: List[((Int, Int), List[(Int, Int)])]): List[List[((Int, Int), List[(Int, Int)])]] = {
     for (k <- 1 to ssps.length) {
-      println("[CustomLayeredRouting] === Flow Order Passed to solve() ===")
-      ssps.zipWithIndex.foreach { case (((src, dst), path), i) =>
-        println(f"  $i%02d: ($src->$dst) path: ${path.mkString("->")}")
-      }
       val result = solve(ssps, k)
       if (result.nonEmpty) return result
     }
@@ -223,8 +214,6 @@ object DatelineAnalyzer {
   case class DatelineResult(datelineEdges: Set[(Int, Int)], vcCount: Int, nextHop: Map[(Int, Int), Set[Int]])
 
   def analyze(topo: PhysicalTopology): DatelineResult = {
-    println("[DatelineAnalyzer] Starting dateline analysis...")
-
     val nodes = 0 until topo.nNodes
 
     def bfsPaths(src: Int, dst: Int): Seq[Seq[Int]] = {
@@ -274,7 +263,6 @@ object DatelineAnalyzer {
       }
     }
 
-    println("[DatelineAnalyzer] Channel Dependency Graph Edges:")
     cdgEdges.foreach { case ((u1, u2), (v1, v2)) => println(s"  ($u1->$u2) -> ($v1->$v2)") }
 
     def findCycles(edges: Iterable[((Int, Int), (Int, Int))]): Seq[List[(Int, Int)]] = {
@@ -312,22 +300,6 @@ object DatelineAnalyzer {
     for ((cycle, idx) <- cycles.zipWithIndex) {
       println(s"  Cycle $idx: ${cycle.map(e => s"(${e._1}->${e._2})").mkString(" -> ")}")
     }
-
-    // Non-Greedy Simple Strategy
-    // val datelineEdges = MSet[(Int, Int)]()
-    // val seenEdges = MSet[(Int, Int)]()
-    // for (cycle <- cycles) {
-    //   val extended = cycle :+ cycle.head
-    //   val edgesInCycle = extended.sliding(2).map {
-    //     case Seq((_, _), (v1, v2)) => (v1, v2)
-    //   }.toList
-
-    //   val newEdge = edgesInCycle.find(e => !datelineEdges.contains(e))
-    //   newEdge.foreach { e =>
-    //     datelineEdges += e
-    //     println(s"[DatelineAnalyzer] Selected dateline edge: (${e._1} -> ${e._2})")
-    //   }
-    // }
 
     // Greedy Approach for Minimum Datelines
     val cycleEdgeSets = cycles.map { cycle =>

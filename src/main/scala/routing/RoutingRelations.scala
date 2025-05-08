@@ -776,9 +776,6 @@ object ShortestPathRouting {
         // Ingress: only inject into first hop of shortest path
         val expected = nextHop.get((flow.ingressNode, flow.egressNode))
         val legal = nxtC.src == flow.ingressNode && expected.contains(nxtC.dst)
-        if (!legal) {
-          println(s"[rel BLOCKED][Inject] Flow $flowKey: Illegal injection into (${nxtC.src} -> ${nxtC.dst})")
-        }
         return legal
       }
 
@@ -786,10 +783,6 @@ object ShortestPathRouting {
 
       val expected = nextHop.get((srcC.dst, flow.egressNode))
       val legal = expected.contains(nxtC.dst)
-      if (!legal) {
-        println(s"[rel BLOCKED] Flow $flowKey: (${srcC.dst} -> ${nxtC.dst}) not on shortest path")
-      }
-
       legal
     }
 
@@ -803,7 +796,6 @@ object ShortestPathRouting {
     override def isEscape(c: ChannelRoutingInfo, vNetId: Int): Boolean = c.isIngress || c.isEgress
 
     println(s"[ShortestPathRouting] Initialized with maxVCs = $maxVCs")
-    // println("[ShortestPathRouting] =======================")
   }
 }
 
@@ -845,43 +837,17 @@ object CustomLayeredRouting {
       val graph = new CustomGraph(topo.nNodes, edgeList)
       val allSSPs = graph.generateSSPs()
 
-      allSSPs.foreach { case ((src, dst), path) =>
-        println(s"[DEBUG] Path from $src to $dst: ${path.mkString("->")}")
-      }
-
       val deduped = graph.deduplicateSSPs(allSSPs)
       val pruned = graph.pruneSubpaths(deduped)
       val packed = graph.packLayersMinimal(pruned)
 
-      packed.zipWithIndex.foreach { case (layer, i) =>
-        val edgeSet = layer.flatMap(_._2).toSet
-        println(s"[CustomLayeredRouting] Edges used in Layer $i:")
-        edgeSet.toList.sortBy(_._1).foreach { case (u, v) =>
-          println(f"  Edge: ($u->$v)")
-        }
-      }
-
-      println("[CustomLayeredRouting] All edges: " + edgeList.map(e => s"(${e._1},${e._2})").mkString(", "))
-
-      packed.zipWithIndex.foreach { case (layer, i) =>
-        println(s"[CustomLayeredRouting] Layer $i:")
-        layer.foreach { case ((src, dst), path) =>
-          println(f"  Flow ($src->$dst) uses path: ${path.mkString("->")}")
-        }
-      }
       println(s"[CustomLayeredRouting] Required VCs: ${packed.length}")
 
       // VC assignment for all flows based on first matching layer
       val allFlowAssignments: Map[(Int, Int), Int] = allSSPs.map { case ((src, dst), path) =>
         val assignedLayer = packed.indexWhere(layer => path.toSet.subsetOf(layer.flatMap(_._2).toSet))
-        require(assignedLayer >= 0, s"[CustomLayeredRouting] ERROR: Could not find a layer covering path for flow ($src->$dst)")
         ((src, dst), assignedLayer)
       }.toMap
-
-
-      allFlowAssignments.foreach { case ((src, dst), vc) =>
-        println(s"[CustomLayeredRouting] Flow ($src->$dst) assigned to logical VC $vc")
-      }
 
       // Build nextHop map per VC (layer)
       val nextHopMap: Map[Int, Map[(Int, Int), Int]] = packed.zipWithIndex.map { case (layer, vc) =>
@@ -905,13 +871,11 @@ object CustomLayeredRouting {
 
         // Step 1: Lookup assigned VC
         val assignedVC = allFlowAssignments.getOrElse(flowKey, {
-          // println(s"[rel ERROR] No VC assigned to flow $flowKey")
           return false
         })
 
         // Step 2: Lookup full path and verify layer correctness
         val flowPath = flowPaths.getOrElse(flowKey, {
-          // println(s"[rel ERROR] No path found for flow $flowKey")
           return false
         })
 
@@ -920,9 +884,6 @@ object CustomLayeredRouting {
 
         val fullPathOk = flowPathEdges.subsetOf(assignedEdgeSet)
         if (!fullPathOk) {
-          // println(s"[rel ERROR] Full path for flow $flowKey is NOT entirely in VC=$assignedVC")
-          // println(s"  Path: ${flowPath.mkString(" -> ")}")
-          // println(s"  Layer edges: ${assignedEdgeSet.mkString(", ")}")
           return false
         }
 
@@ -937,17 +898,6 @@ object CustomLayeredRouting {
 
         val legal = edgeOk && vcOk
 
-        // === DEBUG ===
-
-        if (!legal) {
-          // println(s"[rel BLOCKED] Flow $flowKey: hop ($curNode -> $nextNode) with VC=${nxtC.vc} invalid for assigned VC=$assignedVC")
-        } else {
-          println(s"[rel CHECK] Flow $flowKey | Assigned VC: $assignedVC")
-          println(s"  Full path: ${flowPath.mkString(" -> ")}")
-          println(s"  Checking hop: $edge | VC=${nxtC.vc} | EdgeOK=$edgeOk | VcOK=$vcOk")
-          println(s"[rel ALLOWED] Flow $flowKey: hop ($curNode -> $nextNode) with VC=${nxtC.vc} valid for assigned VC=$assignedVC")
-        }
-
         legal
       }
 
@@ -960,12 +910,7 @@ object CustomLayeredRouting {
 
       override def getNPrios(c: ChannelRoutingInfo): Int = nVirtualLayers
 
-      override def getPrio(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo): Int = {
-        allFlowAssignments.getOrElse((flow.ingressNode, flow.egressNode), {
-          println(s"[getPrio ERROR] No VC assignment for flow (${flow.ingressNode} -> ${flow.egressNode})")
-          0
-        })
-      }
+      override def getPrio(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo): Int = 0
 
     }
   }
@@ -1001,7 +946,7 @@ object ShortestPathGeneralizedDatelineRouting {
   // def apply() = (topo: PhysicalTopology) => new RoutingRelation(topo) {
   def apply(
     useStaticVC0: Boolean = false,
-    vcHashCoeffs: (Int, Int) = (19, 4) //random number doesn't affect logic of the routing, can be anything (don't change)
+    vcHashCoeffs: (Int, Int) = (19, 4)
   ) = (topo: PhysicalTopology) => new RoutingRelation(topo) {
     val result = DatelineAnalyzer.analyze(topo)
     val datelineEdges = result.datelineEdges
@@ -1039,23 +984,14 @@ object ShortestPathGeneralizedDatelineRouting {
     def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo): Boolean = {
 
       val flowKey = (flow.ingressNode, flow.egressNode)
-      println(s"Flow Tested $flowKey")
 
       val path = shortestPaths.getOrElse((flow.ingressNode, flow.egressNode), Nil)
       val vcs  = pathVCs.getOrElse((flow.ingressNode, flow.egressNode), Nil)
-
-      println(s"[rel] src=(${srcC.src},${srcC.dst},vc=${srcC.vc}) -> nxt=(${nxtC.src},${nxtC.dst},vc=${nxtC.vc}) path=$path vcs=$vcs")
 
       if (srcC.src == -1) {
           val validInjectionEdge = path.headOption.contains(nxtC.src) && path.lift(1).contains(nxtC.dst)
           val expectedVC = vcs.lift(1).getOrElse(-1)
           val vcValid = nxtC.vc == expectedVC
-
-          if (validInjectionEdge && vcValid) {
-            println(s"[rel INJECT ALLOWED] on VC $expectedVC")
-          } else {
-            println(s"[rel INJECT BLOCKED] Expected VC $expectedVC, Got VC ${nxtC.vc}")
-          }
           validInjectionEdge && vcValid
       } else if (flow.egressNode == srcC.dst) {
         false
@@ -1067,14 +1003,6 @@ object ShortestPathGeneralizedDatelineRouting {
         val validEdge = idx != -1
         val expectedVC = if (idx >= 0 && idx < vcs.length) vcs(idx + 1) else -1
         val vcValid = nxtC.vc == expectedVC
-
-        // println(s"[rel] ValidEdge=$validEdge VCExpected=$expectedVC VCValid=$vcValid")
-
-        if (validEdge && vcValid){
-          println(s"[rel ALLOWED] ValidEdge=$validEdge VCExpected=$expectedVC VCValid=$vcValid")
-        } else {
-          println(s"[rel BLOCKED] ValidEdge=$validEdge VCExpected=$expectedVC VCValid=$vcValid")
-        }
 
         validEdge && vcValid
       }
