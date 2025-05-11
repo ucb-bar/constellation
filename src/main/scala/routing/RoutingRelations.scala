@@ -719,10 +719,11 @@ object HierarchicalRouting {
  * using BFS and restricts flow transitions to only those that follow the precomputed
  * shortest-path next hop. No deadlock avoidance mechanism is enforced.
  *
- * If multiple virtual channels (VCs) are available, this router assigns flows to
- * VCs using a deterministic hash of (src, dst), which can help balance load across
- * VCs during arbitration. However, VC transitions are not enforced and per-hop—flows 
- * are allowed to use any VC as long as the edge is on the shortest path.
+ * If multiple virtual channels (VCs) are available, we can assist the
+ * PrioritizingVCAllocator by assigning priorities deterministically via a hashing 
+ * of (flow.ingressNode, flow.egressNode) to help with better VC utilization. 
+ * However VC transitions are not enforced and per-hop flows are allowed to use any VC 
+ * as long as the edge is on the shortest path.
  *
  * This routing strategy is best for minimal-hop designs, and 
  * scenarios where higher-level deadlock prevention is handled 
