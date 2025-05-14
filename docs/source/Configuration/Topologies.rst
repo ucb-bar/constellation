@@ -160,3 +160,58 @@ are from the child topologies.
 .. Note:: The ``HierarchicalTopology`` topology must be used with the ``HierarchicalRouting``
 	  routing relation wrapper
 
+
+Custom Topologies
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+The ``CustomTopology`` class allows users to explicitly specify a network graph for use in Constellation. Unlike built-in topologies (e.g., mesh or torus), which follow a fixed structural pattern, ``CustomTopology`` is defined by a set of directed edges between node indices.
+
+This is ideal for prototyping arbitrary architectures, testing irregular interconnects, or modeling existing physical layouts that don’t conform to standard structures. It can be used to connect specific nodes with one edge, leading to latency of one hop rather than multiple. 
+
+.. code-block:: scala
+
+   case class TopologyEdge(src: Int, dst: Int)
+   case class CustomTopology(n: Int, edgeList: Seq[TopologyEdge]) extends PhysicalTopology
+
+- ``n``: total number of nodes
+- ``edgeList``: sequence of directed edges in the format ``TopologyEdge(source, destination)``
+
+Basic Usage
+~~~~~~~~~~~
+
+Here is an example of creating an 8-node unidirectional ring:
+
+.. code-block:: scala
+
+   val ringEdges = (0 until 8).map(i => TopologyEdge(i, (i + 1) % 8))
+   val ringTopo = CustomTopology(8, ringEdges)
+
+This connects nodes as 0→1→2→...→7→0.
+
+Bidirectional ring example:
+
+.. code-block:: scala
+
+   val biRingEdges = (0 until 8).flatMap(i => Seq(
+     TopologyEdge(i, (i + 1) % 8),
+     TopologyEdge(i, (i - 1 + 8) % 8)
+   ))
+   val biRingTopo = CustomTopology(8, biRingEdges)
+
+More complex topologies can also be constructed. For example, a ring with certain bypasses:
+
+.. code-block:: scala
+
+   val coreRing = (0 until 10).map(i => TopologyEdge(i, (i + 1) % 10))
+   val bypasses = Seq((1, 7), (7, 1), (6, 2), (2, 6), (2, 1)).map {
+     case (a, b) => TopologyEdge(a, b)
+   }
+   val topo = CustomTopology(10, coreRing ++ bypasses)
+
+You may define any directed graph, including asymmetric, acyclic, or cyclic structures.
+
+Limitations
+~~~~~~~~~~~
+
+- The topology is purely structural and does not infer routing constraints. Routing must be handled by a compatible `RoutingRelation`.
+- You must ensure sufficient virtual channels and subnetworks to avoid deadlock when used with cyclic graphs. (See ``RoutingSpec.rst`` for guidance.)
