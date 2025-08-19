@@ -4,7 +4,9 @@ import scala.math.{min, max, pow}
 import scala.collection.mutable.HashMap
 import org.chipsalliance.cde.config.{Parameters}
 import scala.collection.immutable.ListMap
-import constellation.topology.{PhysicalTopology, Mesh2DLikePhysicalTopology, HierarchicalTopology}
+import constellation.topology.{PhysicalTopology, Mesh2DLikePhysicalTopology, HierarchicalTopology, CustomTopology}
+
+import scala.collection.mutable
 
 /** Routing and channel allocation policy
  *
@@ -709,3 +711,315 @@ object HierarchicalRouting {
   }
 }
 
+
+/**
+ * Pure shortest-path routing strategy with some VC-based load balancing.
+ *
+ * This routing relation computes single-path shortest routes between all node pairs
+ * using BFS and restricts flow transitions to only those that follow the precomputed
+ * shortest-path next hop. No deadlock avoidance mechanism is enforced.
+ *
+ * If multiple virtual channels (VCs) are available, we can assist the
+ * PrioritizingVCAllocator by assigning priorities deterministically via a hashing 
+ * of (flow.ingressNode, flow.egressNode) to help with better VC utilization. 
+ * However VC transitions are not enforced and per-hop flows are allowed to use any VC 
+ * as long as the edge is on the shortest path.
+ *
+ * This routing strategy is best for minimal-hop designs, and 
+ * scenarios where higher-level deadlock prevention is handled 
+ * externally such as through EscapeChannelRouting.
+ *
+ * maxVCs: The number of virtual channels available per physical channel.
+ *         This must be >= 1. Defaults to 1 (no VC usage).
+ * 
+ */
+
+object ShortestPathRouting {
+  def apply(maxVCs: Int = 1) = (topo: PhysicalTopology) => new RoutingRelation(topo) {
+    require(maxVCs >= 1, s"[ShortestPathRouting] maxVCs must be >= 1 (got $maxVCs)")
+
+    // Build adjacency list
+    val adjList: Map[Int, Seq[Int]] = (0 until topo.nNodes).map { src =>
+      src -> (0 until topo.nNodes).filter(dst => topo.topo(src, dst))
+    }.toMap
+
+    // Precompute shortest-path next hops using BFS
+    val nextHop: Map[(Int, Int), Int] = {
+      val paths = for (src <- 0 until topo.nNodes; dst <- 0 until topo.nNodes if src != dst) yield {
+        val next = bfsNextHop(src, dst)
+        (src, dst) -> next
+      }
+      paths.collect { case ((s, d), Some(n)) => (s, d) -> n }.toMap
+    }
+
+    // BFS shortest-path helper
+    private def bfsNextHop(src: Int, dst: Int): Option[Int] = {
+      val visited = scala.collection.mutable.Set[Int]()
+      val queue = scala.collection.mutable.Queue[(Int, List[Int])]()
+      queue.enqueue((src, List()))
+      while (queue.nonEmpty) {
+        val (node, path) = queue.dequeue()
+        if (node == dst) return path.headOption
+        if (!visited.contains(node)) {
+          visited += node
+          adjList(node).foreach { neighbor =>
+            queue.enqueue((neighbor, if (path.isEmpty) List(neighbor) else path))
+          }
+        }
+      }
+      None
+    }
+
+    def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo): Boolean = {
+      val flowKey = (flow.ingressNode, flow.egressNode)
+
+      if (srcC.src == -1) {
+        // Ingress: only inject into first hop of shortest path
+        val expected = nextHop.get((flow.ingressNode, flow.egressNode))
+        val legal = nxtC.src == flow.ingressNode && expected.contains(nxtC.dst)
+        return legal
+      }
+
+      if (srcC.dst == flow.egressNode) return false
+
+      val expected = nextHop.get((srcC.dst, flow.egressNode))
+      val legal = expected.contains(nxtC.dst)
+      legal
+    }
+
+    // VC configuration
+    override def getNPrios(src: ChannelRoutingInfo): Int = maxVCs
+
+    override def getPrio(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo): Int = {
+      (flow.ingressNode * 31 + flow.egressNode) % maxVCs
+    }
+
+    override def isEscape(c: ChannelRoutingInfo, vNetId: Int): Boolean = c.isIngress || c.isEgress
+
+    println(s"[ShortestPathRouting] Initialized with maxVCs = $maxVCs")
+  }
+}
+
+
+object EscapeIDOrderRouting {
+  def apply() = (topo: PhysicalTopology) => new RoutingRelation(topo) {
+    def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo) = {
+      if (srcC.src == -1) {
+        true // allow ingress to inject anywhere
+      } else {
+        (srcC.dst < nxtC.dst) && topo.topo(srcC.dst, nxtC.dst)
+      }
+    }
+  }
+}
+
+/*
+ * CustomLayeredRouting: This is a a generalized deadlock-free routing policy for arbitrary
+ * topologies. 
+ * 
+ * This routing relation assigns each flow (src, dst) a dedicated virtual channel (VC) layer
+ * such that all paths in the same layer do not introduce cyclic dependencies. This is done by:
+ *   1. Finding all shortest paths between flow pairs
+ *   2. Deduplicating and pruning strict subpaths
+ *   3. Packing flow paths into the minimum number of layers while preserving DAG constraints
+ *   4. Assigning a VC layer to each flow based on its path
+ * 
+ * The rel() function enforces this policy by:
+ *   - Ensuring packets flow only along the assigned VC
+ *   - Ensuring only legal hops in the assigned flow path are taken
+ *   - Ensuring the hop is within the assigned VC layer
+ */
+
+object CustomLayeredRouting {
+  
+  def apply() = (topo: PhysicalTopology) => topo match {
+    case topo: CustomTopology => new RoutingRelation(topo) {
+      val edgeList = topo.edgeList.map(e => (e.src, e.dst))
+      val graph = new CustomGraph(topo.nNodes, edgeList)
+      val allSSPs = graph.generateSSPs()
+
+      val deduped = graph.deduplicateSSPs(allSSPs)
+      val pruned = graph.pruneSubpaths(deduped)
+      val packed = graph.packLayersMinimal(pruned)
+
+      println(s"[CustomLayeredRouting] Required VCs: ${packed.length}")
+
+      // VC assignment for all flows based on first matching layer
+      val allFlowAssignments: Map[(Int, Int), Int] = allSSPs.map { case ((src, dst), path) =>
+        val assignedLayer = packed.indexWhere(layer => path.toSet.subsetOf(layer.flatMap(_._2).toSet))
+        ((src, dst), assignedLayer)
+      }.toMap
+
+      // Build nextHop map per VC (layer)
+      val nextHopMap: Map[Int, Map[(Int, Int), Int]] = packed.zipWithIndex.map { case (layer, vc) =>
+        val nhs = mutable.Map[(Int, Int), Int]()
+
+        for (((src, dst), path) <- layer) {
+          val nodes = path.map(_._1) :+ path.last._2
+          for (i <- 0 until nodes.length - 1) {
+            nhs((nodes(i), dst)) = nodes(i + 1)
+          }
+        }
+
+        vc -> nhs.toMap
+      }.toMap
+
+      val flowPaths: Map[(Int, Int), List[(Int, Int)]] = allSSPs.toMap
+      val vcToEdges = packed.map(_.flatMap(_._2).toSet)
+
+      def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo): Boolean = {
+        val flowKey = (flow.ingressNode, flow.egressNode)
+
+        // Step 1: Lookup assigned VC
+        val assignedVC = allFlowAssignments.getOrElse(flowKey, {
+          return false
+        })
+
+        // Step 2: Lookup full path and verify layer correctness
+        val flowPath = flowPaths.getOrElse(flowKey, {
+          return false
+        })
+
+        val flowPathEdges = flowPath.toSet
+        val assignedEdgeSet = vcToEdges(assignedVC)
+
+        val fullPathOk = flowPathEdges.subsetOf(assignedEdgeSet)
+        if (!fullPathOk) {
+          return false
+        }
+
+        // Step 3: Current and next node
+        val curNode  = if (srcC.src == -1) flow.ingressNode else srcC.dst
+        val nextNode = nxtC.dst
+        val edge     = (curNode, nextNode)
+
+        // Step 4: Legal check
+        val edgeOk = flowPathEdges.contains(edge)
+        val vcOk   = nxtC.vc == assignedVC && (srcC.src == -1 || srcC.vc == assignedVC)
+
+        val legal = edgeOk && vcOk
+
+        legal
+      }
+
+
+      override def isEscape(c: ChannelRoutingInfo, v: Int): Boolean =
+        c.isIngress || c.isEgress
+
+      val guAssignedLayer = allFlowAssignments
+      val nVirtualLayers = vcToEdges.length
+
+      override def getNPrios(c: ChannelRoutingInfo): Int = nVirtualLayers
+
+      override def getPrio(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo): Int = 0
+
+    }
+  }
+
+}
+
+/**
+ * ShortestPathGeneralizedDatelineRouting implements a deadlock-free routing relation
+ * based on identifying cycle-breaking datelines and the presence of virtual channels.
+ *
+ * This routing strategy:
+ * 1. Analyzes the given topology using DatelineAnalyzer to:
+ *    - Identify cycles in the channel dependency graph (CDG)
+ *    - Select a minimal set of "dateline" edges to break those cycles
+ *    - Compute the minimum number of virtual channels (VCs) needed to support
+ *      all shortest paths without deadlock
+ *
+ * 2. Recomputes all-pairs shortest paths and annotates each hop with the
+ *    required VC level. VC level increases only at dateline crossings,
+ *    and remains constant otherwise. This leads to an enforced acyclic traversal 
+ *    of the dependency graph.
+ *
+ * 3. rel()) only permits transitions which:
+ *    - Follow the exact shortest path between (ingress, egress) nodes
+ *    - Match the expected VC at each hop
+ *    - Begin from the ingress using an assigned VC
+ *        - If useStaticVC0 is true then injections are only allowed on VC 0
+ *        - Otherwise there is a hashing scheme used to calculate the injection VC
+ *
+ */
+
+object ShortestPathGeneralizedDatelineRouting {
+  // def apply() = (topo: PhysicalTopology) => new RoutingRelation(topo) {
+  def apply(
+    useStaticVC0: Boolean = false,
+    vcHashCoeffs: (Int, Int) = (19, 4)
+  ) = (topo: PhysicalTopology) => new RoutingRelation(topo) {
+    val result = DatelineAnalyzer.analyze(topo)
+    val datelineEdges = result.datelineEdges
+    val maxVC = result.vcCount
+    val nextHop = result.nextHop
+
+    // Recompute shortest paths and expected VC transitions
+    val (shortestPaths, pathVCs): (Map[(Int, Int), List[Int]], Map[(Int, Int), List[Int]]) = {
+      val g = new CustomGraph(topo.nNodes, (0 until topo.nNodes).flatMap(u => (0 until topo.nNodes).collect {
+        case v if topo.topo(u, v) => (u, v)
+      }))
+      val sspPaths = g.generateSSPs()
+      val pathMap = sspPaths.map { case ((src, dst), edges) => ((src, dst), src +: edges.map(_._2)) }.toMap
+      val vcMap = pathMap.map { case ((src, dst), path) =>
+        val vcs = if (useStaticVC0) {
+          path.sliding(2).scanLeft(0) {
+            case (vc, Seq(u, v)) =>
+              if (datelineEdges.contains((u, v))) vc + 1 else vc
+          }.toList
+        } else {
+          val (a, b) = vcHashCoeffs
+          val baseVC = (src * a + dst * b) % maxVC 
+          path.sliding(2).scanLeft(baseVC) {
+            case (vc, Seq(u, v)) =>
+              if (datelineEdges.contains((u, v))) (vc + 1) % maxVC else vc
+          }.toList
+        }
+        ((src, dst), vcs)
+      }
+      (pathMap, vcMap)
+    }
+
+    println(s"[ShortestPathGeneralizedDatelineRouting] Initialized with ${datelineEdges.size} datelines and $maxVC VCs")
+
+    def rel(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo): Boolean = {
+
+      val flowKey = (flow.ingressNode, flow.egressNode)
+
+      val path = shortestPaths.getOrElse((flow.ingressNode, flow.egressNode), Nil)
+      val vcs  = pathVCs.getOrElse((flow.ingressNode, flow.egressNode), Nil)
+
+      if (srcC.src == -1) {
+          val validInjectionEdge = path.headOption.contains(nxtC.src) && path.lift(1).contains(nxtC.dst)
+          val expectedVC = vcs.lift(1).getOrElse(-1)
+          val vcValid = nxtC.vc == expectedVC
+          validInjectionEdge && vcValid
+      } else if (flow.egressNode == srcC.dst) {
+        false
+      } else {
+        val edge = (srcC.dst, nxtC.dst)
+        val pathEdges = path.sliding(2).toList
+        val idx = pathEdges.indexWhere { case Seq(a, b) => a == edge._1 && b == edge._2 }
+
+        val validEdge = idx != -1
+        val expectedVC = if (idx >= 0 && idx < vcs.length) vcs(idx + 1) else -1
+        val vcValid = nxtC.vc == expectedVC
+
+        validEdge && vcValid
+      }
+    }
+
+    override def getNPrios(src: ChannelRoutingInfo): Int = {
+      maxVC
+    }
+
+    override def getPrio(srcC: ChannelRoutingInfo, nxtC: ChannelRoutingInfo, flow: FlowRoutingInfo): Int = {
+      // Priority is highest for lowest VC to prefer dateline avoidance
+      maxVC - nxtC.vc
+    }
+
+    override def isEscape(c: ChannelRoutingInfo, vNetId: Int): Boolean = {
+      c.isIngress || c.isEgress || c.vc == 0
+    }
+  }
+}

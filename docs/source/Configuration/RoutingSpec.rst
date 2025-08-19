@@ -165,6 +165,36 @@ for the included topology generators.
 | ``DimensionOrderedBidirectionalTorus2DRouting``  | Routing for the ``BidirectioanlTorus2D`` topology.    |
 |                                                  | Routes in the X dimension first.                      |
 +--------------------------------------------------+-------------------------------------------------------+
+| ``ShortestPathGeneralizedDatelineRouting``       | Routing for any ``CustomTopology`` topology.          |
+|                                                  | Routes using the shortest possible path to            |
+|                                                  | destination. It avoids deadlock but detecting         |
+|                                                  | datelines and incrementing VC index each time it      |
+|                                                  | crosses one. Requires multiple VCs depending on the   |
+|                                                  | number of the cycles present.                         |
++--------------------------------------------------+-------------------------------------------------------+
+| ``CustomLayeredRouting``                         | Routing for any ``CustomTopology`` topology.          |
+|                                                  | Routes by assigning each flow to a unique layer (VC). |
+|                                                  | At least one VC will contain the shortest possible    |
+|                                                  | path between source and destination.  Requires as     |
+|                                                  | many VCs as layers to prevent deadlock.               |
++--------------------------------------------------+-------------------------------------------------------+
+
+.. Note:: To guarantee deadlock-freedom, both ``ShortestPathGeneralizedDatelineRouting`` and ``CustomLayeredRouting`` require 
+      sufficient virtual channels to be available.
+
+      - For ``ShortestPathGeneralizedDatelineRouting``, the number of VCs needed equals the maximum number of dateline crossings on any path plus one. 
+      - For ``CustomLayeredRouting``, the number of VCs must match the number of packed layers computed during path decomposition. 
+      
+      These are automatically computed before elaboration. If an insufficient number of VCs is specified, the Chisel elaboration step may fail to complete successfully. 
+      The required number of VCs will be printed during hardware generation in the ``chisel.log`` file.
+
+      Different algorithms may produce different VC requirements depending on the structure of the topology. These trade-offs should be considered when selecting a routing relation for your system.
+
+      In practice:
+
+         - ``ShortestPathGeneralizedDatelineRouting`` often requires fewer VCs but enforces VC transitions only at datelines.
+         - ``CustomLayeredRouting`` may use more VCs but guarantees a purely acyclic per-flow assignment.
+
 
 Compositional Routing Relations
 -------------------------------
@@ -194,6 +224,11 @@ can be described as:
             normalRouter    = Mesh2DMinimalRouting(),
             nEscapeChannels = 2
           )
+
+
+
+.. Note:: ``ShortestPathRouting`` can also be used as the normalRouter in EscapeChannelRouting, 
+      particularly when targeting CustomTopology configurations.
 
 
 Terminal Router Routing
