@@ -1,5 +1,5 @@
-The Constellation NoC Generator
-=======================================================
+The Constellation NoC Generator 
+======================================================= 
 
 **Documentation**: [constellation.readthedocs.io](http://constellation.readthedocs.io).
 
