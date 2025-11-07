@@ -263,7 +263,7 @@ class InputUnit(cParam: ChannelParams, outParams: Seq[ChannelParams],
 
   states.zipWithIndex.map { case (s,idx) =>
     if (virtualChannelParams(idx).traversable) {
-      vcalloc_vals(idx) := s.g === g_v && s.fifo_deps === 0.U
+      vcalloc_vals(idx) := s.g === g_v && (if (anyFifo) s.fifo_deps === 0.U else true.B)
       vcalloc_reqs(idx).in_vc := idx.U
       vcalloc_reqs(idx).vc_sel := s.vc_sel
       vcalloc_reqs(idx).flow := s.flow
