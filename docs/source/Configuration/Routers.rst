@@ -100,9 +100,9 @@ a packet into more flits or merge several flits of a packet into one.
 |                                                                         |                    |
 +-------------------------------------------------------------------------+--------------------+
 
-.. Note:: When merging, the width adapter expects each packet to contain a number of flits 
+.. Note:: When merging, the width adapter requires each packet to contain a number of flits 
    that is a multiple of the merging ratio. For example, when up-scaling from 64 bits to 
-   128 bits, the width adapter requires the packet to consist of a multiple of 2 flits.
+   128 bits, the width adapter expects the packet to consist of a multiple of 2 flits.
 
 
 Virtual Channel Allocator
