@@ -81,7 +81,8 @@ Payload Width
 
 A router can specify its internal ``payloadWidth``. When routers with different payload
 widths are connected by a channel, Constellation will autogenerate width-adapters
-on the channels if the widths are multiples of each other. 
+on the channels if the widths are multiples of each other. A width-adapter either segments 
+a packet into more flits or merge several flits of a packet into one.
 
 
 
@@ -98,6 +99,10 @@ on the channels if the widths are multiples of each other.
 |    )                                                                    |                    |
 |                                                                         |                    |
 +-------------------------------------------------------------------------+--------------------+
+
+.. Note:: When merging, the width adapter requires each packet to contain a number of flits 
+   that is a multiple of the merging ratio. For example, when up-scaling from 64 bits to 
+   128 bits, the width adapter expects the packet to consist of a multiple of 2 flits.
 
 
 Virtual Channel Allocator

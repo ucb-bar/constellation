@@ -34,14 +34,10 @@ will auto-generate width converters to either further segment or merge flits.
 +-------------------------------------------------------------------------+--------------------+
 | .. code:: scala                                                         | |terminal_width|   |
 |                                                                         |                    |
-|    ingresses = Seq(UserIngressParams(0), payloadBits=128)),             |                    |
-|    egresses  = Seq( UserEgressParams(0), payloadBits=128)),             |                    |
+|    ingresses = Seq(UserIngressParams(0, payloadBits=128)),              |                    |
+|    egresses  = Seq( UserEgressParams(1, payloadBits=128)),              |                    |
 |    routers   = (i) => UserRouterParams(payloadBits=64),                 |                    |
 |                                                                         |                    |
 +-------------------------------------------------------------------------+--------------------+
 
 .. Note:: The common use case for ``payloadWidth`` is to set the same width for all terminals.
-
-.. Warning:: Be wary of using payload width converters liberally. For example, a 3-flit packet of
-	     64 bits per flit, if up-scaled to a 2-flit packet of 128 bits per flit, will be
-	     down-scaled into a 4-flit packet of 64 bits per flit.
